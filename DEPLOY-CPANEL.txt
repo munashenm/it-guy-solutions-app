@@ -1,0 +1,61 @@
+IT Guy Solutions — cPanel deployment (subdomain, e.g. app.example.co.za)
+================================================================
+
+FOLDER LAYOUT AFTER UPLOAD (everything under your subdomain document root)
+----------------------------------------------------------------------------
+  index.html, css/, js/, .htaccess     ← static site + SPA
+  backend/                             ← Node.js application
+    server.js                          ← startup file (see cPanel Node app)
+    package.json
+    package-lock.json
+    .env                               ← MySQL credentials (never commit real passwords)
+    uploads/                           ← created automatically; must be writable
+  (optional) DEPLOY-CPANEL.txt         ← this file
+
+CPANEL NODE.JS APPLICATION
+----------------------------------------------------------------------------
+1. Application mode: Production
+2. Application root: the full path to the "backend" folder
+   Example: /home/USERNAME/public_html/app.example.co.za/backend
+3. Application URL: your subdomain (leave as cPanel sets it)
+4. Application startup file: server.js
+5. Click "Run NPM Install" (or in Terminal: cd backend && npm install --production)
+
+ENVIRONMENT
+----------------------------------------------------------------------------
+Edit backend/.env on the server (File Manager or SSH):
+
+  DB_TYPE=mysql
+  DB_HOST=localhost
+  DB_NAME=   ← database name from cPanel MySQL
+  DB_USER=   ← user granted ALL on that database
+  DB_PASSWORD=
+
+Import backend/mysql-setup.sql in phpMyAdmin if this is a new database.
+
+APACHE / .HTACCESS
+----------------------------------------------------------------------------
+Upload the project .htaccess to the subdomain document root (same folder as index.html).
+
+If cPanel adds a "Passenger" or "Node.js" block at the top, KEEP IT. Your custom rules
+should stay below that block if the host says so.
+
+After editing .htaccess, restart the Node app once.
+
+VERIFY
+----------------------------------------------------------------------------
+Open in a browser:
+  https://your-subdomain/api/status
+You should see JSON: "status":"online", "dbType":"mysql", ...
+
+TROUBLESHOOTING
+----------------------------------------------------------------------------
+- Permission denied on upload: fix ownership of the subdomain folder to your cPanel user,
+  or upload via cPanel File Manager, or ask the host to fix permissions.
+- JSON errors in the browser: API not reaching Node — check Node app is Running and URL/root.
+- 500 on login: wrong MySQL credentials or user not linked to database in cPanel.
+
+PACKAGE FROM WINDOWS
+----------------------------------------------------------------------------
+In the project folder, run:  .\deploy-itguy.ps1
+Upload the generated itguy-deploy.zip, extract in the subdomain root, then configure Node + .env.

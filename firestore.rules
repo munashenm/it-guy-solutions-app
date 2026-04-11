@@ -1,0 +1,92 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Function to check if user is logged in
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Function to extract user role from the custom claims or from the users collection if needed
+    // However, since we are using client-side role enforcement (basic), we will enforce document restrictions directly via email.
+    // If we wanted true role enforcement, we'd need Custom Claims.
+    // Let's rely on basic email matching for Clients, and assume Admins/Techs are authenticated members.
+
+    // A securely robust way without custom claims is allowing read/write if the user exists in the "users" collection with role='admin'
+    function isAdmin() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isTechnician() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'technician';
+    }
+
+    function isFrontDesk() {
+      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'frontdesk';
+    }
+
+    function isStaff() {
+      return isAdmin() || isTechnician() || isFrontDesk();
+    }
+
+    // 1. Users Collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      // Only admins can create/modify users. Wait, users must be able to create their initial profile during Registration.
+      // We will allow create if they are writing to their own ID to establish initial client role.
+      allow create: if request.auth.uid == userId;
+      allow update, delete: if isAdmin() || request.auth.uid == userId;
+    }
+
+    // 2. Settings Collection
+    match /settings/{document=**} {
+      // Anyone logged in can read settings (needed for PDFs, Company Profiles)
+      allow read: if isAuthenticated();
+      // Only admins can change system settings
+      allow write: if isAdmin();
+    }
+
+    // 3. Jobs, Field Jobs, Invoices, Quotations
+    match /jobs/{jobId} {
+      allow read: if isStaff() || (isAuthenticated() && resource.data.email == request.auth.token.email);
+      allow create: if isStaff();
+      // Clients can only update if they are leaving a rating/feedback
+      allow update: if isStaff() || (isAuthenticated() && resource.data.email == request.auth.token.email && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rating', 'feedback', 'ratedAt']));
+      allow delete: if isAdmin();
+    }
+
+    match /fieldJobs/{jobId} {
+      allow read: if isStaff() || (isAuthenticated() && resource.data.email == request.auth.token.email);
+      // Clients log field calls! So they must be able to create one if their email matches
+      allow create: if isStaff() || (isAuthenticated() && request.resource.data.email == request.auth.token.email);
+      allow update: if isStaff() || (isAuthenticated() && resource.data.email == request.auth.token.email);
+      allow delete: if isAdmin();
+    }
+
+    match /invoices/{invoiceId} {
+      allow read: if isStaff() || (isAuthenticated() && resource.data.email == request.auth.token.email);
+      allow write: if isStaff(); // Clients cannot alter invoices
+    }
+
+    match /quotations/{quoteId} {
+      allow read: if isStaff() || (isAuthenticated() && resource.data.email == request.auth.token.email);
+      // Clients can approve a quote (change status)
+      allow update: if isStaff() || (isAuthenticated() && resource.data.email == request.auth.token.email && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']));
+      allow create: if isStaff();
+      allow delete: if isAdmin();
+    }
+
+    // 4. Inventory, Suppliers, Customers (CRM)
+    match /inventory/{itemId} {
+      allow read, write: if isStaff();
+    }
+    match /suppliers/{supplierId} {
+      allow read, write: if isStaff();
+    }
+    match /customers/{customerId} {
+      allow read: if isStaff() || (isAuthenticated() && resource.data.email == request.auth.token.email);
+      allow write: if isStaff();
+    }
+
+  }
+}

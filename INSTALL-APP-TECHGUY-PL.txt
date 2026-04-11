@@ -1,0 +1,114 @@
+IT Guy Solutions — Install on https://app.techguy.pl
+=====================================================
+
+OVERVIEW
+--------
+1) DNS points app.techguy.pl to your hosting.
+2) You upload the app files to that subdomain’s document root.
+3) You create a MySQL database and user in the panel (cPanel / DirectAdmin / etc.).
+4) You run the Node.js app from the `backend` folder with `server.js`.
+5) You edit `backend/.env` with MySQL credentials.
+
+-----------------------------------------------------
+STEP 1 — DNS (at your domain registrar or DNS host)
+-----------------------------------------------------
+Create a record:
+  Type: A (or CNAME if your host says so)
+  Name: app
+  Value: your server IP (or target hostname from your hosting provider)
+
+Wait until app.techguy.pl resolves (can take a few minutes to 48 hours).
+
+-----------------------------------------------------
+STEP 2 — Build the zip on your Windows PC
+-----------------------------------------------------
+1. Open PowerShell in the project folder:
+     cd "c:\Users\Nimrod\Documents\Gravity Projects\it-guy-solutions-app"
+
+2. Put MySQL details in backend\.env.production (optional — for the zip),
+   OR leave placeholders and edit backend\.env on the server after upload.
+   See backend\env.template for variable names.
+
+3. Run:
+     .\deploy-itguy.ps1
+
+4. You get: itguy-deploy.zip in the same folder.
+
+-----------------------------------------------------
+STEP 3 — Hosting: subdomain document root
+-----------------------------------------------------
+In your control panel, open the folder that is the WEB ROOT for app.techguy.pl
+(often: public_html/app  OR  domains/app.techguy.pl/public_html).
+
+Upload itguy-deploy.zip → Extract here.
+
+You should have:
+  index.html, css/, js/, .htaccess
+  backend\  (contains server.js, package.json, .env, …)
+
+-----------------------------------------------------
+STEP 4 — MySQL database
+-----------------------------------------------------
+1. Create a new database (e.g. techguy_app).
+2. Create a user with a strong password.
+3. Add the user to the database with ALL PRIVILEGES.
+4. In phpMyAdmin (or similar), select that database → Import →
+   choose file: backend\mysql-setup.sql from the extracted files
+   (only needed for a brand-new empty database).
+
+-----------------------------------------------------
+STEP 5 — backend\.env on the server
+-----------------------------------------------------
+Edit backend\.env (File Manager or SFTP):
+
+  PORT=3000
+  DB_TYPE=mysql
+  DB_HOST=localhost
+  DB_NAME=your_database_name
+  DB_USER=your_database_user
+  DB_PASSWORD=your_database_password
+
+Save the file.
+
+-----------------------------------------------------
+STEP 6 — Node.js application (cPanel-style)
+-----------------------------------------------------
+1. “Setup Node.js App” / “Node.js Selector”:
+   • Application root: FULL path to the backend folder
+     Example: /home/USER/domains/app.techguy.pl/public_html/backend
+   • Application URL: https://app.techguy.pl (or as the panel shows)
+   • Application startup file: server.js
+   • Node version: 18 or newer
+
+2. Click “Run NPM Install” (or in SSH: cd …/backend && npm install --production).
+
+3. Start / Restart the application.
+
+4. If the panel adds Passenger lines to .htaccess, keep them at the top;
+   your project .htaccess rules stay below (see DEPLOY-CPANEL.txt).
+
+-----------------------------------------------------
+STEP 7 — HTTPS
+-----------------------------------------------------
+Issue or enable SSL for app.techguy.pl in the panel (Let’s Encrypt, etc.).
+
+-----------------------------------------------------
+STEP 8 — Verify
+-----------------------------------------------------
+Open in browser:
+  https://app.techguy.pl/api/status
+You should see JSON with "status":"online".
+
+Then open:
+  https://app.techguy.pl
+Log in (first install — default admin seeded by the server):
+  Email or username: admin   OR   admin@techguy.pl
+  Password: admin123
+Change this password immediately under Settings / Users after login.
+
+-----------------------------------------------------
+TROUBLESHOOTING
+-----------------------------------------------------
+• Blank page / JSON errors: Node app not running or wrong Application root.
+• 500 on login: wrong DB_NAME / DB_USER / DB_PASSWORD or SQL not imported.
+• Permission denied on upload: use File Manager or fix folder ownership with host support.

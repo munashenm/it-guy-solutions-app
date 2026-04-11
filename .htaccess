@@ -1,0 +1,32 @@
+# IT Guy Solutions — Apache (cPanel subdomain document root)
+# If cPanel injects Passenger/Node.js directives here, keep them ABOVE this block.
+
+Options -Indexes
+
+# Block sensitive dotfiles and SQLite DB if ever exposed as static files
+<IfModule mod_authz_core.c>
+    <FilesMatch "^\.(env|bak|log)$">
+        Require all denied
+    </FilesMatch>
+    <Files "database.sqlite">
+        Require all denied
+    </Files>
+</IfModule>
+<IfModule !mod_authz_core.c>
+    <FilesMatch "^\.(env|bak|log)$">
+        Order allow,deny
+        Deny from all
+    </FilesMatch>
+</IfModule>
+
+RewriteEngine On
+
+# Let /api reach Node (Passenger); do not rewrite
+RewriteCond %{REQUEST_URI} ^/api/ [NC]
+RewriteRule ^ - [L]
+
+# SPA: non-files → index.html (never for /api — handled above)
+RewriteCond %{REQUEST_URI} !^/api/ [NC]
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.html [L]
