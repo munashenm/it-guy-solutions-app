@@ -52,6 +52,21 @@ const app = {
         });
     },
 
+    async logActivity(event, details) {
+        if (!window.fbDb) return;
+        const user = window.authSystem?.currentUser || { email: 'System' };
+        try {
+            await window.fbDb.collection('activityLog').add({
+                event,
+                details,
+                user: user.email || user.username || 'System',
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+        } catch (e) {
+            console.warn("LogActivity background error:", e);
+        }
+    },
+
     startSync() {
         if(!window.fbDb) return;
         if(this.syncStarted) return;
