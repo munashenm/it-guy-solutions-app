@@ -393,8 +393,16 @@ window.pdfGenerator = {
             });
 
             const imgData = canvas.toDataURL('image/jpeg', 0.95);
-            const pdf = new window.jspdf.jsPDF('p', 'px', [794, 1123]);
-            pdf.addImage(imgData, 'JPEG', 0, 0, 794, 1123);
+            
+            // Calculate proportional height to prevent squashing or cropping
+            const actualWidth = 794;
+            const actualHeight = (canvas.height * actualWidth) / canvas.width;
+            
+            // Use a dynamic page height so long reports don't get cut across awful page breaks
+            const pdfPageHeight = Math.max(1123, actualHeight);
+            
+            const pdf = new window.jspdf.jsPDF('p', 'px', [actualWidth, pdfPageHeight]);
+            pdf.addImage(imgData, 'JPEG', 0, 0, actualWidth, actualHeight);
             
             const filename = `${docType.replace(' ', '_')}_${docId}.pdf`;
             
