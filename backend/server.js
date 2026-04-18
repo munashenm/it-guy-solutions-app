@@ -226,7 +226,7 @@ const requireAdmin = (req, res, next) => {
 };
 
 // Apply auth middleware to all secure routes
-app.use(['/api/users', '/api/collections', '/api/transaction', '/api/counters', '/api/restore', '/api/backup'], requireAuth);
+app.use(['/api/users', '/api/collections', '/api/transaction', '/api/counters', '/api/restore', '/api/backup', '/api/notify'], requireAuth);
 
 // User Registration Endpoint (Bypasses Firebase Auth)
 app.post('/api/users', async (req, res) => {
@@ -449,6 +449,93 @@ app.post('/api/restore', upload.single('database'), async (req, res) => {
     } catch (e) {
         console.error("Restore failed:", e);
         res.status(500).json({ error: "File system error during restore: " + e.message });
+    }
+});
+
+// Notifications endpoint (Email/WhatsApp)
+app.post('/api/notify', async (req, res) => {
+    try {
+        const { actionType, docType, docId, contactInfo, pdfBase64, dataObj } = req.body;
+        
+        // Load settings from local database
+        const rows = await db.all("SELECT json FROM settings WHERE _id = ?", ['systemSettings']);
+        if (!rows || rows.length === 0) throw new Error("System settings not found. Cannot send notifications.");
+        const sysSettings = JSON.parse(rows[0].json);
+
+        if (actionType === 'Email') {
+            if(!sysSettings.smtpHost) throw new Error("SMTP is not configured in settings.");
+            
+            const transporter = nodemailer.createTransport({
+                host: sysSettings.smtpHost,
+                port: parseInt(sysSettings.smtpPort) || 465,
+                secure: sysSettings.smtpPort == '465', 
+                auth: {
+                    user: sysSettings.smtpUser,
+                    pass: sysSettings.smtpPass
+                }
+            });
+
+            // Create attachments array
+            const attachments = [];
+            if (pdfBase64) {
+                attachments.push({
+                    filename: `${docType}_${docId}.pdf`,
+                    content: pdfBase64,
+                    encoding: 'base64'
+                });
+            }
+
+            const subject = `${docType} - ${docId} from ${sysSettings.emailName || 'IT Guy Solutions'}`;
+            const amountMsg = dataObj && dataObj.amount ? `\n\nTotal Amount: R ${dataObj.amount.toFixed(2)}` : '';
+            const textContent = `Hi,\n\nPlease find attached the ${docType} (${docId}) regarding your recent service.${amountMsg}\n\nKind Regards,\n${sysSettings.emailName || 'IT Guy Solutions'}`;
+
+            await transporter.sendMail({
+                from: `"${sysSettings.emailName || 'IT Guy Solutions'}" <${sysSettings.smtpUser}>`,
+                replyTo: sysSettings.emailReply,
+                to: contactInfo,
+                subject: subject,
+                text: textContent,
+                attachments: attachments
+            });
+
+            logger('info', `Automated Email Sent via API: ${docType} ${docId} to ${contactInfo}`);
+            return res.json({ success: true, message: `Email delivered to ${contactInfo}` });
+        } 
+        else if (actionType === 'WhatsApp') {
+            if(!sysSettings.waToken || !sysSettings.waPhoneId) throw new Error("WhatsApp API token/PhoneID is not configured in settings.");
+            
+            let cleanedPhone = contactInfo.replace(/\D/g, '');
+            if(cleanedPhone.startsWith('0')) cleanedPhone = '27' + cleanedPhone.substring(1); 
+            
+            const amountMsg = dataObj && dataObj.amount ? ` Total: R ${dataObj.amount.toFixed(2)}` : '';
+            const textContent = `Hi from ${sysSettings.emailName || 'IT Guy Solutions'}. Your ${docType} (${docId}) has been processed.${amountMsg}. Check your email to download the PDF.`;
+
+            await axios.post(
+                `https://graph.facebook.com/v18.0/${sysSettings.waPhoneId}/messages`,
+                {
+                    messaging_product: 'whatsapp',
+                    to: cleanedPhone,
+                    type: 'text',
+                    text: { body: textContent }
+                },
+                {
+                    headers: {
+                        "Authorization": `Bearer ${sysSettings.waToken}`,
+                        "Content-Type": "application/json"
+                    }
+                }
+            );
+
+            logger('info', `Automated WhatsApp Sent via API: ${docType} ${docId} to ${cleanedPhone}`);
+            return res.json({ success: true, message: `WhatsApp sent to ${cleanedPhone}` });
+        }
+        else {
+            return res.status(400).json({ error: "Invalid actionType" });
+        }
+
+    } catch(err) {
+        logger('error', `Notification Failed: ${err.message}`);
+        return res.status(500).json({ error: err.message });
     }
 });
 

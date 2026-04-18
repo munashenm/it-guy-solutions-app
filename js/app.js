@@ -774,12 +774,10 @@ const app = {
             await window.fbDb.collection('jobs').doc(newId).set(payload);
             this.closeModal();
             
-            // Trigger the professional PDF Job Card engine instantly
+            // Trigger the modal to choose Print, Download, Email, or WhatsApp
             if (window.pdfGenerator) {
-                // Short timeout to ensure Firestore syncs back the new ID to the UI state first
                 setTimeout(() => {
-                    const freshJob = this.state.jobs.find(j => j.id === newId) || payload;
-                    window.pdfGenerator.generate('Job Card', newId, freshJob);
+                    this.showDocumentActionModal('Job Card', newId, customer, 'N/A', email, phone);
                 }, 800);
             }
             
@@ -1245,38 +1243,49 @@ const app = {
                     
                     <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px;">
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                            <button class="btn-secondary" style="justify-content: center; border-radius: 6px;" onclick="app.executeDocumentAction('Print', '${docType}', '${docId}')">
+                            <button type="button" class="btn-secondary" style="justify-content: center; border-radius: 6px;" onclick="app.executeDocumentAction('Print', '${docType}', '${docId}', this)">
                                 <span class="material-symbols-outlined">print</span> Print
                             </button>
-                            <button class="btn-secondary" style="justify-content: center; border-radius: 6px;" onclick="app.executeDocumentAction('Download', '${docType}', '${docId}')">
+                            <button type="button" class="btn-secondary" style="justify-content: center; border-radius: 6px;" onclick="app.executeDocumentAction('Download', '${docType}', '${docId}', this)">
                                 <span class="material-symbols-outlined">download</span> Download
                             </button>
                         </div>
-                        <button class="btn-primary" style="justify-content: center; width: 100%; border-radius: 6px;" onclick="app.executeDocumentAction('Email', '${docType}', '${docId}', '${email}')">
+                        <button type="button" class="btn-primary" style="justify-content: center; width: 100%; border-radius: 6px;" onclick="app.executeDocumentAction('Email', '${docType}', '${docId}', '${email}', this)">
                             <span class="material-symbols-outlined">mail</span> Send via Email
                         </button>
-                        <button class="btn-primary" style="justify-content: center; width: 100%; border-radius: 6px; background: #128C7E; border-color: #128C7E;" onclick="app.executeDocumentAction('WhatsApp', '${docType}', '${docId}', '${phone}')">
+                        <button type="button" class="btn-primary" style="justify-content: center; width: 100%; border-radius: 6px; background: #128C7E; border-color: #128C7E;" onclick="app.executeDocumentAction('WhatsApp', '${docType}', '${docId}', '${phone}', this)">
                             <span class="material-symbols-outlined">chat</span> Send via WhatsApp
                         </button>
                     </div>
                     
-                    <button class="btn-secondary" style="width: 100%; justify-content: center; background: transparent; border: none; text-decoration: underline;" onclick="app.closeModal()">Keep Working</button>
+                    <button type="button" class="btn-secondary" style="width: 100%; justify-content: center; background: transparent; border: none; text-decoration: underline;" onclick="app.closeModal()">Keep Working</button>
                 </div>
             </div>
         `;
         this.showModal(modalHTML);
     },
 
-    async executeDocumentAction(actionType, docType, docId, contactInfo = '') {
+    async executeDocumentAction(actionType, docType, docId, contactInfo = '', btn = null) {
+        if (typeof contactInfo !== 'string') {
+            btn = contactInfo; // If only 3 args passed or 4th is the btn
+            contactInfo = '';
+        }
+        let oldContent = '';
+        if (btn && btn.tagName === 'BUTTON') {
+             oldContent = btn.innerHTML;
+             btn.innerHTML = '<span class="material-symbols-outlined">sync</span> Processing...';
+             btn.disabled = true;
+        }
+
+        let dataObj = {};
+        if (docType === 'Invoice') dataObj = app.state.invoices.find(i => i.id === docId);
+        if (docType === 'Quotation') dataObj = (app.state.quotations || []).find(q => q.id === docId);
+        if (docType === 'Cash Receipt') dataObj = (app.state.sales || []).find(s => s.id === docId);
+        if (docType === 'Job Card') {
+            dataObj = (app.state.jobs || []).find(j => j.id === docId) || (app.state.fieldJobs || []).find(f => f.id === docId);
+        }
+
         if (actionType === 'Print' || actionType === 'Download') {
-            let dataObj = {};
-            if (docType === 'Invoice') dataObj = app.state.invoices.find(i => i.id === docId);
-            if (docType === 'Quotation') dataObj = (app.state.quotations || []).find(q => q.id === docId);
-            if (docType === 'Cash Receipt') dataObj = (app.state.sales || []).find(s => s.id === docId);
-            if (docType === 'Job Card') {
-                dataObj = (app.state.jobs || []).find(j => j.id === docId) || (app.state.fieldJobs || []).find(f => f.id === docId);
-            }
-            
             if(!window.pdfGenerator) {
                 alert("System Error: The high-fidelity PDF engine failed to load properly. Please refresh the portal and try again.");
                 if(btn && btn.tagName === 'BUTTON') { btn.innerHTML = oldContent; btn.disabled = false; }
@@ -1297,7 +1306,40 @@ const app = {
             
             if(btn && btn.tagName === 'BUTTON') { btn.innerHTML = oldContent; btn.disabled = false; }
         } else {
-            alert(`${docType} ${docId} successfully sent to ${contactInfo} via ${actionType}!`);
+            // Action is Email or WhatsApp
+            try {
+                if(!contactInfo || contactInfo === 'undefined' || contactInfo === 'null' || contactInfo.trim() === '') {
+                    throw new Error(`No valid contact provided for ${actionType}. Please edit the client profile.`);
+                }
+
+                // If email, we actually generate the PDF base64 to send as an attachment
+                let pdfBase64 = null;
+                if (actionType === 'Email' && window.pdfGenerator && docType !== 'Report') {
+                    const { pdf } = await window.pdfGenerator.generateInternal(docType, docId, dataObj);
+                    pdfBase64 = pdf.output('datauristring').split(',')[1];
+                }
+
+                const payload = {
+                    actionType,
+                    docType,
+                    docId,
+                    contactInfo,
+                    pdfBase64,
+                    dataObj
+                };
+
+                const res = await window.safeFetch(`${window.API_BASE || '/api'}/notify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                alert(`${docType} ${docId} successfully sent to ${contactInfo} via ${actionType}!`);
+            } catch (err) {
+                console.error(err);
+                alert(`Failed to send ${actionType}: ` + err.message);
+            }
+            if(btn && btn.tagName === 'BUTTON') { btn.innerHTML = oldContent; btn.disabled = false; }
         }
     },
 
