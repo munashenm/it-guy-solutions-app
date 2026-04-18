@@ -124,7 +124,16 @@ const app = {
         register('knowledgeBase', 'knowledgeBase');
         
         
-        // Settings Sync
+        // Branding & Settings Sync
+        const profileUnsub = window.fbDb.collection('settings').doc('companyProfile').onSnapshot(doc => {
+            if(doc.exists) {
+                const data = doc.data();
+                this.state.companyProfile = data;
+                this.applyBranding(data);
+            }
+        });
+        this.unsubscribes.push(profileUnsub);
+
         const settingsUnsub = window.fbDb.collection('settings').doc('systemSettings').onSnapshot(doc => {
             if(doc.exists) {
                 this.state.settings = doc.data();
@@ -132,6 +141,30 @@ const app = {
             }
         });
         this.unsubscribes.push(settingsUnsub);
+    },
+
+    applyBranding(data) {
+        if(!data || !data.logoUrl) return;
+
+        const logoUrl = data.logoUrl;
+
+        // 1. Update Favicon & Apple Touch Icon
+        const favicon = document.getElementById('app-favicon');
+        const touchIcon = document.getElementById('app-apple-touch-icon');
+        if (favicon) favicon.href = logoUrl;
+        if (touchIcon) touchIcon.href = logoUrl;
+
+        // 2. Update Login Screen Logo
+        const loginContainer = document.getElementById('login-logo-container');
+        if (loginContainer) {
+            loginContainer.innerHTML = `<img src="${logoUrl}" alt="Logo" style="max-height: 80px; max-width: 100%; margin-bottom: 15px;">`;
+        }
+
+        // 3. Update Sidebar Logo
+        const sidebarContainer = document.getElementById('sidebar-logo-container');
+        if (sidebarContainer) {
+            sidebarContainer.innerHTML = `<img src="${logoUrl}" alt="Logo" style="max-height: 40px; max-width: 100%; object-fit: contain;">`;
+        }
     },
 
     refreshActiveViews() {

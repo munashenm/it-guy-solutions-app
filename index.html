@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0f111a">
     <link rel="manifest" href="manifest.json">
-    <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=IT&background=6c5ce7&color=fff&rounded=true&size=192">
+    <link id="app-favicon" rel="icon" type="image/x-icon" href="favicon.ico">
+    <link id="app-apple-touch-icon" rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=IT&background=6c5ce7&color=fff&rounded=true&size=192">
     <title>IT Guy Solutions App</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,7 +27,9 @@
     <div id="login-screen" class="login-wrapper hidden">
         <div class="glass-card login-glass-panel" style="max-width: 400px; width: 100%; padding: 32px;">
             <div style="text-align: center; margin-bottom: 24px;">
-                <span class="material-symbols-outlined logo-icon" style="font-size: 48px; color: var(--primary);">terminal</span>
+                <div id="login-logo-container">
+                    <span class="material-symbols-outlined logo-icon" style="font-size: 48px; color: var(--primary);">terminal</span>
+                </div>
                 <h2 style="font-size: 1.8rem; margin: 8px 0;">IT Guy<span class="highlight">Solutions</span></h2>
                 <p style="color: var(--text-secondary);">Sign in to access the portal</p>
             </div>
@@ -91,7 +94,9 @@
         <!-- Sidebar Navigation -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <span class="material-symbols-outlined logo-icon">terminal</span>
+                <div id="sidebar-logo-container">
+                    <span class="material-symbols-outlined logo-icon">terminal</span>
+                </div>
                 <h2>IT Guy<span class="highlight">Solutions</span></h2>
             </div>
             
