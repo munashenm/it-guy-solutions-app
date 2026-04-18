@@ -6,6 +6,7 @@
     --text-secondary: #adb5bd;
     --accent: #6c5ce7;
     --accent-hover: #5b4bc4;
+    --accent-rgb: 108, 92, 231;
     --success: #00b894;
     --warning: #fdcb6e;
     --danger: #ff7675;
@@ -70,7 +71,7 @@ body {
 .logo-icon {
     font-size: 32px;
     color: var(--accent);
-    background: rgba(108, 92, 231, 0.15);
+    background: rgba(var(--accent-rgb), 0.15);
     padding: 8px;
     border-radius: var(--radius-sm);
 }

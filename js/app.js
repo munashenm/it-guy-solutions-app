@@ -144,27 +144,54 @@ const app = {
     },
 
     applyBranding(data) {
-        if(!data || !data.logoUrl) return;
+        if(!data) return;
+
+        // 1. Update Theme Colors (Accent)
+        if(data.themeColor) {
+            const root = document.documentElement;
+            root.style.setProperty('--accent', data.themeColor);
+            
+            // Generate a slightly darker version for hover (approx 15% darker)
+            const darkenChannel = (hex, factor) => {
+                const val = parseInt(hex, 16);
+                return Math.floor(val * factor).toString(16).padStart(2, '0');
+            };
+            const c = data.themeColor.replace('#', '');
+            const r = darkenChannel(c.substring(0,2), 0.85);
+            const g = darkenChannel(c.substring(2,4), 0.85);
+            const b = darkenChannel(c.substring(4,6), 0.85);
+            root.style.setProperty('--accent-hover', `#${r}${g}${b}`);
+            
+            // Also update the logo background opacity for better aesthetics
+            root.style.setProperty('--accent-rgb', this.hexToRgb(data.themeColor));
+        }
+
+        if(!data.logoUrl) return;
 
         const logoUrl = data.logoUrl;
 
-        // 1. Update Favicon & Apple Touch Icon
+        // 2. Update Favicon & Apple Touch Icon
         const favicon = document.getElementById('app-favicon');
         const touchIcon = document.getElementById('app-apple-touch-icon');
         if (favicon) favicon.href = logoUrl;
         if (touchIcon) touchIcon.href = logoUrl;
 
-        // 2. Update Login Screen Logo
+        // 3. Update Login Screen Logo
         const loginContainer = document.getElementById('login-logo-container');
         if (loginContainer) {
             loginContainer.innerHTML = `<img src="${logoUrl}" alt="Logo" style="max-height: 80px; max-width: 100%; margin-bottom: 15px;">`;
         }
 
-        // 3. Update Sidebar Logo
+        // 4. Update Sidebar Logo
         const sidebarContainer = document.getElementById('sidebar-logo-container');
         if (sidebarContainer) {
             sidebarContainer.innerHTML = `<img src="${logoUrl}" alt="Logo" style="max-height: 40px; max-width: 100%; object-fit: contain;">`;
         }
+    },
+
+    hexToRgb(hex) {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '108, 92, 231';
     },
 
     refreshActiveViews() {

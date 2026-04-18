@@ -81,6 +81,13 @@ window.companySettings = {
                                     </div>
                                 </div>
                             </div>
+                            <div class="form-group" style="max-width: 150px;">
+                                <label>Theme Color</label>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="color" id="cs-theme-color" class="form-control" style="height: 45px; padding: 4px; border-radius: 8px; cursor: pointer;" value="#6c5ce7">
+                                    <span style="font-size: 0.85rem; color: #a0a0a0;">Brand</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -425,6 +432,7 @@ window.companySettings = {
                 document.getElementById('cs-website').value = data.website || '';
                 const logoVal = data.logoUrl || '';
                 document.getElementById('cs-logo').value = logoVal;
+                document.getElementById('cs-theme-color').value = data.themeColor || '#6c5ce7';
                 const preview = document.getElementById('cs-logo-preview');
                 if(preview && logoVal) {
                     preview.innerHTML = `<img src="${logoVal}" style="max-width: 100%; max-height: 100%; object-fit: contain;">`;
@@ -516,6 +524,7 @@ window.companySettings = {
             email: document.getElementById('cs-email').value,
             website: document.getElementById('cs-website').value,
             logoUrl: document.getElementById('cs-logo').value,
+            themeColor: document.getElementById('cs-theme-color').value,
             updatedAt
         };
 
