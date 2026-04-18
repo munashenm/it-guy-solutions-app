@@ -247,6 +247,15 @@ window.pdfGenerator = {
                         c.style.color = '#000';
                         c.style.borderColor = '#eee';
                     });
+                    
+                    // Convert explicitly grey text to black for printer visibility
+                    clone.querySelectorAll('.stat-info p, .stat-info h3, p, span, td, table, th, div').forEach(c => {
+                         // Only override if not expressly colored green/red inline by the renderer
+                         if (!c.style.color || c.style.color === '' || c.style.color.includes('a0a0a0')) {
+                             c.style.color = '#000000';
+                         }
+                    });
+
                     contentHTML = `
                         <div style="font-family: ${fontStack};">
                             <h2 style="color: ${themeColor}; margin-bottom: 20px;">Execution Summary Report</h2>
