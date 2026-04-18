@@ -999,4 +999,54 @@ textarea.form-control {
          } 
  } 
   
- 
+ /* Appended Mobile Responsiveness Overrides */
+.settings-tabs, .glass-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    padding-bottom: 5px;
+}
+.settings-tabs::-webkit-scrollbar, .glass-tabs::-webkit-scrollbar {
+    height: 4px;
+}
+@media (max-width: 600px) {
+    .section-header > div:last-child {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        width: 100%;
+    }
+    .section-header button {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 10px 4px !important;
+        font-size: 0.8rem;
+    }
+    .table-container {
+        font-size: 0.85rem;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+        display: block;
+        width: 100%;
+    }
+    th, td {
+        white-space: nowrap;
+    }
+    .modal-content {
+        padding: 16px !important;
+    }
+    .glass-card {
+        padding: 16px 12px !important;
+    }
+    .stat-card {
+        padding: 12px !important;
+    }
+    .pos-layout {
+        flex-direction: column !important;
+    }
+    .pos-products {
+        max-height: 45vh;
+        overflow-y: auto;
+    }
+}
