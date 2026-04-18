@@ -1821,6 +1821,62 @@ const app = {
 
     renderCurrentView() {
         // Handled by applyRolePermissions routing now on boot
+    },
+
+    scanBarcode() {
+        // Check if library is loaded
+        if (typeof Html5QrcodeScanner === 'undefined') {
+            alert("Scanner library is still loading. Please make sure you are connected to the internet.");
+            return;
+        }
+
+        const modalHTML = `
+            <div class="modal-content" style="max-width: 600px; text-align: center;">
+                <div class="modal-header">
+                    <h2>Scan Job/Inventory Tag</h2>
+                    <button class="btn-icon" onclick="app.closeScanner()"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div class="modal-body">
+                    <p style="color: #a0a0a0; margin-bottom: 20px; font-size: 0.9rem;">Point your camera at the QR Code or Barcode.</p>
+                    <div id="qr-reader" style="width: 100%; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;"></div>
+                </div>
+            </div>
+        `;
+        this.showModal(modalHTML);
+
+        // Initialize Scanner
+        this.html5QrcodeScanner = new Html5QrcodeScanner(
+            "qr-reader", { fps: 10, qrbox: 250 }, false);
+
+        this.html5QrcodeScanner.render((decodedText, decodedResult) => {
+            console.log(`Scan result: ${decodedText}`);
+            // Play a success beep physically
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRl9vT19XQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YU');
+                audio.play().catch(e=>{});
+            } catch(e){}
+            
+            this.closeScanner();
+            
+            // Auto trigger global search
+            const searchInput = document.getElementById('global-search-input');
+            if (searchInput) {
+                searchInput.value = decodedText;
+                this.handleGlobalSearch(decodedText);
+            }
+        }, (errorMessage) => {
+            // Background scanning errors, ignore
+        });
+    },
+
+    closeScanner() {
+        if (this.html5QrcodeScanner) {
+            this.html5QrcodeScanner.clear().catch(error => {
+                console.error("Failed to clear html5QrcodeScanner. ", error);
+            });
+            this.html5QrcodeScanner = null;
+        }
+        this.closeModal();
     }
 };
 

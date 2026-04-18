@@ -17,6 +17,22 @@ function resolveApiBase() {
 const API_BASE = resolveApiBase();
 window.API_BASE = API_BASE;
 
+// SECURITY: Auto-Logout Timer for POPIA / GDPR Compliance (20 minutes idle)
+let idleTimeoutTimer;
+function resetIdleTimer() {
+    clearTimeout(idleTimeoutTimer);
+    if(sessionStorage.getItem('it-guy-token')) {
+        idleTimeoutTimer = setTimeout(() => {
+            alert('SECURITY LOCK: Your session has expired due to 20 minutes of inactivity. Please log in again.');
+            window.authSystem.signOut();
+        }, 20 * 60 * 1000); 
+    }
+}
+window.addEventListener('mousemove', resetIdleTimer);
+window.addEventListener('keypress', resetIdleTimer);
+window.addEventListener('click', resetIdleTimer);
+window.addEventListener('scroll', resetIdleTimer);
+
 /**
  * Robust fetch helper that checks content-type and provides detailed errors
  */

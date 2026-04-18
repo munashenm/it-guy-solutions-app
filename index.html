@@ -168,11 +168,14 @@
         <main class="main-content">
             <header class="topbar">
                 <button class="btn-icon mobile-menu-btn" id="mobile-menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')" style="display: none;"><span class="material-symbols-outlined">menu</span></button>
-                <div class="search-wrap">
+                <div class="search-wrap" style="display: flex; align-items: center; gap: 8px;">
                     <div class="search-bar">
                         <span class="material-symbols-outlined">search</span>
                         <input type="text" id="global-search-input" placeholder="Search invoices, quotes, jobs...">
                     </div>
+                    <button class="btn-icon" onclick="app.scanBarcode()" title="Scan QR Code" style="background: var(--accent); color: white; width: 40px; height: 40px;">
+                        <span class="material-symbols-outlined">qr_code_scanner</span>
+                    </button>
                     <div id="global-search-results" class="search-results-dropdown hidden"></div>
                 </div>
                 <div class="topbar-actions">
@@ -377,5 +380,18 @@
     <!-- Modern PDF Generation Libraries (Replaces buggy html2pdf wrapper) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then(registration => {
+              console.log('ServiceWorker registration successful with scope: ', registration.scope);
+            }, err => {
+              console.log('ServiceWorker registration failed: ', err);
+            });
+          });
+        }
+    </script>
 </body>
 </html>
