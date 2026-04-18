@@ -497,9 +497,9 @@ app.post('/api/notify', async (req, res) => {
         const { actionType, docType, docId, contactInfo, pdfBase64, dataObj } = req.body;
         
         // Load settings from local database
-        const rows = await db.all("SELECT json FROM settings WHERE _id = ?", ['systemSettings']);
+        const rows = await db.all("SELECT data FROM collections WHERE name = ? AND id = ?", ['settings', 'systemSettings']);
         if (!rows || rows.length === 0) throw new Error("System settings not found. Cannot send notifications.");
-        const sysSettings = JSON.parse(rows[0].json);
+        const sysSettings = JSON.parse(rows[0].data);
 
         if (actionType === 'Email') {
             if(!sysSettings.smtpHost) throw new Error("SMTP is not configured in settings.");
