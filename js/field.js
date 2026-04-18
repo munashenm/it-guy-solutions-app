@@ -171,14 +171,46 @@ window.field = {
     },
 
     showCompletionModal(jobId) {
+        const job = window.app.state.fieldJobs.find(j => j.id === jobId);
+        if(!job) return;
+
+        const checkIn = job.checkInTime ? new Date(job.checkInTime) : new Date();
+        const checkOut = new Date();
+        const durationHours = job.checkInTime ? ((checkOut - checkIn) / (1000 * 60 * 60)).toFixed(1) : \"0.0\";
+        
+        const resourcesUsed = (job.items || []).map(i => `${i.qty}x ${i.desc}`).join(', ') || 'No parts used';
+        
         const modalHTML = `
-            <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+            <div class="modal-content" style="max-width: 650px; max-height: 90vh; overflow-y: auto;">
                 <div class="modal-header">
-                    <h2>Complete Field Service</h2>
+                    <h2>Final Field Report: ${job.id}</h2>
                     <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
                 </div>
                 <div class="modal-body">
                     <form onsubmit="field.submitCompletion(event, '${jobId}')">
+                        <!-- Time Tracking Banner -->
+                        <div style="background: rgba(var(--primary-rgb), 0.1); padding: 12px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border);">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; text-align: center;">
+                                <div><small style="color: #a0a0a0; display: block;">Arrived At</small> <strong>${checkIn.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</strong></div>
+                                <div><small style="color: #a0a0a0; display: block;">Completed At</small> <strong>${checkOut.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</strong></div>
+                                <div><small style="color: #a0a0a0; display: block;">Total Hours</small> <strong style="color: var(--accent);">${durationHours} hrs</strong></div>
+                            </div>
+                            <input type=\"hidden\" id=\"comp-hours\" value=\"${durationHours}\">
+                            <input type=\"hidden\" id=\"comp-start\" value=\"${checkIn.toISOString()}\">
+                            <input type=\"hidden\" id=\"comp-end\" value=\"${checkOut.toISOString()}\">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Travel Distance (Roundtrip KM)</label>
+                                <input type="number" id="comp-distance" class="form-control" placeholder="e.g. 25" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Resources Used</label>
+                                <input type="text" class="form-control" value="${resourcesUsed}" readonly style="background: rgba(0,0,0,0.2); color: #a0a0a0;">
+                            </div>
+                        </div>
+
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Before Job Photo</label>
@@ -190,24 +222,40 @@ window.field = {
                             </div>
                         </div>
                         <div class="form-group">
-                            <label>Service Report</label>
+                            <label>Service Report & Findings</label>
                             <textarea id="comp-report" class="form-control" rows="3" placeholder="Detail the work carried out..." required></textarea>
                         </div>
                         <div class="form-group">
-                            <label>Suggestions / Follow-ups</label>
+                            <label>Client Suggestions / Recommendations</label>
                             <textarea id="comp-suggestions" class="form-control" rows="2" placeholder="Recommendations for the client..."></textarea>
                         </div>
-                        <div class="form-group">
-                            <label>Client Sign-off</label>
-                            <p style="font-size: 0.8rem; color: #a0a0a0; margin-bottom: 8px;">
-                                <i>I confirm that the work described above has been completed to my satisfaction.</i>
-                            </p>
-                            <canvas id="signature-canvas" class="signature-pad" style="width: 100%; border: 1px dashed var(--border); border-radius: 8px; cursor: crosshair;"></canvas>
-                            <button type="button" class="btn-secondary" style="margin-top: 8px;" onclick="app.clearSignature()">Clear Signature</button>
+
+                        <div style="background: rgba(0,0,0,0.1); padding: 16px; border-radius: 8px; margin-top: 24px; border: 1px solid var(--border);">
+                            <h3 style="font-size: 1rem; margin-bottom: 12px; color: var(--success); text-align: center;">Customer Experience</h3>
+                            
+                            <div class="rating-container" style="display: flex; justify-content: center; gap: 8px; margin-bottom: 16px;">
+                                <input type=\"hidden\" id=\"comp-rating\" value=\"5\">
+                                ${[1,2,3,4,5].map(i => `
+                                    <span class=\"material-symbols-outlined star-icon\" data-value=\"${i}\" style=\"font-size: 32px; cursor: pointer; color: ${i <= 5 ? '#f1c40f' : '#3d3f4b'};\" onclick=\"
+                                        const stars = this.parentElement.querySelectorAll('.star-icon');
+                                        const val = ${i};
+                                        document.getElementById('comp-rating').value = val;
+                                        stars.forEach((s, idx) => s.style.color = (idx < val) ? '#f1c40f' : '#3d3f4b');
+                                    \">star</span>
+                                `).join('')}
+                            </div>
+
+                            <label>Client Signature</label>
+                            <canvas id="signature-canvas" class="signature-pad" style="width: 100%; height: 120px; border: 1px dashed var(--border); border-radius: 8px; cursor: crosshair; background: #fff;"></canvas>
+                            <div style="display: flex; justify-content: space-between; margin-top: 8px;">
+                                <button type="button" class="btn-secondary" style="font-size: 0.8rem;" onclick="app.clearSignature()">Clear Signature</button>
+                                <p style="font-size: 0.7rem; color: #a0a0a0; max-width: 70%;"><i>Confirming work has been completed to satisfaction.</i></p>
+                            </div>
                         </div>
-                        <div class="modal-footer">
+
+                        <div class="modal-footer" style="padding-top: 24px;">
                             <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancel</button>
-                            <button type="submit" class="btn-primary" style="background: var(--success);"><span class="material-symbols-outlined" style="margin-right: 4px;">check_circle</span> Finalize & Complete</button>
+                            <button type="submit" class="btn-primary" style="background: var(--success);"><span class="material-symbols-outlined" style="margin-right: 4px;">mail_lock</span> Save & Send Jobcard</button>
                         </div>
                     </form>
                 </div>
@@ -267,6 +315,11 @@ window.field = {
 
             const completionData = {
                 completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                startTime: document.getElementById('comp-start').value,
+                endTime: document.getElementById('comp-end').value,
+                hoursSpent: document.getElementById('comp-hours').value,
+                distanceKM: document.getElementById('comp-distance').value,
+                rating: document.getElementById('comp-rating').value,
                 photoBefore: beforeB64,
                 photoAfter: afterB64,
                 report: report,
@@ -279,7 +332,7 @@ window.field = {
                 if(!job.notes) job.notes = [];
                 job.notes.push({
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    text: 'System: Job marked as Completed with client sign-off.',
+                    text: `System: Job marked as Completed. Rating: ${completionData.rating}/5. Duration: ${completionData.hoursSpent}h.`,
                     user: 'System'
                 });
             }
@@ -292,51 +345,68 @@ window.field = {
             });
 
             app.closeModal();
-            alert("Job successfully completed and signed off!");
+            alert(\"Job successfully completed! A digital jobcard has been prepared and queued for the customer.\");
+            
+            // Auto-trigger Digital Jobcard Email/Action
+            if(job && job.email) {
+                setTimeout(() => {
+                    app.showDocumentActionModal('Job Card', jobId, job.customer, 'Field Service', job.email, job.phone);
+                }, 500);
+            }
         } catch(err) {
             console.error(err);
-            alert("Error saving completion report. Please try again.");
-            if(btn) { btn.innerHTML = 'Finalize & Complete'; btn.disabled = false; }
+            alert(\"Error saving completion report. Please try again.\");
+            if(btn) { btn.innerHTML = 'Save & Send Jobcard'; btn.disabled = false; }
         }
     },
     
     viewReport(jobId) {
         const job = window.app.state.fieldJobs.find(j => j.id === jobId);
         if(!job || !job.completionData) {
-            alert("No completion report found for this job.");
+            alert(\"No completion report found for this job.\");
             return;
         }
         
         const cd = job.completionData;
         const modalHTML = `
-            <div class="modal-content" style="max-width: 700px; max-height: 90vh; overflow-y: auto;">
-                <div class="modal-header">
+            <div class=\"modal-content\" style=\"max-width: 700px; max-height: 90vh; overflow-y: auto;\">
+                <div class=\"modal-header\">
                     <h2>Completion Report: ${job.id}</h2>
-                    <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
+                    <button class=\"btn-icon\" onclick=\"app.closeModal()\"><span class=\"material-symbols-outlined\">close</span></button>
                 </div>
-                <div class="modal-body">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+                <div class=\"modal-body\">
+                    <div style=\"display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;\">
                         <div>
-                            <h3 style="color: #a0a0a0; font-size: 0.9rem; margin-bottom: 8px;">Before Work</h3>
-                            ${cd.photoBefore ? `<img src="${cd.photoBefore}" style="width: 100%; border-radius: 8px; border: 1px solid var(--border);">` : '<p>No image</p>'}
+                            <h3 style=\"color: #a0a0a0; font-size: 0.9rem; margin-bottom: 8px;\">Before Work</h3>
+                            ${cd.photoBefore ? `<img src=\"${cd.photoBefore}\" style=\"width: 100%; border-radius: 8px; border: 1px solid var(--border);\">` : '<p>No image</p>'}
                         </div>
                         <div>
-                            <h3 style="color: #a0a0a0; font-size: 0.9rem; margin-bottom: 8px;">After Work</h3>
-                            ${cd.photoAfter ? `<img src="${cd.photoAfter}" style="width: 100%; border-radius: 8px; border: 1px solid var(--border);">` : '<p>No image</p>'}
+                            <h3 style=\"color: #a0a0a0; font-size: 0.9rem; margin-bottom: 8px;\">After Work</h3>
+                            ${cd.photoAfter ? `<img src=\"${cd.photoAfter}\" style=\"width: 100%; border-radius: 8px; border: 1px solid var(--border);\">` : '<p>No image</p>'}
                         </div>
                     </div>
-                    <div style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 16px;">
-                        <h3 style="color: var(--accent); margin-bottom: 8px;">Service Report</h3>
-                        <p style="white-space: pre-wrap; line-height: 1.5;">${cd.report}</p>
+                    
+                    <div style=\"background: rgba(var(--primary-rgb), 0.1); padding: 12px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border);\">
+                        <div style=\"display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; text-align: center;\">
+                            <div><small style=\"color: #a0a0a0; display: block;\">Hours Spent</small> <strong>${cd.hoursSpent || '-'}</strong></div>
+                            <div><small style=\"color: #a0a0a0; display: block;\">Distance (KM)</small> <strong>${cd.distanceKM || '-'}</strong></div>
+                            <div><small style=\"color: #a0a0a0; display: block;\">Rating Given</small> <strong style=\"color: #f1c40f;\">${cd.rating || '5'}/5</strong></div>
+                            <div><small style=\"color: #a0a0a0; display: block;\">Status</small> <strong style=\"color: var(--success);\">Completed</strong></div>
+                        </div>
+                    </div>
+
+                    <div style=\"background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 16px;\">
+                        <h3 style=\"color: var(--accent); margin-bottom: 8px;\">Service Report</h3>
+                        <p style=\"white-space: pre-wrap; line-height: 1.5;\">${cd.report}</p>
                     </div>
                     ${cd.suggestions ? `
-                    <div style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 16px;">
-                        <h3 style="color: var(--warning); margin-bottom: 8px;">Recommendations / Follow-up</h3>
-                        <p style="white-space: pre-wrap; line-height: 1.5;">${cd.suggestions}</p>
+                    <div style=\"background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 16px;\">
+                        <h3 style=\"color: var(--warning); margin-bottom: 8px;\">Recommendations / Follow-up</h3>
+                        <p style=\"white-space: pre-wrap; line-height: 1.5;\">${cd.suggestions}</p>
                     </div>` : ''}
-                    <div style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
-                        <h3 style="color: #a0a0a0; margin-bottom: 8px;">Client Sign-off</h3>
-                        ${cd.signature ? `<img src="${cd.signature}" style="max-height: 100px; background: white; border-radius: 4px; padding: 4px;">` : '<p>No signature captured</p>'}
+                    <div style=\"background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; border: 1px solid var(--border);\">
+                        <h3 style=\"color: #a0a0a0; margin-bottom: 8px;\">Client Sign-off</h3>
+                        ${cd.signature ? `<img src=\"${cd.signature}\" style=\"max-height: 100px; background: white; border-radius: 4px; padding: 4px;\">` : '<p>No signature captured</p>'}
                     </div>
                 </div>
             </div>
@@ -408,17 +478,17 @@ window.field = {
         }
 
         if(!invItem || (isTech && (!tsItem || tsItem.qty < qty))) {
-            alert("Insufficient Stock!");
+            alert(\"Insufficient Stock!\");
             return;
         }
 
-        const btn = e.target.querySelector('button[type="submit"]');
-        btn.innerHTML = "Processing...";
+        const btn = e.target.querySelector('button[type=\"submit\"]');
+        btn.innerHTML = \"Processing...\";
         btn.disabled = true;
 
         try {
             const batch = window.fbDb.batch();
-            const price = parseFloat(invItem.sell.replace(/[^0-9.-]+/g,"")) || 0;
+            const price = parseFloat(invItem.sell.replace(/[^0-9.-]+/g,\"\")) || 0;
 
             if(!job.items) job.items = [];
             job.items.push({
@@ -443,20 +513,20 @@ window.field = {
 
             await batch.commit();
             window.app.closeModal();
-            alert("Part successfully deducted from stock and attached to job.");
+            alert(\"Part successfully deducted from stock and attached to job.\");
         } catch(err) {
             console.error(err);
-            alert("Failed to record part usage.");
-            btn.innerHTML = "Deduct & Attach";
+            alert(\"Failed to record part usage.\");
+            btn.innerHTML = \"Deduct & Attach\";
             btn.disabled = false;
         }
     },
 
     sendETA(jobId) {
         const job = window.app.state.fieldJobs.find(j => j.id === jobId);
-        if(!job || !job.phone) return alert("No phone number for client.");
+        if(!job || !job.phone) return alert(\"No phone number for client.\");
         
-        const techName = window.authSystem?.currentUser?.email?.split('@')[0] || "Your Technician";
+        const techName = window.authSystem?.currentUser?.email?.split('@')[0] || \"Your Technician\";
         const message = `Hi ${job.customer}, this is ${techName} from IT Guy Solutions. I'm on my way to your premises for the scheduled support/repair. See you shortly!`;
         
         const url = `https://wa.me/${job.phone.replace(/\s+/g, '')}?text=${encodeURIComponent(message)}`;
@@ -464,7 +534,7 @@ window.field = {
     },
 
     async checkIn(jobId) {
-        if(!navigator.geolocation) return alert("GPS not supported on this device.");
+        if(!navigator.geolocation) return alert(\"GPS not supported on this device.\");
 
         navigator.geolocation.getCurrentPosition(async (pos) => {
             const lat = pos.coords.latitude;
@@ -484,12 +554,12 @@ window.field = {
                     notes: firebase.firestore.FieldValue.arrayUnion(note),
                     updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                 });
-                alert("Checked in! Location and time recorded.");
+                alert(\"Checked in! Location and time recorded.\");
             } catch(e) {
-                alert("Check-in failed.");
+                alert(\"Check-in failed.\");
             }
         }, (err) => {
-            alert("Location access denied. Please enable GPS.");
+            alert(\"Location access denied. Please enable GPS.\");
         });
     },
 
@@ -510,9 +580,7 @@ window.field = {
             // Trigger completion modal immediately
             this.showCompletionModal(jobId);
         } catch(e) {
-            alert("Check-out failed.");
+            alert(\"Check-out failed.\");
         }
     }
 };
-
-// Initialized by app.js
