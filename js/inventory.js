@@ -156,13 +156,23 @@ window.inventory = {
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Category</label>
-                                <select id="part-cat" class="form-control" style="appearance: auto;">
-                                    <option value="Storage">Storage</option>
-                                    <option value="RAM">RAM</option>
-                                    <option value="Displays">Displays</option>
-                                    <option value="Cables">Cables</option>
-                                    <option value="Consumables">Consumables</option>
-                                </select>
+                                <div id="cat-select-wrapper">
+                                    <select id="part-cat" class="form-control" style="appearance: auto;" onchange="if(this.value==='_NEW_') { document.getElementById('cat-select-wrapper').classList.add('hidden'); document.getElementById('cat-input-wrapper').classList.remove('hidden'); document.getElementById('part-cat-new').focus(); }">
+                                        ${[...new Set((window.app.state.inventory || []).map(i => i.category))].filter(Boolean).sort().map(c => `<option value="${c}">${c}</option>`).join('')}
+                                        <option value="Storage">Storage</option>
+                                        <option value="RAM">RAM</option>
+                                        <option value="Displays">Displays</option>
+                                        <option value="Cables">Cables</option>
+                                        <option value="Consumables">Consumables</option>
+                                        <option value="_NEW_">+ Add Custom Category</option>
+                                    </select>
+                                </div>
+                                <div id="cat-input-wrapper" class="hidden">
+                                    <div style="display: flex; gap: 4px;">
+                                        <input type="text" id="part-cat-new" class="form-control" placeholder="Enter Category Name">
+                                        <button type="button" class="btn-icon" onclick="document.getElementById('cat-select-wrapper').classList.remove('hidden'); document.getElementById('cat-input-wrapper').classList.add('hidden'); document.getElementById('part-cat').value='Storage';"><span class="material-symbols-outlined">undo</span></button>
+                                    </div>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label>Preferred Supplier</label>
@@ -207,7 +217,7 @@ window.inventory = {
                 sku: document.getElementById('part-sku').value,
                 serial: document.getElementById('part-serial') ? document.getElementById('part-serial').value : '',
                 name: document.getElementById('part-name').value,
-                category: document.getElementById('part-cat').value,
+                category: document.getElementById('part-cat').value === '_NEW_' ? document.getElementById('part-cat-new').value : document.getElementById('part-cat').value,
                 supplier: document.getElementById('part-supplier').value,
                 cost: document.getElementById('part-cost').value,
                 sell: document.getElementById('part-sell').value,
@@ -253,13 +263,18 @@ window.inventory = {
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Category</label>
-                                <select id="edit-part-cat" class="form-control" style="appearance: auto;">
-                                    <option value="Storage" ${item.category === 'Storage' ? 'selected' : ''}>Storage</option>
-                                    <option value="RAM" ${item.category === 'RAM' ? 'selected' : ''}>RAM</option>
-                                    <option value="Displays" ${item.category === 'Displays' ? 'selected' : ''}>Displays</option>
-                                    <option value="Cables" ${item.category === 'Cables' ? 'selected' : ''}>Cables</option>
-                                    <option value="Consumables" ${item.category === 'Consumables' ? 'selected' : ''}>Consumables</option>
-                                </select>
+                                <div id="edit-cat-select-wrapper">
+                                    <select id="edit-part-cat" class="form-control" style="appearance: auto;" onchange="if(this.value==='_NEW_') { document.getElementById('edit-cat-select-wrapper').classList.add('hidden'); document.getElementById('edit-cat-input-wrapper').classList.remove('hidden'); document.getElementById('edit-part-cat-new').focus(); }">
+                                        ${[...new Set((window.app.state.inventory || []).map(k => k.category))].filter(Boolean).sort().map(c => `<option value="${c}" ${item.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                                        <option value="_NEW_">+ Add Custom Category</option>
+                                    </select>
+                                </div>
+                                <div id="edit-cat-input-wrapper" class="hidden">
+                                    <div style="display: flex; gap: 4px;">
+                                        <input type="text" id="edit-part-cat-new" class="form-control" placeholder="Enter Category Name">
+                                        <button type="button" class="btn-icon" onclick="document.getElementById('edit-cat-select-wrapper').classList.remove('hidden'); document.getElementById('edit-cat-input-wrapper').classList.add('hidden');"><span class="material-symbols-outlined">undo</span></button>
+                                    </div>
+                                </div>
                             </div>
                             <div class="form-group">
                                 <label>Supplier</label>
@@ -304,7 +319,7 @@ window.inventory = {
                 sku: document.getElementById('edit-part-sku').value,
                 serial: document.getElementById('edit-part-serial').value,
                 name: document.getElementById('edit-part-name').value,
-                category: document.getElementById('edit-part-cat').value,
+                category: document.getElementById('edit-part-cat').value === '_NEW_' ? document.getElementById('edit-part-cat-new').value : document.getElementById('edit-part-cat').value,
                 supplier: document.getElementById('edit-part-supplier').value,
                 cost: document.getElementById('edit-part-cost').value,
                 sell: document.getElementById('edit-part-sell').value,
