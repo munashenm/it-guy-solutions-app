@@ -33,7 +33,7 @@ window.companySettings = {
                     <button class="settings-tab" style="color: #6c5ce7; font-weight: bold;" onclick="companySettings.switchTab('users', event)">Users & Roles</button>
                 </div>
 
-                <form id="unified-settings-form" onsubmit="companySettings.saveAllSettings(event)">
+                <div id="unified-settings-form">
                     
                     <!-- COMPANY PROFILE SECTION -->
                     <div id="settings-profile" class="settings-section active">
@@ -309,9 +309,9 @@ window.companySettings = {
                     </div>
 
                     <div style="text-align: right; margin-top: 32px; border-top: 1px solid #e0e0e0; padding-top: 16px;">
-                        <button type="submit" class="btn-primary" id="btn-save-settings">Save Configured Settings</button>
+                        <button type="button" class="btn-primary" id="btn-save-settings" onclick="companySettings.saveAllSettings(event)">Save Configured Settings</button>
                     </div>
-                </form>
+                </div>
 
                 <!-- USERS AND ROLES SECTION (Outside main form to prevent conflicts) -->
                 <div id="settings-users" class="settings-section">
