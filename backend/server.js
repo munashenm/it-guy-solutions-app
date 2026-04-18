@@ -505,12 +505,12 @@ app.post('/api/notify', async (req, res) => {
             if(!sysSettings.smtpHost) throw new Error("SMTP is not configured in settings.");
             
             const transporter = nodemailer.createTransport({
-                host: sysSettings.smtpHost,
+                host: String(sysSettings.smtpHost).trim(),
                 port: parseInt(sysSettings.smtpPort) || 465,
-                secure: sysSettings.smtpPort == '465', 
+                secure: String(sysSettings.smtpPort).trim() === '465', 
                 auth: {
-                    user: sysSettings.smtpUser,
-                    pass: sysSettings.smtpPass
+                    user: String(sysSettings.smtpUser).trim(),
+                    pass: String(sysSettings.smtpPass).trim()
                 }
             });
 
@@ -552,7 +552,7 @@ app.post('/api/notify', async (req, res) => {
             const textContent = `Hi from ${sysSettings.emailName || 'IT Guy Solutions'}. Your ${docType} (${docId}) has been processed.${amountMsg}. Check your email to download the PDF.`;
 
             await axios.post(
-                `https://graph.facebook.com/v18.0/${sysSettings.waPhoneId}/messages`,
+                `https://graph.facebook.com/v18.0/${String(sysSettings.waPhoneId).trim()}/messages`,
                 {
                     messaging_product: 'whatsapp',
                     to: cleanedPhone,
@@ -561,7 +561,7 @@ app.post('/api/notify', async (req, res) => {
                 },
                 {
                     headers: {
-                        "Authorization": `Bearer ${sysSettings.waToken}`,
+                        "Authorization": `Bearer ${String(sysSettings.waToken).trim()}`,
                         "Content-Type": "application/json"
                     }
                 }
