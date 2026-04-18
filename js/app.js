@@ -505,27 +505,26 @@ const app = {
     },
 
     showSendModal(docId, docType) {
-        this.showModal(`
-            <div class="modal-content" style="max-width: 400px; text-align: center;">
-                <div class="modal-header" style="justify-content: center; position: relative;">
-                    <h2 style="margin: 0;">Send to Client</h2>
-                    <button class="btn-icon" style="position: absolute; right: 20px;" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
-                </div>
-                <div class="modal-body" style="padding-top: 24px; padding-bottom: 24px;">
-                    <p style="color: #a0a0a0; margin-bottom: 24px;">How would you like to send <strong>${docType} ${docId}</strong> to the client?</p>
-                    
-                    <div style="display: flex; flex-direction: column; gap: 16px;">
-                        <button class="btn-primary" style="justify-content: center; padding: 16px; font-size: 1.1rem; background: var(--accent);" onclick="alert('Simulating Email Send...\\n\\nPlease note: Active SMTP backend is required for live delivery.'); app.closeModal();">
-                            <span class="material-symbols-outlined">mail</span> Send via Email
-                        </button>
-                        
-                        <button class="btn-primary" style="justify-content: center; padding: 16px; font-size: 1.1rem;" style="background: #25D366; color: white; border: none;" onclick="alert('Simulating WhatsApp Send...\\n\\nPlease note: Active WhatsApp API backend is required for live delivery.'); app.closeModal();">
-                            <span class="material-symbols-outlined">chat</span> Send via WhatsApp
-                        </button>
-                    </div>
-                </div>
-            </div>
-        `);
+        let doc = null;
+        let internalDocType = docType.toLowerCase();
+        
+        if(internalDocType.includes('job') || docId.startsWith('JOB') || docId.startsWith('FLD')) {
+            doc = [...(this.state.jobs || []), ...(this.state.fieldJobs || [])].find(x => x.id === docId);
+            docType = 'Job Card';
+        } else if(internalDocType.includes('invoice') || docId.startsWith('INV')) {
+            doc = (this.state.invoices || []).find(x => x.id === docId);
+            docType = 'Invoice';
+        } else if(internalDocType.includes('quotation') || docId.startsWith('QUO')) {
+            doc = (this.state.quotations || []).find(x => x.id === docId);
+            docType = 'Quotation';
+        }
+
+        const clientName = doc ? (doc.customer || doc.customerName || 'N/A') : 'N/A';
+        const amount = doc ? (doc.amount || '') : '';
+        const email = doc ? (doc.email || '') : '';
+        const phone = doc ? (doc.phone || '') : '';
+
+        this.showDocumentActionModal(docType, docId, clientName, amount, email, phone);
     },
 
     openDocumentPreview(type, id) {
