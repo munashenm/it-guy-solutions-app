@@ -63,6 +63,20 @@ window.field = {
 
                 <div style="border-top: 1px solid #e0e0e0; margin: 16px 0;"></div>
 
+                <!-- Parts List -->
+                <div style="margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.8rem; color: #a0a0a0; font-weight: bold;">PARTS / HARDWARE</span>
+                        <button class="btn-icon" style="color: var(--accent);" onclick="field.showAddPartModal('${job.id}')"><span class="material-symbols-outlined" style="font-size: 1.2rem;">add_circle</span></button>
+                    </div>
+                    <div style="font-size: 0.85rem; color: #fff;">
+                        ${(job.items || []).length === 0 ? '<div style="color: #666; font-style: italic;">No parts recorded.</div>' : 
+                          job.items.map(i => `<div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span>${i.qty}x ${i.desc}</span> <span style="color: #a0a0a0;">R ${(i.unit * i.qty).toFixed(2)}</span></div>`).join('')}
+                    </div>
+                </div>
+
+                <div style="border-top: 1px solid #e0e0e0; margin: 16px 0;"></div>
+
                 <div style="display: flex; gap: 12px; margin-bottom: 24px;">
                     <button class="btn-secondary" style="flex: 1; justify-content: center;" onclick="field.navTo('${job.address}')">
                         <span class="material-symbols-outlined">directions_car</span> Navigate
@@ -310,8 +324,114 @@ window.field = {
                 </div>
             </div>
         `;
+    },
+
+    showAddPartModal(jobId) {
+        const currentUser = window.authSystem?.currentUser;
+        const isTech = currentUser?.role === 'technician';
+        const uEmail = currentUser?.email?.toLowerCase();
+        
+        let stockToPickFrom = [];
+        if (isTech) {
+            stockToPickFrom = (window.app.state.techStock || []).filter(s => s.techEmail.toLowerCase() === uEmail);
+        } else {
+            stockToPickFrom = window.app.state.inventory || [];
+        }
+
+        const modalHTML = `
+            <div class="modal-content" style="max-width: 450px;">
+                <div class="modal-header">
+                    <h2>Record Part Usage</h2>
+                    <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div class="modal-body">
+                    <form onsubmit="field.handleAttachPart(event, '${jobId}')">
+                        <div class="form-group">
+                            <label>Product / Part Used</label>
+                            <select id="part-id" class="form-control" style="appearance: auto;" required>
+                                <option value="" disabled selected>-- Select from ${isTech ? 'My Stock' : 'Inventory'} --</option>
+                                ${stockToPickFrom.map(i => `<option value="${isTech ? i.sku : i.id}">${i.name} (Qty: ${i.qty})</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity Used</label>
+                            <input type="number" id="part-qty" class="form-control" value="1" min="1" required>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancel</button>
+                            <button type="submit" class="btn-primary">Deduct & Attach</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
         window.app.showModal(modalHTML);
+    },
+
+    async handleAttachPart(e, jobId) {
+        e.preventDefault();
+        const partId = document.getElementById('part-id').value;
+        const qty = parseInt(document.getElementById('part-qty').value);
+        const currentUser = window.authSystem?.currentUser;
+        const isTech = currentUser?.role === 'technician';
+        const uEmail = currentUser?.email?.toLowerCase();
+
+        const job = window.app.state.fieldJobs.find(j => j.id === jobId);
+        if(!job) return;
+
+        let invItem = null;
+        let tsItem = null;
+
+        if (isTech) {
+            tsItem = (window.app.state.techStock || []).find(s => s.techEmail.toLowerCase() === uEmail && s.sku === partId);
+            invItem = window.app.state.inventory.find(i => i.sku === partId);
+        } else {
+            invItem = window.app.state.inventory.find(i => i.id === partId);
+        }
+
+        if(!invItem || (isTech && (!tsItem || tsItem.qty < qty))) {
+            alert("Insufficient Stock!");
+            return;
+        }
+
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.innerHTML = "Processing...";
+        btn.disabled = true;
+
+        try {
+            const batch = window.fbDb.batch();
+            const price = parseFloat(invItem.sell.replace(/[^0-9.-]+/g,"")) || 0;
+
+            if(!job.items) job.items = [];
+            job.items.push({
+                desc: invItem.name,
+                unit: price,
+                qty: qty
+            });
+
+            // 1. Update Job
+            const jobRef = window.fbDb.collection('fieldJobs').doc(jobId);
+            batch.update(jobRef, { items: job.items });
+
+            // 2. Update Global Inventory
+            const invRef = window.fbDb.collection('inventory').doc(invItem.id);
+            batch.update(invRef, { qty: firebase.firestore.FieldValue.increment(-qty) });
+
+            // 3. Update Tech Stock
+            if (isTech && tsItem) {
+                const tsRef = window.fbDb.collection('techStock').doc(tsItem.id);
+                batch.update(tsRef, { qty: firebase.firestore.FieldValue.increment(-qty) });
+            }
+
+            await batch.commit();
+            window.app.closeModal();
+            alert("Part successfully deducted from stock and attached to job.");
+        } catch(err) {
+            console.error(err);
+            alert("Failed to record part usage.");
+            btn.innerHTML = "Deduct & Attach";
+            btn.disabled = false;
+        }
     }
-};
 
 // Initialized by app.js

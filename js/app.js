@@ -6,6 +6,7 @@ const app = {
         fieldJobs: [],
         quotations: [],
         inventory: [],
+        techStock: [],
         suppliers: [],
         purchaseOrders: [],
         expenses: [],
@@ -33,6 +34,7 @@ const app = {
             { name: 'invoice', ref: window.invoice },
             { name: 'client', ref: window.client },
             { name: 'inventory', ref: window.inventory },
+            { name: 'mystock', ref: window.mystock },
             { name: 'posSystem', ref: window.posSystem },
             { name: 'reports', ref: window.reports },
             { name: 'customers', ref: window.customers }
@@ -96,6 +98,7 @@ const app = {
         register('invoices', 'invoices');
         register('quotations', 'quotations');
         register('inventory', 'inventory');
+        register('techStock', 'techStock');
         register('suppliers', 'suppliers');
         register('customers', 'customers');
         register('sales', 'sales');
@@ -130,6 +133,7 @@ const app = {
             if(window.quotation && activeView === 'quotations-view') quotation.render();
             if(window.invoice && activeView === 'invoices-view') invoice.render();
             if(window.inventory && activeView === 'inventory-view') inventory.render();
+            if(window.mystock && activeView === 'mystock-view') mystock.render();
             if(window.posSystem && activeView === 'pos-view') posSystem.render();
             if(window.customers && activeView === 'customers-view') customers.render();
             if(window.reports && activeView === 'reports-view') reports.render();
@@ -1761,7 +1765,7 @@ const app = {
             item.classList.remove('hidden'); // reset all to visible initially
             
             if (role === 'technician') {
-                if(target === 'dashboard-view' || target === 'invoices-view' || target === 'quotations-view' || target === 'client-view' || target === 'team-view' || target === 'company-view' || target === 'reports-view' || target === 'pos-view' || target === 'inventory-view' || target === 'customers-view') {
+                if(target === 'dashboard-view' || target === 'invoices-view' || target === 'quotations-view' || target === 'client-view' || target === 'team-view' || target === 'company-view' || target === 'reports-view' || target === 'pos-view' || target === 'inventory-view' || target === 'customers-view' || target === 'purchases-view') {
                     item.classList.add('hidden');
                 }
             } else if (role === 'client') {
@@ -1800,13 +1804,18 @@ const app = {
         if(role === 'admin') {
             if(window.companySettings) window.companySettings.init();
             if(window.reports) window.reports.init();
+            if(window.purchases) window.purchases.init();
         }
+        if(window.mystock) window.mystock.init();
+        if(window.wiki) window.wiki.init();
         
         // Render permitted view
         const newJobBtn = document.querySelector('.sidebar-new-job');
         if (role === 'technician') {
-            document.querySelector('[data-target="repair-view"]').click();
+            document.querySelector('[data-target="mystock-view"]').click();
             if(newJobBtn) newJobBtn.classList.add('hidden');
+            const mystockNav = document.getElementById('nav-mystock');
+            if(mystockNav) mystockNav.classList.remove('hidden');
         } else if (role === 'client') {
             document.querySelector('[data-target="client-view"]').click();
             // Hide "New Job" button for clients

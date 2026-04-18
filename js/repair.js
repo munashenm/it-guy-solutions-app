@@ -354,7 +354,20 @@ window.repair = {
 
         // Parse unit price
         const price = parseFloat(invItem.sell.replace(/[^0-9.-]+/g,"")) || 0;
+        const currentUser = window.authSystem?.currentUser;
+        const isTech = currentUser?.role === 'technician';
+        const uEmail = currentUser?.email?.toLowerCase();
 
+        // If tech, check if they have it in 'My Stock'
+        let techStockItem = null;
+        if (isTech) {
+            techStockItem = (window.app.state.techStock || []).find(s => s.techEmail.toLowerCase() === uEmail && s.sku === invItem.sku);
+            if (!techStockItem || techStockItem.qty < qty) {
+                alert(`Insufficient Stock in 'My Stock'! You have ${techStockItem?.qty || 0} but tried to use ${qty}. Please request more from Admin.`);
+                if(btn) { btn.innerHTML = 'Attach Part'; btn.disabled = false; }
+                return;
+            }
+        }
         if(!job.items) job.items = [];
         job.items.push({
             type: 'Hardware',
@@ -382,10 +395,18 @@ window.repair = {
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
 
-            // Update Inventory (since we attached it, deduct from live stock)
+            // 2. Update Inventory (Main Warehouse)
             if(invItem.id) {
                 const invRef = window.fbDb.collection('inventory').doc(invItem.id);
                 batch.update(invRef, {
+                    qty: firebase.firestore.FieldValue.increment(-qty)
+                });
+            }
+
+            // 3. Update Tech Stock (Personal Stock)
+            if (isTech && techStockItem) {
+                const tsRef = window.fbDb.collection('techStock').doc(techStockItem.id);
+                batch.update(tsRef, {
                     qty: firebase.firestore.FieldValue.increment(-qty)
                 });
             }

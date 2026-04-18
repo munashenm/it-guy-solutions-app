@@ -131,6 +131,10 @@
                     <span class="material-symbols-outlined">shopping_cart</span>
                     <span>Purchase Orders</span>
                 </a>
+                <a href="#mystock" class="nav-item hidden" data-target="mystock-view" id="nav-mystock">
+                    <span class="material-symbols-outlined">inventory_2</span>
+                    <span>My Stock</span>
+                </a>
                 <a href="#pos" class="nav-item hidden employee-only" data-target="pos-view" id="nav-pos">
                     <span class="material-symbols-outlined">point_of_sale</span>
                     <span>Point of Sale</span>
@@ -326,6 +330,11 @@
                 <section id="purchases-view" class="view-section hidden">
                     <div id="purchases-content"></div>
                 </section>
+
+                <!-- My Stock View -->
+                <section id="mystock-view" class="view-section hidden">
+                    <div id="mystock-content"></div>
+                </section>
                 
                 <!-- Expense Tracking View -->
                 <section id="expenses-view" class="view-section hidden">
@@ -364,6 +373,7 @@
     <script src="js/field.js?v=2.3"></script>
     <script src="js/tickets.js?v=2.3"></script>
     <script src="js/purchases.js?v=2.3"></script>
+    <script src="js/mystock.js?v=2.3"></script>
     <script src="js/expenses.js?v=2.3"></script>
     <script src="js/wiki.js?v=2.3"></script>
     <script src="js/quotations.js?v=2.3"></script>

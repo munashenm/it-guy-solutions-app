@@ -104,6 +104,7 @@ window.inventory = {
                 <td style="font-weight: 500">R ${item.sell || item.sellPrice || '0.00'}</td>
                 <td>
                     <div style="display: flex; gap: 8px;">
+                        <button class="btn-icon" onclick="inventory.showIssueStockModal('${item.id}')" title="Issue to Technician" style="color: var(--warning);"><span class="material-symbols-outlined" style="font-size: 1.1rem">person_pin</span></button>
                         <button class="btn-icon" onclick="inventory.showEditPartModal('${item.id}')" title="Edit Item"><span class="material-symbols-outlined" style="font-size: 1.1rem">edit</span></button>
                         <button class="btn-icon" onclick="inventory.deletePart('${item.id}')" style="color: var(--danger);" title="Delete Item"><span class="material-symbols-outlined" style="font-size: 1.1rem">delete</span></button>
                     </div>
@@ -471,6 +472,109 @@ window.inventory = {
             console.error("Error adding supplier:", error);
             alert("Failed to save supplier. Check connection.");
             if(btn) { btn.innerHTML = 'Save Supplier'; btn.disabled = false; }
+        }
+    },
+
+    showIssueStockModal(id) {
+        const item = window.app.state.inventory.find(i => i.id === id);
+        if(!item) return;
+
+        const modalHTML = `
+            <div class="modal-content" style="max-width: 450px;">
+                <div class="modal-header">
+                    <h2>Issue Stock to Technician</h2>
+                    <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div class="modal-body">
+                    <p style="color: #a0a0a0; margin-bottom: 16px;">Item: <strong>${item.name}</strong><br>Warehouse Qty: <strong>${item.qty}</strong></p>
+                    <form onsubmit="inventory.handleIssueStock(event, '${id}')">
+                        <div class="form-group">
+                            <label>Select Technician</label>
+                            <select id="issue-tech-email" class="form-control" style="appearance: auto;" required>
+                                <option value="" disabled selected>-- Select --</option>
+                                <option value="admin@itguy.co.za">Admin (Self)</option>
+                                <option value="john@itguy.co.za">John Doe</option>
+                                <option value="sarah@itguy.co.za">Sarah Parker</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Quantity to Issue</label>
+                            <input type="number" id="issue-qty" class="form-control" value="1" min="1" max="${item.qty}" required>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancel</button>
+                            <button type="submit" class="btn-primary">Handover Stock</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        window.app.showModal(modalHTML);
+    },
+
+    async handleIssueStock(e, invId) {
+        e.preventDefault();
+        const techEmail = document.getElementById('issue-tech-email').value;
+        const qtyToIssue = parseInt(document.getElementById('issue-qty').value);
+        const item = window.app.state.inventory.find(i => i.id === invId);
+
+        if(!item || qtyToIssue > item.qty) {
+            alert("Insufficient stock in warehouse!");
+            return;
+        }
+
+        const btn = e.target.querySelector('button[type="submit"]');
+        btn.innerHTML = "Processing...";
+        btn.disabled = true;
+
+        try {
+            const batch = window.fbDb.batch();
+
+            // 1. Deduct from Warehouse
+            const invRef = window.fbDb.collection('inventory').doc(invId);
+            batch.update(invRef, {
+                qty: firebase.firestore.FieldValue.increment(-qtyToIssue),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            // 2. Add to Tech Stock (Upsert)
+            // We search for existing tech stock for this item/tech
+            const existingTechStock = (window.app.state.techStock || []).find(s => s.techEmail === techEmail && s.sku === item.sku);
+            if (existingTechStock) {
+                const tsRef = window.fbDb.collection('techStock').doc(existingTechStock.id);
+                batch.update(tsRef, {
+                    qty: firebase.firestore.FieldValue.increment(qtyToIssue),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            } else {
+                const tsRef = window.fbDb.collection('techStock').doc();
+                batch.set(tsRef, {
+                    techEmail,
+                    invId,
+                    sku: item.sku,
+                    name: item.name,
+                    category: item.category,
+                    qty: qtyToIssue,
+                    issuedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+
+            // 3. Log Activity
+            const logRef = window.fbDb.collection('logs').doc();
+            batch.set(logRef, {
+                type: 'Stock Handover',
+                message: `Issued ${qtyToIssue}x ${item.name} to ${techEmail}`,
+                timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            await batch.commit();
+            window.app.closeModal();
+            alert(`Stock issued successfully to ${techEmail}`);
+        } catch(err) {
+            console.error(err);
+            alert("Handover failed.");
+            btn.innerHTML = "Handover Stock";
+            btn.disabled = false;
         }
     }
 };
