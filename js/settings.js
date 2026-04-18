@@ -866,16 +866,11 @@ window.companySettings = {
         try {
             if (typeof window.localAuth !== 'undefined') {
                 // We are using the local-db adapter. Use the dedicated backend endpoint.
-                const res = await fetch(`${window.API_BASE || '/api'}/users`, {
+                await window.safeFetch(`${window.API_BASE || '/api'}/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password: pwd, role, firstName, lastName, username, employeeId })
                 });
-                
-                if(!res.ok) {
-                    const errData = await res.json();
-                    throw new Error(errData.error || "Failed to create user on local server");
-                }
             } else {
                 // Real Firebase flow
                 if(!this.secondaryApp) this.initSecondaryApp();
@@ -1033,13 +1028,11 @@ window.companySettings = {
         };
 
         try {
-            const res = await fetch(`${window.API_BASE || '/api'}/users/${uid}`, {
+            await window.safeFetch(`${window.API_BASE || '/api'}/users/${uid}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-
-            if(!res.ok) throw new Error("Failed to update user");
 
             app.closeModal();
             this.showMessage("User profile updated successfully.", true);
@@ -1082,13 +1075,11 @@ window.companySettings = {
         btn.disabled = true;
 
         try {
-            const res = await fetch(`${window.API_BASE || '/api'}/users/admin-password`, {
+            await window.safeFetch(`${window.API_BASE || '/api'}/users/admin-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ uid, newPassword: pwd })
             });
-
-            if(!res.ok) throw new Error("Failed to reset password");
 
             app.closeModal();
             this.showMessage("Password updated successfully.", true);
@@ -1109,11 +1100,9 @@ window.companySettings = {
         }
 
         try {
-            const res = await fetch(`${window.API_BASE || '/api'}/users/${uid}`, {
+            await window.safeFetch(`${window.API_BASE || '/api'}/users/${uid}`, {
                 method: 'DELETE'
             });
-
-            if(!res.ok) throw new Error("Failed to delete user");
 
             this.showMessage(`User ${label} deleted successfully.`, true);
             this.fetchUsers();

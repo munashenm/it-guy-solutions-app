@@ -126,16 +126,11 @@ window.userProfile = {
         btn.innerText = "Updating...";
 
         try {
-            const res = await fetch(`${window.API_BASE || '/api'}/users/password`, {
+            await window.safeFetch(`${window.API_BASE || '/api'}/users/password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ uid, oldPassword: oldPwd, newPassword: newPwd })
             });
-
-            if(!res.ok) {
-                const errData = await res.json();
-                throw new Error(errData.error || "Failed to update password");
-            }
 
             document.getElementById('my-password-form').reset();
             this.showMessage("Password successfully updated!", true);
