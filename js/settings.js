@@ -50,11 +50,11 @@ window.companySettings = {
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Contact Number</label>
-                                <input type="text" id="cs-phone" class="form-control" placeholder="087 550 1813">
+                                <input type="tel" id="cs-phone" class="form-control" placeholder="087 550 1813" pattern="^0[0-9]{2}\s?[0-9]{3}\s?[0-9]{4}$" title="10-digit SA number starting with 0">
                             </div>
                             <div class="form-group">
                                 <label>WhatsApp Number</label>
-                                <input type="text" id="cs-whatsapp" class="form-control" placeholder="065 866 3103">
+                                <input type="tel" id="cs-whatsapp" class="form-control" placeholder="065 866 3103" pattern="^0[0-9]{2}\s?[0-9]{3}\s?[0-9]{4}$" title="10-digit SA number starting with 0">
                             </div>
                         </div>
                         <div class="form-row">
@@ -487,6 +487,21 @@ window.companySettings = {
             updatedAt
         };
 
+        const phoneRegex = /^0[0-9]{2}\s?[0-9]{3}\s?[0-9]{4}$/;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        if(profileData.email && !emailRegex.test(profileData.email)) {
+            this.showMessage("Invalid Email Address format.", false);
+            btn.disabled = false; btn.innerText = "Save Configured Settings";
+            return;
+        }
+
+        if((profileData.phone && !phoneRegex.test(profileData.phone)) || (profileData.whatsapp && !phoneRegex.test(profileData.whatsapp))) {
+            this.showMessage("Phone/WhatsApp must be a 10-digit South African number starting with 0.", false);
+            btn.disabled = false; btn.innerText = "Save Configured Settings";
+            return;
+        }
+
         const docData = {
             invPrefix: document.getElementById('cs-inv-prefix').value,
             quoPrefix: document.getElementById('cs-quo-prefix').value,
@@ -865,7 +880,7 @@ window.companySettings = {
                             <label>Name / Company</label><input type="text" id="new-cust-name" class="form-control" required>
                         </div>
                         <div class="form-group">
-                            <label>Phone Number</label><input type="tel" id="new-cust-phone" class="form-control" required>
+                            <label>Phone Number</label><input type="tel" id="new-cust-phone" class="form-control" pattern="^0[0-9]{2}\s?[0-9]{3}\s?[0-9]{4}$" title="10-digit SA number starting with 0" required>
                         </div>
                         <div class="form-group">
                             <label>Email Address</label><input type="email" id="new-cust-email" class="form-control">
@@ -938,7 +953,7 @@ window.companySettings = {
                         </div>
                         <div class="form-group">
                             <label>Phone Number</label>
-                            <input type="text" id="edit-user-phone" class="form-control" value="${user.phone || ''}">
+                            <input type="tel" id="edit-user-phone" class="form-control" value="${user.phone || ''}" pattern="^0[0-9]{2}\s?[0-9]{3}\s?[0-9]{4}$" title="10-digit SA number starting with 0">
                         </div>
                         <div class="form-row">
                             <div class="form-group">

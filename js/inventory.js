@@ -428,7 +428,7 @@ window.inventory = {
                             </div>
                             <div class="form-group">
                                 <label>Phone Number</label>
-                                <input type="tel" id="sup-phone" class="form-control" placeholder="011 555 1234">
+                                <input type="tel" id="sup-phone" class="form-control" placeholder="011 555 1234" pattern="^0[0-9]{2}\s?[0-9]{3}\s?[0-9]{4}$" title="10-digit SA number starting with 0">
                             </div>
                         </div>
                         <div class="form-group">

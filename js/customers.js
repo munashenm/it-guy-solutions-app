@@ -77,7 +77,7 @@ window.customers = {
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Phone Number</label>
-                                <input type="tel" id="crm-phone" class="form-control" placeholder="082 123 4567" required>
+                                <input type="tel" id="crm-phone" class="form-control" placeholder="082 123 4567" pattern="^0[0-9]{2}\s?[0-9]{3}\s?[0-9]{4}$" title="10-digit SA number starting with 0" required>
                             </div>
                             <div class="form-group">
                                 <label>Email Address</label>

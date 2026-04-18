@@ -656,8 +656,8 @@ const app = {
                                 ${this.generateCustomerDatalist()}
                             </div>
                             <div class="form-group">
-                                <label>Cell / WhatsApp</label>
-                                <input type="tel" id="job-phone" class="form-control" placeholder="e.g. 082 123 4567" required>
+                                <label>Cell Phone</label>
+                                <input type="tel" id="job-phone" class="form-control" placeholder="082 123 4567" pattern="^0[0-9]{2}\s?[0-9]{3}\s?[0-9]{4}$" title="10-digit SA number starting with 0" required>
                             </div>
                         </div>
                         <div class="form-group">
