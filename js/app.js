@@ -386,7 +386,11 @@ const app = {
     bindEvents() {
         this.navItems.forEach(item => {
             item.addEventListener('click', (e) => {
-                // Let the hashchange listener handle it
+                // If on mobile, close the sidebar when navigating
+                if (window.innerWidth <= 992) {
+                    const sidebar = document.querySelector('.sidebar');
+                    if (sidebar) sidebar.classList.remove('open');
+                }
             });
         });
 

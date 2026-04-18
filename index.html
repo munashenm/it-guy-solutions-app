@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f111a">
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=IT&background=6c5ce7&color=fff&rounded=true&size=192">
     <title>IT Guy Solutions App</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -164,6 +167,7 @@
         <!-- Main Content Area -->
         <main class="main-content">
             <header class="topbar">
+                <button class="btn-icon mobile-menu-btn" id="mobile-menu-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')" style="display: none;"><span class="material-symbols-outlined">menu</span></button>
                 <div class="search-wrap">
                     <div class="search-bar">
                         <span class="material-symbols-outlined">search</span>
