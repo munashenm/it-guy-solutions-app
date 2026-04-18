@@ -21,6 +21,12 @@ window.API_BASE = API_BASE;
  * Robust fetch helper that checks content-type and provides detailed errors
  */
 async function safeFetch(url, options = {}) {
+    if (!options.headers) options.headers = {};
+    if (!options.headers['Authorization']) {
+        const token = sessionStorage.getItem('it-guy-token');
+        if (token) options.headers['Authorization'] = `Bearer ${token}`;
+    }
+
     try {
         const res = await fetch(url, options);
         const contentType = res.headers.get('content-type');
@@ -289,7 +295,7 @@ window.localAuth = {
     onAuthStateChanged: (callback) => {
         authListeners.push(callback);
         // Immediate initial check
-        const storedUser = localStorage.getItem('it-guy-user');
+        const storedUser = sessionStorage.getItem('it-guy-user');
         try {
             const user = storedUser ? JSON.parse(storedUser) : null;
             callback(user);
@@ -312,8 +318,10 @@ window.localAuth = {
                 body: JSON.stringify({ email, password })
             });
 
-            if (data.user) {
-                localStorage.setItem('it-guy-user', JSON.stringify(data.user));
+            if (data.user && data.token) {
+                // Use sessionStorage to forget login on browser close
+                sessionStorage.setItem('it-guy-token', data.token);
+                sessionStorage.setItem('it-guy-user', JSON.stringify(data.user));
                 triggerAuthChange(data.user);
             } else {
                 throw new Error("Invalid response format from server");
@@ -324,7 +332,8 @@ window.localAuth = {
         }
     },
     signOut: async () => {
-        localStorage.removeItem('it-guy-user');
+        sessionStorage.removeItem('it-guy-user');
+        sessionStorage.removeItem('it-guy-token');
         triggerAuthChange(null);
         // Forced reload ensures all modules reset their state
         setTimeout(() => window.location.reload(), 100);

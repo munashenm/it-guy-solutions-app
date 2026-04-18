@@ -293,7 +293,7 @@ window.companySettings = {
                                 <p style="font-size: 0.9rem; color: #a0a0a0; margin-bottom: 0;">Since you are running on a local database, we recommend downloading regular backups. You can also restore from a previous backup file.</p>
                             </div>
                             <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-                                <button type="button" class="btn-primary" onclick="window.location.href='${window.API_BASE || '/api'}/backup'" style="background: var(--accent); display: flex; align-items: center; gap: 8px;">
+                                <button type="button" class="btn-primary" onclick="companySettings.downloadBackup()" style="background: var(--accent); display: flex; align-items: center; gap: 8px;">
                                     <span class="material-symbols-outlined">download</span> Download Backup (.sqlite)
                                 </button>
                                 
@@ -586,6 +586,9 @@ window.companySettings = {
         try {
             const response = await fetch(`${window.API_BASE || '/api'}/restore`, {
                 method: 'POST',
+                headers: {
+                    'Authorization': 'Bearer ' + sessionStorage.getItem('it-guy-token')
+                },
                 body: formData
             });
 
@@ -601,7 +604,40 @@ window.companySettings = {
             alert("Critical Error: Failed to restore database. " + e.message);
         } finally {
             progress.classList.add('hidden');
-            event.target.value = "";
+        }
+    },
+
+    async downloadBackup() {
+        try {
+            const btn = document.querySelector('button[onclick="companySettings.downloadBackup()"]');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<span class="material-symbols-outlined">sync</span> Downloading...';
+            btn.disabled = true;
+
+            const response = await fetch(`${window.API_BASE || '/api'}/backup`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + sessionStorage.getItem('it-guy-token')
+                }
+            });
+
+            if (!response.ok) throw new Error("Failed to download backup");
+
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `it-guy-backup-${new Date().toISOString().split('T')[0]}.sqlite`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        } catch (e) {
+            console.error(e);
+            alert("Error downloading backup: " + e.message);
         }
     },
 

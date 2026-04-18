@@ -111,7 +111,7 @@ db.init().then(async () => {
         await db.run(userSchema);
 
         // 2. Add columns if missing (mostly for schema evolution)
-        const columnsToAdd = ['username', 'firstName', 'lastName', 'employeeId'];
+        const columnsToAdd = ['username', 'firstName', 'lastName', 'employeeId', 'sessionToken'];
         for (const col of columnsToAdd) {
             try {
                 await db.run(`ALTER TABLE users ADD COLUMN ${col} ${isMySQL ? 'VARCHAR(255)' : 'TEXT'}`);
@@ -185,16 +185,16 @@ const getCollection = async (name) => {
     }
 };
 
-// API Endpoints
-
 // Authentication
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
         const row = await db.get("SELECT * FROM users WHERE (email = ? OR username = ?) AND password = ?", [email, email, password]);
         if (row) {
-            const { password, ...user } = row;
-            res.json({ user });
+            const token = 'token-' + Math.random().toString(36).substr(2) + Date.now().toString(36);
+            await db.run("UPDATE users SET sessionToken = ? WHERE uid = ?", [token, row.uid]);
+            const { password, sessionToken, ...user } = row;
+            res.json({ user, token });
         } else {
             res.status(401).json({ error: "Invalid credentials" });
         }
@@ -202,6 +202,31 @@ app.post('/api/login', async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+
+// Middleware to enforce API security
+const requireAuth = async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ error: "Unauthorized. Please log in." });
+    }
+    const token = authHeader.split(' ')[1];
+    try {
+        const row = await db.get("SELECT * FROM users WHERE sessionToken = ?", [token]);
+        if (!row) return res.status(401).json({ error: "Session expired or invalid" });
+        req.user = row;
+        next();
+    } catch (err) {
+        res.status(500).json({ error: "Database error verifying session" });
+    }
+};
+
+const requireAdmin = (req, res, next) => {
+    if (req.user && req.user.role === 'admin') next();
+    else res.status(403).json({ error: "Forbidden. Admin access required." });
+};
+
+// Apply auth middleware to all secure routes
+app.use(['/api/users', '/api/collections', '/api/transaction', '/api/counters', '/api/restore', '/api/backup'], requireAuth);
 
 // User Registration Endpoint (Bypasses Firebase Auth)
 app.post('/api/users', async (req, res) => {
