@@ -247,15 +247,6 @@ window.pdfGenerator = {
                         c.style.color = '#000';
                         c.style.borderColor = '#eee';
                     });
-                    
-                    // Convert explicitly grey text to black for printer visibility
-                    clone.querySelectorAll('.stat-info p, .stat-info h3, p, span, td, table, th, div').forEach(c => {
-                         // Only override if not expressly colored green/red inline by the renderer
-                         if (!c.style.color || c.style.color === '' || c.style.color.includes('a0a0a0')) {
-                             c.style.color = '#000000';
-                         }
-                    });
-
                     contentHTML = `
                         <div style="font-family: ${fontStack};">
                             <h2 style="color: ${themeColor}; margin-bottom: 20px;">Execution Summary Report</h2>
@@ -389,6 +380,20 @@ window.pdfGenerator = {
             }
 
             container.innerHTML = contentHTML;
+
+            // Universal Safety Pass: Convert absolutely ALL grey text to black for flawless print visibility on white paper across ALL document types
+            container.querySelectorAll('*').forEach(c => {
+                const computed = window.getComputedStyle(c);
+                const color = computed.color || c.style.color || '';
+                // Check if color is a shade of grey (e.g. #a0a0a0, rgb(160, 160, 160), #747d8c, etc)
+                if (color.includes('160, 160, 160') || color.includes('116, 125, 140') || color.includes('a0a0a0') || c.tagName === 'P' || c.tagName === 'SPAN') {
+                    // Ignore explicitly colored badges/themes
+                    if(!color.includes('var(--success)') && !color.includes('var(--danger)') && !color.includes('var(--primary)')) {
+                        // Force black text
+                        c.style.color = '#000000';
+                    }
+                }
+            });
 
             // Wait for fonts and stabilizing re-paint
             if(document.fonts) await document.fonts.ready;
