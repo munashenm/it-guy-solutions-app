@@ -23,8 +23,11 @@ function resetIdleTimer() {
     clearTimeout(idleTimeoutTimer);
     if(sessionStorage.getItem('it-guy-token')) {
         idleTimeoutTimer = setTimeout(() => {
-            alert('SECURITY LOCK: Your session has expired due to 20 minutes of inactivity. Please log in again.');
-            window.authSystem.signOut();
+            if(window.authSystem && typeof window.authSystem.logout === 'function') {
+                window.authSystem.logout().then(() => {
+                    alert('SECURITY LOCK: Your session has expired due to 20 minutes of inactivity. Please log in again.');
+                });
+            }
         }, 20 * 60 * 1000); 
     }
 }
