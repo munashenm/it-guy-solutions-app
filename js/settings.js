@@ -67,9 +67,20 @@ window.companySettings = {
                                 <input type="text" id="cs-website" class="form-control" placeholder="www.techguy.pl">
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label>Company Logo URL (Optional. e.g. https://domain.com/logo.png)</label>
-                            <input type="text" id="cs-logo" class="form-control" placeholder="Paste transparent PNG linked URL here">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Company Logo (Transparent PNG recommended)</label>
+                                <div style="display: flex; gap: 16px; align-items: center;">
+                                    <div id="cs-logo-preview" style="width: 80px; height: 80px; border: 2px dashed var(--border); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: rgba(0,0,0,0.2);">
+                                        <span class="material-symbols-outlined" style="color: #444;">image</span>
+                                    </div>
+                                    <div style="flex: 1;">
+                                        <input type="file" id="cs-logo-file" class="form-control" accept="image/*" onchange="companySettings.handleLogoUpload(this)">
+                                        <input type="hidden" id="cs-logo">
+                                        <p style="font-size: 0.75rem; color: #a0a0a0; margin-top: 4px;">Upload your company logo. This will appear on Invoices, Quotes, and Job Cards.</p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -412,7 +423,12 @@ window.companySettings = {
                 document.getElementById('cs-whatsapp').value = data.whatsapp || '';
                 document.getElementById('cs-email').value = data.email || '';
                 document.getElementById('cs-website').value = data.website || '';
-                document.getElementById('cs-logo').value = data.logoUrl || '';
+                const logoVal = data.logoUrl || '';
+                document.getElementById('cs-logo').value = logoVal;
+                const preview = document.getElementById('cs-logo-preview');
+                if(preview && logoVal) {
+                    preview.innerHTML = `<img src="${logoVal}" style="max-width: 100%; max-height: 100%; object-fit: contain;">`;
+                }
             }
 
             const docsDoc = await window.fbDb.collection("settings").doc("documentSettings").get();
@@ -466,6 +482,22 @@ window.companySettings = {
         } catch(e) {
             console.error("Error loading settings", e);
         }
+    },
+    
+    handleLogoUpload(input) {
+        const file = input.files[0];
+        if(!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const b64 = e.target.result;
+            document.getElementById('cs-logo').value = b64;
+            const preview = document.getElementById('cs-logo-preview');
+            if(preview) {
+                preview.innerHTML = `<img src="${b64}" style="max-width: 100%; max-height: 100%; object-fit: contain;">`;
+            }
+        };
+        reader.readAsDataURL(file);
     },
 
     async saveAllSettings(e) {

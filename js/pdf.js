@@ -45,6 +45,7 @@ window.pdfGenerator = {
 
     async imgToBase64(url) {
         if(!url || url.trim() === '') return null;
+        if(url.startsWith('data:image')) return url; // Already Base64
         try {
             // Use our local backend proxy to avoid CORS issues
             const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
