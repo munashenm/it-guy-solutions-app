@@ -525,7 +525,8 @@ app.post('/api/notify', async (req, res) => {
             }
 
             const subject = `${docType} - ${docId} from ${sysSettings.emailName || 'IT Guy Solutions'}`;
-            const amountMsg = dataObj && dataObj.amount ? `\n\nTotal Amount: R ${dataObj.amount.toFixed(2)}` : '';
+            const parsedAmt = dataObj && dataObj.amount ? parseFloat(dataObj.amount) : null;
+            const amountMsg = parsedAmt && !isNaN(parsedAmt) ? `\n\nTotal Amount: R ${parsedAmt.toFixed(2)}` : '';
             const textContent = `Hi,\n\nPlease find attached the ${docType} (${docId}) regarding your recent service.${amountMsg}\n\nKind Regards,\n${sysSettings.emailName || 'IT Guy Solutions'}`;
 
             await transporter.sendMail({
@@ -546,7 +547,8 @@ app.post('/api/notify', async (req, res) => {
             let cleanedPhone = contactInfo.replace(/\D/g, '');
             if(cleanedPhone.startsWith('0')) cleanedPhone = '27' + cleanedPhone.substring(1); 
             
-            const amountMsg = dataObj && dataObj.amount ? ` Total: R ${dataObj.amount.toFixed(2)}` : '';
+            const parsedAmt = dataObj && dataObj.amount ? parseFloat(dataObj.amount) : null;
+            const amountMsg = parsedAmt && !isNaN(parsedAmt) ? ` Total: R ${parsedAmt.toFixed(2)}` : '';
             const textContent = `Hi from ${sysSettings.emailName || 'IT Guy Solutions'}. Your ${docType} (${docId}) has been processed.${amountMsg}. Check your email to download the PDF.`;
 
             await axios.post(
