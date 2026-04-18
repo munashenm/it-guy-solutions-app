@@ -102,18 +102,37 @@ window.customers = {
     async handleAddCustomer(e) {
         e.preventDefault();
         const btn = e.target.querySelector('button[type="submit"]');
-        if(btn) { btn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span> Saving...'; btn.disabled = true; }
+        const payload = {
+            name: document.getElementById('crm-name').value.trim(),
+            phone: document.getElementById('crm-phone').value.trim(),
+            email: document.getElementById('crm-email').value.trim(),
+            address: document.getElementById('crm-addr').value.trim(),
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
 
         try {
-            await window.fbDb.collection('customers').add({
-                name: document.getElementById('crm-name').value.trim(),
-                phone: document.getElementById('crm-phone').value.trim(),
-                email: document.getElementById('crm-email').value.trim(),
-                address: document.getElementById('crm-addr').value.trim(),
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            await window.fbDb.collection('customers').add(payload);
+            
+            // Intelligence: If the "Schedule Call-out" or "New Workshop Job" modal was effectively being filled, populate it
+            const activeForms = [
+                { id: 'callout-client', nameEl: 'callout-client', phoneEl: 'callout-phone', emailEl: 'callout-email', addressEl: 'callout-address', contactEl: 'callout-contact-person' },
+                { id: 'job-customer', nameEl: 'job-customer', phoneEl: 'job-phone', emailEl: 'job-email' },
+                { id: 'inv-client', nameEl: 'inv-client', phoneEl: 'inv-phone', emailEl: 'inv-email', addressEl: 'inv-address' }
+            ];
+
+            activeForms.forEach(form => {
+                const el = document.getElementById(form.id);
+                if (el) {
+                    if (form.nameEl) { const target = document.getElementById(form.nameEl); if(target) target.value = payload.name; }
+                    if (form.phoneEl) { const target = document.getElementById(form.phoneEl); if(target) target.value = payload.phone; }
+                    if (form.emailEl) { const target = document.getElementById(form.emailEl); if(target) target.value = payload.email; }
+                    if (form.addressEl) { const target = document.getElementById(form.addressEl); if(target) target.value = payload.address; }
+                    if (form.contactEl) { const target = document.getElementById(form.contactEl); if(target) target.value = payload.name; }
+                }
             });
-            window.app.closeModal();
-            // onSnapshot triggers app.refreshActiveViews() seamlessly
+
+            window.app.closeModal(); // Close "Add Customer" modal
+            // The underlying form (Callout/Job/Inv) stays open and is now populated!
         } catch(error) {
             console.error("Error adding customer:", error);
             alert("Failed to save customer. Check connection.");

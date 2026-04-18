@@ -116,6 +116,7 @@ const app = {
         register('techStock', 'techStock');
         register('suppliers', 'suppliers');
         register('customers', 'customers');
+        register('users', 'users');
         register('sales', 'sales');
         register('tickets', 'tickets');
         register('purchaseOrders', 'purchaseOrders');
@@ -884,9 +885,8 @@ const app = {
                                 <label>Assigned Technician</label>
                                 <select id="callout-technician" class="form-control" required style="appearance: auto;">
                                     <option value="" disabled selected>Select from team</option>
-                                    <option value="Admin User" style="background: #1a1d2d; color: #fff;">Admin User</option>
-                                    <option value="Tech John" style="background: #1a1d2d; color: #fff;">Tech John</option>
-                                    <option value="Tech Sarah" style="background: #1a1d2d; color: #fff;">Tech Sarah</option>
+                                    ${(this.state.users || []).filter(u => u.role === 'technician').map(t => `<option value="${t.firstName} ${t.lastName || ''}">${t.firstName} ${t.lastName || ''} (${t.username})</option>`).join('')}
+                                    ${(this.state.users || []).filter(u => u.role === 'admin').map(a => `<option value="${a.firstName} ${a.lastName || ''}">${a.firstName} ${a.lastName || ''} (Admin)</option>`).join('')}
                                 </select>
                             </div>
                         </div>
