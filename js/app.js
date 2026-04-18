@@ -157,7 +157,8 @@ const app = {
         const results = {
             jobs: [],
             invoices: [],
-            quotations: []
+            quotations: [],
+            inventory: []
         };
 
         // 1. Search Jobs (Workshop & Field)
@@ -179,6 +180,13 @@ const app = {
             (quo.customer || '').toLowerCase().includes(q)
         ).slice(0, 10);
 
+        // 4. Search Inventory
+        results.inventory = (this.state.inventory || []).filter(item => 
+            (item.sku || '').toLowerCase().includes(q) || 
+            (item.name || '').toLowerCase().includes(q) ||
+            (item.serial || '').toLowerCase().includes(q)
+        ).slice(0, 10);
+
         this.renderGlobalSearchResults(results);
     },
 
@@ -186,7 +194,7 @@ const app = {
         const resultsEl = document.getElementById('global-search-results');
         if(!resultsEl) return;
 
-        const hasResults = results.jobs.length > 0 || results.invoices.length > 0 || results.quotations.length > 0;
+        const hasResults = results.jobs.length > 0 || results.invoices.length > 0 || results.quotations.length > 0 || results.inventory.length > 0;
         
         if(!hasResults) {
             resultsEl.innerHTML = `<div class="search-no-results">No documents found matching your search.</div>`;
@@ -230,6 +238,19 @@ const app = {
                     <div class="search-item-info">
                         <div class="search-item-title">${inv.id}</div>
                         <div class="search-item-subtitle">${inv.customer || 'Unnamed Client'} - R ${inv.amount || '0.00'}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        if(results.inventory.length > 0) {
+            html += `<div class="search-header"><span class="material-symbols-outlined" style="font-size: 1rem;">inventory_2</span> Inventory & Parts</div>`;
+            html += results.inventory.map(i => `
+                <div class="search-item" onclick="app.openDocumentPreview('inventory', '${i.id}')">
+                    <div class="search-item-icon" style="color: var(--accent);"><span class="material-symbols-outlined">inventory_2</span></div>
+                    <div class="search-item-info">
+                        <div class="search-item-title">${i.name}</div>
+                        <div class="search-item-subtitle">SKU: ${i.sku} | In Stock: ${i.qty}</div>
                     </div>
                 </div>
             `).join('');
@@ -1872,6 +1893,28 @@ const app = {
                 searchInput.value = decodedText;
                 this.handleGlobalSearch(decodedText);
             }
+
+            // Direct Routing if it looks like a specific ID
+            const q = decodedText.toLowerCase();
+            const allJobs = [...(this.state.jobs || []), ...(this.state.fieldJobs || [])];
+            const foundJob = allJobs.find(j => j.id.toLowerCase() === q);
+            if (foundJob) {
+                if (foundJob.id.startsWith('FLD')) {
+                    document.querySelector('[data-target="field-view"]').click();
+                } else {
+                    document.querySelector('[data-target="repair-view"]').click();
+                    setTimeout(() => window.repair.viewJob(foundJob.id), 100);
+                }
+                return;
+            }
+
+            const foundItem = (this.state.inventory || []).find(i => i.sku.toLowerCase() === q || (i.serial && i.serial.toLowerCase() === q));
+            if (foundItem) {
+                document.querySelector('[data-target="inventory-view"]').click();
+                setTimeout(() => window.inventory.showEditPartModal(foundItem.id), 100);
+                return;
+            }
+
         }, (errorMessage) => {
             // Background scanning errors, ignore
         });

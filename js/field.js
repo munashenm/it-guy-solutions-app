@@ -87,13 +87,30 @@ window.field = {
                     </button>` : ''}
                 </div>
 
-                <div style="margin-top: auto; display: flex; gap: 12px; align-items: center;">
-                    <button class="btn-secondary" style="flex: 1; justify-content: center;" onclick="field.addNote('${job.id}')">Add Note</button>
-                    ${job.status.toLowerCase() !== 'completed' ? `
-                        <button class="btn-primary" style="flex: 1; justify-content: center;" onclick="field.changeStatus('${job.id}')">Update Status</button>
-                    ` : `
-                        <button class="btn-primary" style="flex: 1; justify-content: center; background: var(--success);" onclick="field.viewReport('${job.id}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; margin-right: 4px;">assignment</span> View Report</button>
-                    `}
+                <div style="margin-top: auto; display: flex; flex-direction: column; gap: 10px;">
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-secondary" style="flex: 1; justify-content: center; background: rgba(37, 211, 102, 0.1); color: #25D366; border-color: #25D366;" onclick="field.sendETA('${job.id}')">
+                            <span class="material-symbols-outlined" style="font-size: 1.1rem; margin-right: 4px;">chat</span> Send ETA
+                        </button>
+                        ${job.status === 'On-site' ? `
+                            <button class="btn-primary" style="flex: 1; justify-content: center; background: var(--warning);" onclick="field.checkOut('${job.id}')">
+                                <span class="material-symbols-outlined" style="font-size: 1.1rem; margin-right: 4px;">logout</span> Check-out
+                            </button>
+                        ` : job.status !== 'Completed' ? `
+                            <button class="btn-primary" style="flex: 1; justify-content: center; background: var(--accent);" onclick="field.checkIn('${job.id}')">
+                                <span class="material-symbols-outlined" style="font-size: 1.1rem; margin-right: 4px;">login</span> Check-in (GPS)
+                            </button>
+                        ` : ''}
+                    </div>
+                    
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <button class="btn-secondary" style="flex: 1; justify-content: center;" onclick="field.addNote('${job.id}')">Update Log</button>
+                        ${job.status.toLowerCase() !== 'completed' ? `
+                            <button class="btn-primary" style="flex: 1; justify-content: center; background: var(--success);" onclick="field.changeStatus('${job.id}')">Complete Job</button>
+                        ` : `
+                            <button class="btn-primary" style="flex: 1; justify-content: center; background: var(--success);" onclick="field.viewReport('${job.id}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; margin-right: 4px;">assignment</span> Report</button>
+                        `}
+                    </div>
                 </div>
             </div>
         `;
@@ -324,6 +341,7 @@ window.field = {
                 </div>
             </div>
         `;
+        window.app.showModal(modalHTML);
     },
 
     showAddPartModal(jobId) {
@@ -432,6 +450,69 @@ window.field = {
             btn.innerHTML = "Deduct & Attach";
             btn.disabled = false;
         }
+    },
+
+    sendETA(jobId) {
+        const job = window.app.state.fieldJobs.find(j => j.id === jobId);
+        if(!job || !job.phone) return alert("No phone number for client.");
+        
+        const techName = window.authSystem?.currentUser?.email?.split('@')[0] || "Your Technician";
+        const message = `Hi ${job.customer}, this is ${techName} from IT Guy Solutions. I'm on my way to your premises for the scheduled support/repair. See you shortly!`;
+        
+        const url = `https://wa.me/${job.phone.replace(/\s+/g, '')}?text=${encodeURIComponent(message)}`;
+        window.open(url, '_blank');
+    },
+
+    async checkIn(jobId) {
+        if(!navigator.geolocation) return alert("GPS not supported on this device.");
+
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const lat = pos.coords.latitude;
+            const lng = pos.coords.longitude;
+            
+            try {
+                const note = {
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    text: `SYSTEM: Technician checked-in via GPS. Location: ${lat.toFixed(4)}, ${lng.toFixed(4)}`,
+                    user: 'System'
+                };
+
+                await window.fbDb.collection('fieldJobs').doc(jobId).update({
+                    status: 'On-site',
+                    checkInTime: new Date().toISOString(),
+                    checkInCoords: { lat, lng },
+                    notes: firebase.firestore.FieldValue.arrayUnion(note),
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                alert("Checked in! Location and time recorded.");
+            } catch(e) {
+                alert("Check-in failed.");
+            }
+        }, (err) => {
+            alert("Location access denied. Please enable GPS.");
+        });
+    },
+
+    async checkOut(jobId) {
+        try {
+            const note = {
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                text: `SYSTEM: Technician checked-out. Support session ended.`,
+                user: 'System'
+            };
+
+            await window.fbDb.collection('fieldJobs').doc(jobId).update({
+                checkOutTime: new Date().toISOString(),
+                notes: firebase.firestore.FieldValue.arrayUnion(note),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            
+            // Trigger completion modal immediately
+            this.showCompletionModal(jobId);
+        } catch(e) {
+            alert("Check-out failed.");
+        }
     }
+};
 
 // Initialized by app.js
