@@ -78,7 +78,18 @@ window.expenses = {
     getStats() {
         const list = window.app.state.expenses || [];
         const now = new Date();
-        const thisMonth = list.filter(e => {
+        const currentUser = window.authSystem?.currentUser;
+        const isTech = currentUser?.role === 'technician';
+        const uName = currentUser?.email?.split('@')[0].toLowerCase();
+
+        const filteredList = list.filter(e => {
+            if (isTech) {
+                return e.addedBy && e.addedBy.toLowerCase() === uName;
+            }
+            return true;
+        });
+
+        const thisMonth = filteredList.filter(e => {
             const d = new Date(e.date);
             return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
         });
@@ -86,7 +97,7 @@ window.expenses = {
         const totalThisMonth = thisMonth.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0).toFixed(2);
         
         const cats = {};
-        list.forEach(e => {
+        filteredList.forEach(e => {
             cats[e.category] = (cats[e.category] || 0) + (parseFloat(e.amount) || 0);
         });
         
@@ -96,23 +107,40 @@ window.expenses = {
             if(cats[c] > max) { max = cats[c]; topCat = c; }
         }
 
-        return { totalThisMonth, topCategory: topCat, count: list.length };
+        return { totalThisMonth, topCategory: topCat, count: filteredList.length };
     },
 
     renderExpenseRows() {
         const list = window.app.state.expenses || [];
-        if(list.length === 0) {
+        const currentUser = window.authSystem?.currentUser;
+        const isTech = currentUser?.role === 'technician';
+        const uName = currentUser?.email?.split('@')[0].toLowerCase();
+
+        const filtered = list.filter(e => {
+            if (isTech) {
+                return e.addedBy && e.addedBy.toLowerCase() === uName;
+            }
+            return true;
+        });
+
+        if(filtered.length === 0) {
             return `<tr><td colspan="5" style="text-align: center; color: #a0a0a0; padding: 40px;">No expense records found.</td></tr>`;
         }
 
-        return list.sort((a, b) => new Date(b.date) - new Date(a.date)).map(e => `
+        return filtered.sort((a, b) => new Date(b.date) - new Date(a.date)).map(e => `
             <tr>
                 <td>${e.date}</td>
-                <td><strong>${e.description}</strong></td>
+                <td>
+                    <strong>${e.description}</strong>
+                    ${e.addedBy ? `<div style="font-size: 0.75rem; color: #a0a0a0;">By: ${e.addedBy}</div>` : ''}
+                </td>
                 <td><span class="badge" style="background: rgba(255,255,255,0.05); color: #fff; border: 1px solid var(--border);">${e.category}</span></td>
                 <td style="color: var(--danger); font-weight: bold;">R ${parseFloat(e.amount).toFixed(2)}</td>
                 <td>
-                    <button class="btn-icon" style="color: var(--danger);" onclick="expenses.deleteExpense('${e.id}')"><span class="material-symbols-outlined">delete</span></button>
+                    <div style="display: flex; gap: 8px;">
+                        ${e.receiptBase64 ? `<button class="btn-icon" style="color: var(--accent);" onclick="expenses.viewReceipt('${e.id}')" title="View Receipt"><span class="material-symbols-outlined">receipt_long</span></button>` : ''}
+                        <button class="btn-icon" style="color: var(--danger);" onclick="expenses.deleteExpense('${e.id}')"><span class="material-symbols-outlined">delete</span></button>
+                    </div>
                 </td>
             </tr>
         `).join('');
@@ -152,6 +180,11 @@ window.expenses = {
                             <label>Date</label>
                             <input type="date" id="exp-date" class="form-control" value="${new Date().toISOString().split('T')[0]}" required>
                         </div>
+                        <div class="form-group">
+                            <label>Scan/Upload Receipt</label>
+                            <input type="file" id="exp-receipt" class="form-control" accept="image/*" capture="environment">
+                            <p style="font-size: 0.75rem; color: #a0a0a0; margin-top: 4px;">Capture the slip for tax compliance.</p>
+                        </div>
 
                         <div class="modal-footer" style="padding: 0; margin-top: 24px;">
                             <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancel</button>
@@ -170,18 +203,56 @@ window.expenses = {
         const cat = document.getElementById('exp-cat').value;
         const amount = document.getElementById('exp-amount').value;
         const date = document.getElementById('exp-date').value;
+        const receiptFile = document.getElementById('exp-receipt').files[0];
 
         try {
+            const btn = e.target.querySelector('button[type="submit"]');
+            btn.innerHTML = "Saving...";
+            btn.disabled = true;
+
+            let receiptBase64 = null;
+            if (receiptFile && window.field && typeof window.field.compressImage === 'function') {
+                receiptBase64 = await window.field.compressImage(receiptFile);
+            }
+
+            const currentUser = window.authSystem?.currentUser;
+            const uName = currentUser?.email?.split('@')[0] || 'Unknown';
+
             const id = 'EXP-' + Date.now();
             await window.fbDb.collection('expenses').doc(id).set({
-                id, description: desc, category: cat, amount, date,
+                id, 
+                description: desc, 
+                category: cat, 
+                amount, 
+                date,
+                addedBy: uName,
+                receiptBase64: receiptBase64,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             window.app.closeModal();
             alert("Expense logged successfully.");
         } catch(err) {
+            console.error(err);
             alert("Failed to save expense.");
         }
+    },
+
+    viewReceipt(id) {
+        const exp = window.app.state.expenses.find(x => x.id === id);
+        if(!exp || !exp.receiptBase64) return;
+
+        app.showModal(`
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2>Receipt: ${exp.description}</h2>
+                    <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div class="modal-body" style="text-align: center;">
+                    <img src="${exp.receiptBase64}" style="max-width: 100%; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+                    <p style="margin-top: 16px; color: #a0a0a0;">Amount: R ${exp.amount} | Date: ${exp.date}</p>
+                </div>
+            </div>
+        `);
     },
 
     async deleteExpense(id) {

@@ -130,7 +130,6 @@ window.repair = {
             </div>
 
             <!-- Add Note / Part Bar -->
-            <div style="padding: 16px; border-top: 1px solid #e0e0e0; background: rgba(0,0,0,0.15); display: flex; flex-direction: column; gap: 12px;">
                 <div style="display: flex; gap: 12px;">
                     <button class="btn-secondary" onclick="repair.showAddPartModal()" style="white-space: nowrap;"><span class="material-symbols-outlined">memory</span> Attach Part/Labour</button>
                     <div style="flex: 1; display: flex; background: rgba(255,255,255,0.05); border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden;">
@@ -140,6 +139,15 @@ window.repair = {
                          </button>
                     </div>
                 </div>
+                ${job.status !== 'Completed' ? `
+                <button class="btn-primary" style="width: 100%; justify-content: center; background: var(--success); margin-top: 8px; height: 45px;" onclick="repair.showCompletionModal('${job.id}')">
+                    <span class="material-symbols-outlined">verified_user</span> Mark Job as Fully Completed & Signed
+                </button>
+                ` : `
+                <button class="btn-secondary" style="width: 100%; justify-content: center; height: 45px;" onclick="repair.viewReport('${job.id}')">
+                    <span class="material-symbols-outlined">assignment</span> View Completion Evidence
+                </button>
+                `}
             </div>
         `;
     },
@@ -391,6 +399,117 @@ window.repair = {
             alert("Database Error: Failed to attach part");
             if(btn) { btn.innerHTML = 'Attach Part'; btn.disabled = false; }
         }
+    },
+
+    showCompletionModal(jobId) {
+        const modalHTML = `
+            <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+                <div class="modal-header">
+                    <h2>Complete Workshop Job</h2>
+                    <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div class="modal-body">
+                    <form onsubmit="repair.submitCompletion(event, '${jobId}')">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Proof of Repair (Photo 1)</label>
+                                <input type="file" id="comp-photo-before" class="form-control" accept="image/*" capture="environment" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Proof of Repair (Photo 2)</label>
+                                <input type="file" id="comp-photo-after" class="form-control" accept="image/*" capture="environment">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Repair Summary / Notes</label>
+                            <textarea id="comp-report" class="form-control" rows="3" placeholder="Explain what was fixed..." required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>Customer Sign-off</label>
+                            <p style="font-size: 0.8rem; color: #a0a0a0; margin-bottom: 8px;">
+                                <i>I confirm receipt of my device and that the repair is satisfactory.</i>
+                            </p>
+                            <canvas id="signature-canvas" class="signature-pad" style="width: 100%; border: 1px dashed var(--border); border-radius: 8px; cursor: crosshair;"></canvas>
+                            <button type="button" class="btn-secondary" style="margin-top: 8px;" onclick="app.clearSignature()">Clear Signature</button>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancel</button>
+                            <button type="submit" class="btn-primary" style="background: var(--success);"><span class="material-symbols-outlined" style="margin-right: 4px;">check_circle</span> Finalize & Archive</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        window.app.showModal(modalHTML);
+        setTimeout(() => app.initSignaturePad(), 100);
+    },
+
+    async submitCompletion(e, jobId) {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        if(btn) { btn.innerHTML = 'Archiving...'; btn.disabled = true; }
+
+        try {
+            const photo1 = document.getElementById('comp-photo-before').files[0];
+            const photo2 = document.getElementById('comp-photo-after').files[0];
+            const report = document.getElementById('comp-report').value;
+            const sigCanvas = document.getElementById('signature-canvas');
+            const signature = sigCanvas ? sigCanvas.toDataURL() : null;
+
+            // Reuse field compression if available
+            const compress = window.field?.compressImage || (async (f) => null);
+            const [p1B64, p2B64] = await Promise.all([compress(photo1), compress(photo2)]);
+
+            const completionData = {
+                completedAt: firebase.firestore.FieldValue.serverTimestamp(),
+                photoBefore: p1B64,
+                photoAfter: p2B64,
+                report: report,
+                signature: signature
+            };
+
+            await window.fbDb.collection('jobs').doc(jobId).update({
+                status: 'Completed',
+                completionData: completionData,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            app.closeModal();
+            alert("Workshop Job successfully finalized!");
+        } catch(err) {
+            console.error(err);
+            alert("Error saving completion report.");
+            if(btn) { btn.innerHTML = 'Finalize & Archive'; btn.disabled = false; }
+        }
+    },
+
+    viewReport(jobId) {
+        const job = window.app.state.jobs.find(j => j.id === jobId);
+        if(!job || !job.completionData) return alert("No proof of completion found.");
+        
+        const cd = job.completionData;
+        app.showModal(`
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h2>Completion Proof: ${job.id}</h2>
+                    <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div class="modal-body">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px;">
+                        ${cd.photoBefore ? `<img src="${cd.photoBefore}" style="width: 100%; border-radius: 8px;">` : ''}
+                        ${cd.photoAfter ? `<img src="${cd.photoAfter}" style="width: 100%; border-radius: 8px;">` : ''}
+                    </div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; margin-bottom: 20px;">
+                        <h4 style="margin: 0 0 8px 0; color: var(--accent);">Technician Summary</h4>
+                        <p style="margin: 0;">${cd.report}</p>
+                    </div>
+                    <div style="background: white; padding: 12px; border-radius: 8px; text-align: center;">
+                        <h4 style="margin: 0 0 8px 0; color: #333;">Client Sign-off</h4>
+                        ${cd.signature ? `<img src="${cd.signature}" style="max-height: 80px;">` : 'No signature captured'}
+                    </div>
+                </div>
+            </div>
+        `);
     }
 };
 

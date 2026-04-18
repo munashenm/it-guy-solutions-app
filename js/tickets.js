@@ -26,7 +26,7 @@ window.tickets = {
                     <p style="color: #a0a0a0; margin-top: 4px;">Manage support requests, track billable time, and onsite consulting.</p>
                 </div>
                 <div style="display: flex; gap: 12px;">
-                    <button class="btn-primary" onclick="tickets.showNewTicketModal()"><span class="material-symbols-outlined">add_circle</span> New Ticket</button>
+                    ${window.authSystem?.currentUser?.role !== 'technician' ? `<button class="btn-primary" onclick="tickets.showNewTicketModal()"><span class="material-symbols-outlined">add_circle</span> New Ticket</button>` : ''}
                 </div>
             </div>
 
@@ -79,6 +79,7 @@ window.tickets = {
                                 <th>Priority</th>
                                 <th>Client / Contact</th>
                                 <th>Subject</th>
+                                <th>Assigned To</th>
                                 <th>Time Tracked</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -118,9 +119,16 @@ window.tickets = {
 
     renderTicketRows(filter = '') {
         const tks = window.app.state.tickets || [];
+        const currentUser = window.authSystem?.currentUser;
         const filtered = tks.filter(t => {
-            const searchStr = `${t.id} ${t.customer} ${t.subject}`.toLowerCase();
-            return searchStr.includes(filter.toLowerCase());
+            const matchesSearch = `${t.id} ${t.customer} ${t.subject}`.toLowerCase().includes(filter.toLowerCase());
+            
+            if (currentUser && currentUser.role === 'technician') {
+                const uName = currentUser.email.split('@')[0].toLowerCase();
+                // Techs only see tickets specifically assigned to them
+                return matchesSearch && t.assignedTo && t.assignedTo.toLowerCase().includes(uName);
+            }
+            return matchesSearch;
         });
 
         if(filtered.length === 0) {
@@ -140,6 +148,7 @@ window.tickets = {
                         <div style="font-size: 0.8rem; color: #a0a0a0;">${t.phone || t.email || ''}</div>
                     </td>
                     <td>${t.subject}</td>
+                    <td><span style="font-size: 0.9rem; color: #a29bfe; font-weight: 600;">${t.assignedTo || 'Unassigned'}</span></td>
                     <td><span class="material-symbols-outlined" style="font-size: 1rem; vertical-align: middle; color: var(--accent);">schedule</span> ${timeTracked}</td>
                     <td><span class="badge ${t.status?.toLowerCase() || 'open'}">${t.status || 'Open'}</span></td>
                     <td>
@@ -336,6 +345,17 @@ window.tickets = {
                             </div>
 
                             <div style="display: grid; grid-template-columns: 1fr; gap: 10px;">
+                                ${window.authSystem?.currentUser?.role === 'admin' ? `
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.75rem;">Assign Technician</label>
+                                    <select class="form-control" style="appearance: auto;" onchange="tickets.assignTech('${ticket.id}', this.value)">
+                                        <option value="">Unassigned</option>
+                                        <option value="Admin" ${ticket.assignedTo === 'Admin' ? 'selected' : ''}>Admin</option>
+                                        <option value="John" ${ticket.assignedTo === 'John' ? 'selected' : ''}>John</option>
+                                        <option value="Sarah" ${ticket.assignedTo === 'Sarah' ? 'selected' : ''}>Sarah</option>
+                                    </select>
+                                </div>
+                                ` : ''}
                                 <button class="btn-secondary" style="justify-content: center;" onclick="tickets.toggleStatus('${ticket.id}')">
                                     <span class="material-symbols-outlined">sync</span> Mark as ${ticket.status === 'Open' ? 'Pending' : 'Open'}
                                 </button>
@@ -503,6 +523,22 @@ window.tickets = {
         const newStatus = ticket.status === 'Open' ? 'Pending' : 'Open';
         await window.fbDb.collection('tickets').doc(id).update({ status: newStatus });
         this.viewTicket(id);
+    },
+
+    async assignTech(id, tech) {
+        try {
+            await window.fbDb.collection('tickets').doc(id).update({ 
+                assignedTo: tech,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            // Update local state and trigger refresh
+            const t = window.app.state.tickets.find(x => x.id === id);
+            if(t) t.assignedTo = tech;
+            this.render();
+            alert(`Ticket assigned to ${tech || 'Unassigned'}`);
+        } catch(e) {
+            alert("Assignment failed.");
+        }
     },
 
     showBillingModal(id) {
