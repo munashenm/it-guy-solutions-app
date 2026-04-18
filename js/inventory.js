@@ -214,22 +214,21 @@ window.inventory = {
 
         try {
             await window.fbDb.collection('inventory').add({
-                sku: document.getElementById('part-sku').value,
-                serial: document.getElementById('part-serial') ? document.getElementById('part-serial').value : '',
-                name: document.getElementById('part-name').value,
-                category: document.getElementById('part-cat').value === '_NEW_' ? document.getElementById('part-cat-new').value : document.getElementById('part-cat').value,
-                supplier: document.getElementById('part-supplier').value,
-                cost: document.getElementById('part-cost').value,
-                sell: document.getElementById('part-sell').value,
-                qty: parseInt(document.getElementById('part-qty').value) || 0,
+                sku: document.getElementById('part-sku')?.value || '',
+                serial: document.getElementById('part-serial')?.value || '',
+                name: document.getElementById('part-name')?.value || '',
+                category: (document.getElementById('part-cat')?.value === '_NEW_') ? (document.getElementById('part-cat-new')?.value || 'General') : (document.getElementById('part-cat')?.value || 'General'),
+                supplier: document.getElementById('part-supplier')?.value || '',
+                cost: document.getElementById('part-cost')?.value || '0.00',
+                sell: document.getElementById('part-sell')?.value || '0.00',
+                qty: parseInt(document.getElementById('part-qty')?.value) || 0,
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-            window.app.logActivity('Inventory Item Added', `Added ${document.getElementById('part-name').value} (SKU: ${document.getElementById('part-sku').value})`);
+            window.app.logActivity('Inventory Item Added', `Added ${document.getElementById('part-name')?.value} (SKU: ${document.getElementById('part-sku')?.value})`);
             window.app.closeModal();
-            // The onSnapshot listener in app.js will auto-refresh the table
         } catch(error) {
             console.error("Error adding part:", error);
-            alert("Failed to save stock item. Check connection.");
+            alert("Failed to save stock item: " + error.message);
             if(btn) { btn.innerHTML = 'Save Part'; btn.disabled = false; }
         }
     },
@@ -316,21 +315,21 @@ window.inventory = {
 
         try {
             await window.fbDb.collection('inventory').doc(id).update({
-                sku: document.getElementById('edit-part-sku').value,
-                serial: document.getElementById('edit-part-serial').value,
-                name: document.getElementById('edit-part-name').value,
-                category: document.getElementById('edit-part-cat').value === '_NEW_' ? document.getElementById('edit-part-cat-new').value : document.getElementById('edit-part-cat').value,
-                supplier: document.getElementById('edit-part-supplier').value,
-                cost: document.getElementById('edit-part-cost').value,
-                sell: document.getElementById('edit-part-sell').value,
-                qty: parseInt(document.getElementById('edit-part-qty').value) || 0,
+                sku: document.getElementById('edit-part-sku')?.value || '',
+                serial: document.getElementById('edit-part-serial')?.value || '',
+                name: document.getElementById('edit-part-name')?.value || '',
+                category: (document.getElementById('edit-part-cat')?.value === '_NEW_') ? (document.getElementById('edit-part-cat-new')?.value || 'General') : (document.getElementById('edit-part-cat')?.value || 'General'),
+                supplier: document.getElementById('edit-part-supplier')?.value || '',
+                cost: document.getElementById('edit-part-cost')?.value || '',
+                sell: document.getElementById('edit-part-sell')?.value || '',
+                qty: parseInt(document.getElementById('edit-part-qty')?.value) || 0,
                 updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
-            window.app.logActivity('Inventory Item Updated', `Modified ${document.getElementById('edit-part-name').value} (SKU: ${document.getElementById('edit-part-sku').value})`);
+            window.app.logActivity('Inventory Item Updated', `Modified ${document.getElementById('edit-part-name')?.value || id}`);
             window.app.closeModal();
         } catch(error) {
             console.error("Error updating part:", error);
-            alert("Failed to update stock item.");
+            alert("Failed to update stock item: " + error.message);
             if(btn) { btn.innerHTML = 'Update Item'; btn.disabled = false; }
         }
     },
