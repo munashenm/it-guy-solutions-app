@@ -1388,6 +1388,28 @@ const app = {
             dataObj = (app.state.jobs || []).find(j => j.id === docId) || (app.state.fieldJobs || []).find(f => f.id === docId);
         }
 
+        // FALLBACK: If not in state, try to fetch directly from DB to avoid sync delay errors
+        if (!dataObj && docType !== 'Report') {
+            try {
+                let collName = '';
+                if(docType === 'Invoice') collName = 'invoices';
+                else if(docType === 'Quotation') collName = 'quotations';
+                else if(docType === 'Cash Receipt') collName = 'sales';
+                else if(docType === 'Job Card') collName = (docId.startsWith('FLD-')) ? 'fieldJobs' : 'jobs';
+                
+                if(collName) {
+                    console.log(`Document ${docId} not in state. Attempting direct DB fetch...`);
+                    const doc = await window.fbDb.collection(collName).doc(docId).get();
+                    if(doc.exists) {
+                        dataObj = doc.data();
+                        console.log(`Successfully fetched ${docId} from DB fallback.`);
+                    }
+                }
+            } catch (e) {
+                console.error("Direct DB fetch failed during document action", e);
+            }
+        }
+
         if (actionType === 'Print' || actionType === 'Download') {
             if(!window.pdfGenerator) {
                 alert("System Error: The high-fidelity PDF engine failed to load properly. Please refresh the portal and try again.");
@@ -1396,7 +1418,7 @@ const app = {
             }
 
             if (!dataObj && docType !== 'Report') {
-                alert(`Data Sync Error: Could not find the source record for ${docType} ${docId}. If you just created it, please wait a few seconds for synchronization.`);
+                alert(`Data Sync Error: Could not find the source record for ${docType} ${docId}. If you just created it, please wait a few seconds and try again.`);
                 if(btn && btn.tagName === 'BUTTON') { btn.innerHTML = oldContent; btn.disabled = false; }
                 return;
             }
