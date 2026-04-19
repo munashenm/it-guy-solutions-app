@@ -267,6 +267,7 @@ window.pdfGenerator = {
                                 ${dataObj.address ? `<span style="display: block; color: #000000;">${dataObj.address}</span>` : ''}
                                 ${dataObj.email ? `<span style="display: block; color: #000000;">${dataObj.email}</span>` : ''}
                                 ${dataObj.phone ? `<span style="display: block; color: #000000;">${dataObj.phone}</span>` : ''}
+                                ${(dataObj.vat || dataObj.vatNumber) ? `<span style="display: block; color: #000000;"><strong>VAT No:</strong> ${dataObj.vat || dataObj.vatNumber}</span>` : ''}
                             </div>
                             ${dataObj.device ? `
                             <div style="font-size: 13px; color: #000000; text-align: right; background-color: #ffffff; padding: 12px; border: 1px solid #e0e0e0; border-radius: 8px; width: 220px;">
@@ -336,6 +337,33 @@ window.pdfGenerator = {
                                 ${dataObj.devicePasscode ? `<div style="font-size: 13px; color: #000000;"><strong>Device PIN:</strong> <span style="font-family:monospace; background:#eee; padding:2px 4px;">${dataObj.devicePasscode}</span></div>` : ''}
                             </div>
                         </div>
+                    `;
+                } else if (docType === 'Statement') {
+                    bodyHTML = `
+                        <div style="margin-bottom: 30px; font-family: ${fontStack};">
+                            <h3 style="font-size: 16px; border-bottom: 2px solid ${themeColor}; padding-bottom: 8px; color: ${themeColor};">Account Statement</h3>
+                            <p style="font-size: 13px; color: #000;">Total Outstanding Balance: <strong style="font-size: 18px;">R ${dataObj.totalOutstanding.toFixed(2)}</strong></p>
+                        </div>
+                        <table style="width: 100%; border-collapse: collapse; margin-bottom: 35px; font-size: 12px; color: #000; font-family: ${fontStack};">
+                            <thead>
+                                <tr style="background-color: ${accentColor}; border-bottom: 2px solid ${themeColor};">
+                                    <th style="padding: 10px; text-align: left;">Reference</th>
+                                    <th style="padding: 10px; text-align: left;">Date</th>
+                                    <th style="padding: 10px; text-align: left;">Status</th>
+                                    <th style="padding: 10px; text-align: right;">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${dataObj.invoices.map(i => `
+                                    <tr style="border-bottom: 1px solid #eee;">
+                                        <td style="padding: 10px;">${i.id}</td>
+                                        <td style="padding: 10px;">${i.date}</td>
+                                        <td style="padding: 10px;"><span style="color: ${i.status === 'Paid' ? 'green' : 'red'};">${i.status}</span></td>
+                                        <td style="padding: 10px; text-align: right;">${i.amount}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
                     `;
                 }
 

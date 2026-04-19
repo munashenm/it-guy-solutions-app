@@ -88,6 +88,10 @@ window.customers = {
                             <label>Physical Address</label>
                             <input type="text" id="crm-addr" class="form-control" placeholder="123 Main St, City">
                         </div>
+                        <div class="form-group">
+                            <label>VAT Number (Optional)</label>
+                            <input type="text" id="crm-vat" class="form-control" placeholder="e.g. 123456789">
+                        </div>
                         <div class="modal-footer">
                             <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancel</button>
                             <button type="submit" class="btn-primary">Save Customer</button>
@@ -107,6 +111,7 @@ window.customers = {
             phone: document.getElementById('crm-phone').value.trim(),
             email: document.getElementById('crm-email').value.trim(),
             address: document.getElementById('crm-addr').value.trim(),
+            vat: document.getElementById('crm-vat').value.trim(),
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
@@ -128,6 +133,10 @@ window.customers = {
                     if (form.emailEl) { const target = document.getElementById(form.emailEl); if(target) target.value = payload.email; }
                     if (form.addressEl) { const target = document.getElementById(form.addressEl); if(target) target.value = payload.address; }
                     if (form.contactEl) { const target = document.getElementById(form.contactEl); if(target) target.value = payload.name; }
+                    if (payload.vat) {
+                        const vatEl = document.getElementById('inv-vat');
+                        if (vatEl) vatEl.value = payload.vat;
+                    }
                 }
             });
 

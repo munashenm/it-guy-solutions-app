@@ -452,10 +452,12 @@ const app = {
         if(c) {
             const phoneEl = document.getElementById(prefix + '-phone');
             const emailEl = document.getElementById(prefix + '-email');
-            const addrEl = document.getElementById(prefix + '-address'); // For invoces/callouts
+            const addrEl = document.getElementById(prefix + '-address'); 
+            const vatEl = document.getElementById(prefix + '-vat'); 
             if(phoneEl && c.phone) phoneEl.value = c.phone;
             if(emailEl && c.email) emailEl.value = c.email;
             if(addrEl && c.address) addrEl.value = c.address;
+            if(vatEl && c.vat) vatEl.value = c.vat;
         }
     },
     
@@ -1152,6 +1154,9 @@ const app = {
         
         if (sourceObj) {
             document.getElementById('inv-client').value = sourceObj.customer || '';
+            const vatEl = document.getElementById('inv-vat');
+            if(vatEl) vatEl.value = sourceObj.vat || '';
+            
             document.getElementById('inv-phone').value = sourceObj.phone || '';
             document.getElementById('inv-email').value = sourceObj.email || '';
             document.getElementById('inv-address').value = sourceObj.address || '';
@@ -1387,9 +1392,12 @@ const app = {
         if (docType === 'Job Card') {
             dataObj = (app.state.jobs || []).find(j => j.id === docId) || (app.state.fieldJobs || []).find(f => f.id === docId);
         }
+        if (docType === 'Statement') {
+            // dataObj is already passed in the call for statements
+        }
 
         // FALLBACK: If not in state, try to fetch directly from DB to avoid sync delay errors
-        if (!dataObj && docType !== 'Report') {
+        if (!dataObj && docType !== 'Report' && docType !== 'Statement') {
             try {
                 let collName = '';
                 if(docType === 'Invoice') collName = 'invoices';

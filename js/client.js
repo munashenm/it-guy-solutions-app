@@ -151,7 +151,12 @@ window.client = {
         // 3. Invoices Section
         html += `
             <div style="margin-bottom: 32px;">
-                <h3 style="margin-bottom: 16px; color: #a29bfe; border-bottom: 1px solid #e0e0e0; padding-bottom: 8px;">My Invoices</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #e0e0e0; padding-bottom: 8px;">
+                    <h3 style="margin: 0; color: #a29bfe;">My Invoices</h3>
+                    <button class="btn-secondary" style="font-size: 0.8rem; padding: 4px 12px;" onclick="client.downloadStatement()">
+                        <span class="material-symbols-outlined" style="font-size: 1rem; margin-right: 4px;">analytics</span> Statement Report
+                    </button>
+                </div>
                 <div class="glass-card" style="padding: 0;">
                     <div class="table-container">
                         <table>
@@ -192,6 +197,33 @@ window.client = {
         `;
 
         this.container.innerHTML = html;
+    },
+
+    async downloadStatement() {
+        const curEmail = window.authSystem.currentUser.email.toLowerCase();
+        const myInvoices = (app.state.invoices || []).filter(i => (i.email || '').toLowerCase() === curEmail);
+        
+        if (myInvoices.length === 0) {
+            alert("You have no invoices to generate a statement from.");
+            return;
+        }
+
+        const statementData = {
+            customer: curEmail.split('@')[0],
+            email: curEmail,
+            date: new Date().toLocaleDateString(),
+            invoices: myInvoices.map(i => ({
+                id: i.id,
+                date: i.date,
+                amount: i.amount,
+                status: i.status
+            })),
+            totalInvoiced: myInvoices.reduce((sum, i) => sum + (parseFloat(i.amount.replace(/[^0-9.]/g, '')) || 0), 0),
+            totalOutstanding: myInvoices.filter(i => i.status !== 'Paid').reduce((sum, i) => sum + (parseFloat(i.amount.replace(/[^0-9.]/g, '')) || 0), 0)
+        };
+
+        // We use the Report docType with custom data
+        app.executeDocumentAction('Download', 'Statement', curEmail, statementData);
     },
 
     approveQuotation(quoteId) {
