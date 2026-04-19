@@ -1415,6 +1415,25 @@ const app = {
                     throw new Error(`No valid contact provided for ${actionType}. Please edit the client profile.`);
                 }
 
+                // Prepare Content Preview
+                const sysSettings = this.state.settings || {};
+                const subject = `${docType} - ${docId} from ${sysSettings.emailName || 'IT Guy Solutions'}`;
+                const parsedAmt = dataObj && dataObj.amount ? parseFloat(dataObj.amount) : null;
+                const amountMsg = parsedAmt && !isNaN(parsedAmt) ? `\n\nTotal Amount: R ${parsedAmt.toFixed(2)}` : '';
+                let defaultText = `Hi,\n\nPlease find attached the ${docType} (${docId}) regarding your recent service.${amountMsg}\n\nKind Regards,\n${sysSettings.emailName || 'IT Guy Solutions'}`;
+                
+                if (actionType === 'WhatsApp') {
+                    defaultText = `Hi! This is ${sysSettings.emailName || 'IT Guy Solutions'}. Just sharing your ${docType} (${docId}).${amountMsg}\n\nLink: https://app.itguysa.co.za/track.html?id=${docId}`;
+                }
+
+                const confirmed = await this.showNotificationPreview(actionType, contactInfo, subject, defaultText);
+                if (!confirmed) {
+                    if(btn && btn.tagName === 'BUTTON') { btn.innerHTML = oldContent; btn.disabled = false; }
+                    return;
+                }
+
+                const finalMessage = confirmed.message;
+
                 // If email, we actually generate the PDF base64 to send as an attachment
                 let pdfBase64 = null;
                 if (actionType === 'Email' && window.pdfGenerator && docType !== 'Report') {
@@ -1428,22 +1447,74 @@ const app = {
                     docId,
                     contactInfo,
                     pdfBase64,
-                    dataObj
+                    dataObj,
+                    customMessage: finalMessage,
+                    subject: confirmed.subject || subject
                 };
 
-                const res = await window.safeFetch(`${window.API_BASE || '/api'}/notify`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
+                if (actionType === 'WhatsApp') {
+                    const waUrl = `https://wa.me/${contactInfo.replace(/\s+/g, '')}?text=${encodeURIComponent(finalMessage)}`;
+                    window.open(waUrl, '_blank');
+                    alert("WhatsApp opened in a new tab. Please complete the send there.");
+                } else {
+                    const res = await window.safeFetch(`${window.API_BASE || '/api'}/notify`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    alert(`${docType} ${docId} successfully sent to ${contactInfo} via ${actionType}!`);
+                }
 
-                alert(`${docType} ${docId} successfully sent to ${contactInfo} via ${actionType}!`);
             } catch (err) {
                 console.error(err);
                 alert(`Failed to send ${actionType}: ` + err.message);
             }
             if(btn && btn.tagName === 'BUTTON') { btn.innerHTML = oldContent; btn.disabled = false; }
         }
+    },
+
+    showNotificationPreview(type, contact, subject, message) {
+        return new Promise((resolve) => {
+            const modalHTML = `
+                <div class="modal-content" style="max-width: 500px;">
+                    <div class="modal-header">
+                        <h2>Preview ${type}</h2>
+                        <button class="btn-icon" onclick="app._resolvePreview(null)"><span class="material-symbols-outlined">close</span></button>
+                    </div>
+                    <div class="modal-body">
+                        <p style="margin-bottom: 12px; color: var(--text-secondary);">Sending to: <strong>${contact}</strong></p>
+                        ${type === 'Email' ? `
+                            <div class="form-group">
+                                <label>Subject</label>
+                                <input type="text" id="prev-subject" class="form-control" value="${subject}">
+                            </div>
+                        ` : ''}
+                        <div class="form-group">
+                            <label>Message Content</label>
+                            <textarea id="prev-message" class="form-control" style="height: 180px;">${message}</textarea>
+                        </div>
+                        <div class="modal-footer">
+                            <button class="btn-secondary" onclick="app._resolvePreview(null)">Cancel</button>
+                            <button class="btn-primary" onclick="app._resolvePreview('ok')">Send Now</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            this.showModal(modalHTML);
+            this._previewResolver = resolve;
+        });
+    },
+
+    _resolvePreview(status) {
+        if (!status) {
+            this.closeModal();
+            this._previewResolver(null);
+            return;
+        }
+        const msg = document.getElementById('prev-message').value;
+        const sub = document.getElementById('prev-subject')?.value || '';
+        this.closeModal();
+        this._previewResolver({ message: msg, subject: sub });
     },
 
     convertQuoteToInvoice(quoteId) {

@@ -7,6 +7,7 @@ const nodemailer = require('nodemailer');
 const multer = require('multer');
 const fs = require('fs');
 const axios = require('axios');
+const bcrypt = require('bcryptjs');
 
 const uploadDir = path.resolve(__dirname, 'uploads');
 try {
@@ -179,8 +180,9 @@ db.init().then(async () => {
         if (!row) {
             logger('info', 'Seeding default admin user...');
             const admin = { uid: 'admin-123', email: 'admin@techguy.pl', username: 'admin', firstName: 'System', lastName: 'Admin', employeeId: 'EMP-001', role: 'admin' };
+            const hashedDefault = await bcrypt.hash('admin123', 12);
             await db.run("INSERT INTO users (uid, email, username, firstName, lastName, employeeId, role, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
-                [admin.uid, admin.email, admin.username, admin.firstName, admin.lastName, admin.employeeId, admin.role, 'admin123']);
+                [admin.uid, admin.email, admin.username, admin.firstName, admin.lastName, admin.employeeId, admin.role, hashedDefault]);
             const jsonData = JSON.stringify(admin);
             if (isMySQL) {
                 await db.run(`INSERT INTO collections (id, name, data, updatedAt) VALUES (?, 'users', ?, CURRENT_TIMESTAMP) 
@@ -244,16 +246,44 @@ const getCollection = async (name, query = {}) => {
     }
 };
 
-// Authentication
+// Authentication with Hybrid Migration (Plain -> Bcrypt)
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
     try {
-        const row = await db.get("SELECT * FROM users WHERE (email = ? OR username = ?) AND password = ?", [email, email, password]);
+        // Find user by email or username
+        const row = await db.get("SELECT * FROM users WHERE email = ? OR username = ?", [email, email]);
+        
         if (row) {
-            const token = 'token-' + Math.random().toString(36).substr(2) + Date.now().toString(36);
-            await db.run("UPDATE users SET sessionToken = ? WHERE uid = ?", [token, row.uid]);
-            const { password, sessionToken, ...user } = row;
-            res.json({ user, token });
+            let isValid = false;
+            let needsMigration = false;
+
+            // 1. Try Bcrypt check
+            if (row.password && row.password.startsWith('$2a$')) {
+                isValid = await bcrypt.compare(password, row.password);
+            } 
+            // 2. Fallback to Plain text check for legacy users
+            else {
+                isValid = (row.password === password);
+                if (isValid) needsMigration = true;
+            }
+
+            if (isValid) {
+                const token = 'token-' + Math.random().toString(36).substr(2) + Date.now().toString(36);
+                
+                // If this was a plain text login, hash the password now
+                if (needsMigration) {
+                    const hashedPassword = await bcrypt.hash(password, 12);
+                    await db.run("UPDATE users SET sessionToken = ?, password = ? WHERE uid = ?", [token, hashedPassword, row.uid]);
+                    logger('info', `Successfully migrated user ${email} to Bcrypt hashing.`);
+                } else {
+                    await db.run("UPDATE users SET sessionToken = ? WHERE uid = ?", [token, row.uid]);
+                }
+
+                const { password: _p, sessionToken: _s, ...user } = row;
+                res.json({ user, token });
+            } else {
+                res.status(401).json({ error: "Invalid credentials" });
+            }
         } else {
             res.status(401).json({ error: "Invalid credentials" });
         }
@@ -287,7 +317,7 @@ const requireAdmin = (req, res, next) => {
 // Apply auth middleware to all secure routes
 app.use(['/api/users', '/api/collections', '/api/transaction', '/api/counters', '/api/restore', '/api/backup', '/api/notify'], requireAuth);
 
-// User Registration Endpoint (Bypasses Firebase Auth)
+// User Registration Endpoint (Now with BCRYPT)
 app.post('/api/users', async (req, res) => {
     const { email, password, role, username, firstName, lastName, employeeId } = req.body;
     if(!email || !password || !role) return res.status(400).json({ error: "Missing required fields" });
@@ -296,8 +326,9 @@ app.post('/api/users', async (req, res) => {
     const uid = 'user-' + Math.random().toString(36).substring(2, 12);
     
     try {
+        const hashedPassword = await bcrypt.hash(password, 12);
         await db.run("INSERT INTO users (uid, email, username, firstName, lastName, employeeId, role, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
-            [uid, email, username||'', firstName||'', lastName||'', employeeId||'', role, password]);
+            [uid, email, username||'', firstName||'', lastName||'', employeeId||'', role, hashedPassword]);
         
         const userData = { uid, email, username: username||'', firstName: firstName||'', lastName: lastName||'', employeeId: employeeId||'', role, createdAt: new Date().toISOString() };
         await saveDoc('users', uid, userData);
@@ -312,23 +343,34 @@ app.post('/api/users/password', async (req, res) => {
     if(!uid || !oldPassword || !newPassword) return res.status(400).json({ error: "Missing required fields" });
 
     try {
-        const row = await db.get("SELECT * FROM users WHERE uid = ? AND password = ?", [uid, oldPassword]);
-        if(!row) return res.status(401).json({ error: "Incorrect current password" });
+        const row = await db.get("SELECT * FROM users WHERE uid = ?", [uid]);
+        if(!row) return res.status(404).json({ error: "User not found" });
 
-        await db.run("UPDATE users SET password = ? WHERE uid = ?", [newPassword, uid]);
+        let isMatch = false;
+        if (row.password.startsWith('$2a$')) {
+            isMatch = await bcrypt.compare(oldPassword, row.password);
+        } else {
+            isMatch = (row.password === oldPassword);
+        }
+
+        if(!isMatch) return res.status(401).json({ error: "Incorrect current password" });
+
+        const hashedPassword = await bcrypt.hash(newPassword, 12);
+        await db.run("UPDATE users SET password = ? WHERE uid = ?", [hashedPassword, uid]);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
-// Admin forced password change
+// Admin forced password change (Bcrypt)
 app.post('/api/users/admin-password', async (req, res) => {
     const { uid, newPassword } = req.body;
     if(!uid || !newPassword) return res.status(400).json({ error: "Missing required fields" });
 
     try {
-        await db.run("UPDATE users SET password = ? WHERE uid = ?", [newPassword, uid]);
+        const hashedPassword = await bcrypt.hash(newPassword, 12);
+        await db.run("UPDATE users SET password = ? WHERE uid = ?", [hashedPassword, uid]);
         res.json({ success: true });
     } catch (err) {
         res.status(500).json({ error: err.message });
@@ -547,13 +589,16 @@ app.post('/api/notify', async (req, res) => {
             const subject = `${docType} - ${docId} from ${sysSettings.emailName || 'IT Guy Solutions'}`;
             const parsedAmt = dataObj && dataObj.amount ? parseFloat(dataObj.amount) : null;
             const amountMsg = parsedAmt && !isNaN(parsedAmt) ? `\n\nTotal Amount: R ${parsedAmt.toFixed(2)}` : '';
-            const textContent = `Hi,\n\nPlease find attached the ${docType} (${docId}) regarding your recent service.${amountMsg}\n\nKind Regards,\n${sysSettings.emailName || 'IT Guy Solutions'}`;
+            const defaultText = `Hi,\n\nPlease find attached the ${docType} (${docId}) regarding your recent service.${amountMsg}\n\nKind Regards,\n${sysSettings.emailName || 'IT Guy Solutions'}`;
+            
+            const finalSubject = req.body.subject || `${docType} - ${docId} from ${sysSettings.emailName || 'IT Guy Solutions'}`;
+            const textContent = req.body.customMessage || defaultText;
 
             await transporter.sendMail({
                 from: `"${sysSettings.emailName || 'IT Guy Solutions'}" <${sysSettings.smtpUser}>`,
                 replyTo: sysSettings.emailReply,
                 to: contactInfo,
-                subject: subject,
+                subject: finalSubject,
                 text: textContent,
                 attachments: attachments
             });

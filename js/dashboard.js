@@ -10,11 +10,29 @@ window.dashboard = {
             if (!this.container) return;
         }
 
-        const jobs = app.state.jobs;
-        const invoices = app.state.invoices;
+        const jobs = app.state.jobs || [];
+        const invoices = app.state.invoices || [];
+        const fieldJobs = app.state.fieldJobs || [];
         
         const openJobsCount = jobs.filter(j => j.status !== 'Collected').length;
         const unpaidInvoicesCount = invoices.filter(i => i.status === 'Unpaid').length;
+        const techsOnSite = fieldJobs.filter(j => j.status?.toLowerCase() === 'on-site').length;
+        
+        // Calculate Revenue This Week
+        const startOfWeek = new Date();
+        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+        startOfWeek.setHours(0,0,0,0);
+        
+        const weeklyRevenue = invoices
+            .filter(i => i.status === 'Paid' && new Date(i.createdAt) >= startOfWeek)
+            .reduce((sum, i) => sum + (parseFloat(i.total || i.amount) || 0), 0);
+            
+        // Urgent Jobs (Started > 48h ago)
+        const fortyEightHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
+        const urgentJobs = jobs.filter(j => 
+            j.status === 'Started' && 
+            new Date(j.createdAt).getTime() < fortyEightHoursAgo
+        ).length;
         
         const html = `
             <div class="section-header">
@@ -33,23 +51,33 @@ window.dashboard = {
                     </div>
                 </div>
                 
-                <div class="glass-card stat-card">
+                <div class="glass-card stat-card" onclick="app.switchTab('invoices-view')" style="cursor: pointer;">
                     <div class="stat-icon warning">
-                        <span class="material-symbols-outlined">receipt_long</span>
+                        <span class="material-symbols-outlined">payments</span>
                     </div>
                     <div class="stat-content">
-                        <h3>Unpaid Invoices</h3>
-                        <div class="value">${unpaidInvoicesCount}</div>
+                        <h3>Revenue This Week</h3>
+                        <div class="value">R ${weeklyRevenue.toLocaleString()}</div>
                     </div>
                 </div>
                 
-                <div class="glass-card stat-card">
+                <div class="glass-card stat-card" onclick="app.switchTab('field-view')" style="cursor: pointer;">
                     <div class="stat-icon success">
                         <span class="material-symbols-outlined">directions_car</span>
                     </div>
                     <div class="stat-content">
                         <h3>Technicians on site</h3>
-                        <div class="value">1</div>
+                        <div class="value">${techsOnSite}</div>
+                    </div>
+                </div>
+
+                <div class="glass-card stat-card ${urgentJobs > 0 ? 'urgent-pulse' : ''}" onclick="app.switchTab('repair-view')" style="cursor: pointer;">
+                    <div class="stat-icon danger">
+                        <span class="material-symbols-outlined">priority_high</span>
+                    </div>
+                    <div class="stat-content">
+                        <h3>Urgent Repairs</h3>
+                        <div class="value">${urgentJobs}</div>
                     </div>
                 </div>
             </div>

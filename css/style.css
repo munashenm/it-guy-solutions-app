@@ -1051,3 +1051,78 @@ textarea.form-control {
         overflow-y: auto;
     }
 }
+
+/* Premium Animations & Effects */
+
+/* Login Logo Breathing Glow */
+#login-logo-container .logo-icon {
+    animation: logo-breathing 3s ease-in-out infinite;
+    filter: drop-shadow(0 0 10px rgba(var(--accent-rgb), 0.3));
+}
+
+@keyframes logo-breathing {
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 10px rgba(var(--accent-rgb), 0.3)); }
+    50% { transform: scale(1.05); filter: drop-shadow(0 0 20px rgba(var(--accent-rgb), 0.6)); }
+}
+
+/* Urgent Pulse Effect */
+.urgent-pulse {
+    border: 2px solid var(--danger) !important;
+    animation: urgent-grow 2s ease-in-out infinite;
+}
+
+@keyframes urgent-grow {
+    0%, 100% { box-shadow: 0 0 10px rgba(255, 118, 117, 0.2); }
+    50% { box-shadow: 0 0 25px rgba(255, 118, 117, 0.5); }
+}
+
+/* Rotating icon for syncing */
+.rotating {
+    animation: rotate 1.5s linear infinite;
+}
+
+@keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* View Transition Fade */
+.view-section {
+    animation: fade-in 0.4s ease-out;
+}
+
+@keyframes fade-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Status Pulse for On-Site jobs */
+.badge.active {
+    position: relative;
+    overflow: hidden;
+}
+
+.badge.active::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: inherit;
+    animation: status-pulse 1.5s infinite;
+}
+
+@keyframes status-pulse {
+    0% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1.5); opacity: 0; }
+}
+
+/* Glass Card Hover Elevation */
+.glass-card {
+    transition: var(--transition);
+}
+
+.glass-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    border-color: rgba(255, 255, 255, 0.15);
+}
