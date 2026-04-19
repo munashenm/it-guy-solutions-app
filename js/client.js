@@ -6,8 +6,7 @@ window.client = {
 
     ensureMockDataForClient(email) {
         // Only run if we are in Mock mode and data hasn't been injected yet for this email
-        // This makes testing easy for the user
-        const hasJob = app.state.jobs.some(j => j.email === email);
+        const hasJob = app.state.jobs.some(j => (j.email || '').toLowerCase() === email.toLowerCase());
         if (!hasJob) {
             app.state.jobs.push({
                 id: 'JOB-9999',
@@ -50,12 +49,6 @@ window.client = {
         const curEmail = user.email.toLowerCase();
         const displayName = user.firstName || curEmail.split('@')[0];
         
-        // Populate specific mock data for this user to make the demo feel alive
-        if (!window.fbAuth) {
-            this.ensureMockDataForClient(curEmail);
-        }
-
-        // Filter all records for just this client
         const myJobs = (app.state.jobs || []).filter(j => (j.email || '').toLowerCase() === curEmail);
         const myQuotations = (app.state.quotations || []).filter(q => (q.email || '').toLowerCase() === curEmail);
         const myInvoices = (app.state.invoices || []).filter(i => (i.email || '').toLowerCase() === curEmail);
@@ -78,21 +71,24 @@ window.client = {
         `;
 
         // 1. Pending Actions Section
-        if(myQuotations.some(q => q.status === 'Pending') || myInvoices.some(i => i.status === 'Unpaid')) {
+        const pendingQuos = myQuotations.filter(q => q.status === 'Pending');
+        const unpaidInvs = myInvoices.filter(i => i.status === 'Unpaid');
+
+        if(pendingQuos.length > 0 || unpaidInvs.length > 0) {
             html += `
             <div class="glass-card" style="margin-bottom: 32px; border: 1px solid rgba(108, 92, 231, 0.3); background: rgba(108, 92, 231, 0.05);">
                 <h4 style="margin-bottom: 12px; color: var(--primary);">⚠️ Action Required</h4>
                 <div style="display: flex; flex-wrap: wrap; gap: 16px;">
-                    ${myQuotations.filter(q => q.status === 'Pending').map(q => `
+                    ${pendingQuos.map(q => `
                         <div class="pending-item">
                             <span>Quote <strong>${q.id}</strong> requires your approval</span>
-                            <button class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="client.approveQuotation('${q.id}')">View & Action</button>
+                            <button class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="client.viewQuotation('${q.id}')">View & Comment</button>
                         </div>
                     `).join('')}
-                    ${myInvoices.filter(i => i.status === 'Unpaid').map(i => `
+                    ${unpaidInvs.map(i => `
                         <div class="pending-item">
                             <span>Invoice <strong>${i.id}</strong> is ready for payment</span>
-                            <button class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background: var(--success);">Pay Now</button>
+                            <button class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background: var(--success);" onclick="client.viewInvoice('${i.id}')">Pay Now</button>
                         </div>
                     `).join('')}
                 </div>
@@ -106,33 +102,26 @@ window.client = {
                     <span class="material-symbols-outlined" style="color: var(--primary);">query_stats</span>
                     Active Repair Status
                 </h3>
-                <div class="grid-3">
+                <div class="grid-3" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
                     ${myJobs.length > 0 ? myJobs.map(job => `
                         <div class="glass-card job-track-card">
                             <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
                                 <span class="job-id">${job.id}</span>
-                                <span class="badge ${job.status.toLowerCase().replace(' ', '-')}">${job.status}</span>
+                                <span class="badge ${job.status.toLowerCase().replace(/ /g, '-')}">${job.status}</span>
                             </div>
                             <h4 style="margin-bottom: 5px;">${job.device}</h4>
                             <p style="font-size: 0.85rem; color: #888;">${job.issue || 'General Maintenance'}</p>
                             <div class="track-timeline">
-                                <div class="track-step ${['Received', 'In Diagnosis', 'Waiting for Parts', 'Repairing', 'Ready'].includes(job.status) ? 'active' : ''}"></div>
-                                <div class="track-step ${['In Diagnosis', 'Waiting for Parts', 'Repairing', 'Ready'].includes(job.status) ? 'active' : ''}"></div>
-                                <div class="track-step ${['Waiting for Parts', 'Repairing', 'Ready'].includes(job.status) ? 'active' : ''}"></div>
-                                <div class="track-step ${['Repairing', 'Ready'].includes(job.status) ? 'active' : ''}"></div>
-                                <div class="track-step ${['Ready', 'Completed'].includes(job.status) ? 'active' : ''}"></div>
                                 <div class="track-step ${['Received', 'In Diagnosis', 'Waiting for Parts', 'Repairing', 'Ready', 'Collected'].includes(job.status) ? 'active' : ''}"></div>
                                 <div class="track-step ${['In Diagnosis', 'Waiting for Parts', 'Repairing', 'Ready', 'Collected'].includes(job.status) ? 'active' : ''}"></div>
                                 <div class="track-step ${['Waiting for Parts', 'Repairing', 'Ready', 'Collected'].includes(job.status) ? 'active' : ''}"></div>
                                 <div class="track-step ${['Repairing', 'Ready', 'Collected'].includes(job.status) ? 'active' : ''}"></div>
                                 <div class="track-step ${['Ready', 'Collected'].includes(job.status) ? 'active' : ''}"></div>
                             </div>
-                            
-                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #555; font-weight: 500;">
-                                <span>Booked</span>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #666; margin-top: 10px;">
+                                <span>Received</span>
                                 <span>Ready</span>
                             </div>
-
                             ${['Collected', 'Delivered', 'Completed'].includes(job.status) ? `
                                 <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;">
                                     ${job.rating ? `
@@ -146,7 +135,7 @@ window.client = {
                                 </div>
                             ` : ''}
                         </div>
-                    `).join('') : '<p style="grid-column: 1/-1; text-align: center; color: #666; padding: 40px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">You currently have no active repairs. Book a repair to get started!</p>'}
+                    `).join('') : '<p style="grid-column: 1/-1; text-align: center; color: #666; padding: 40px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">No active repairs found.</p>'}
                 </div>
             </div>
         `;
@@ -189,7 +178,7 @@ window.client = {
         const desc = document.getElementById('cl-desc').value;
         const user = window.authSystem.currentUser;
 
-        if(btn) { btn.innerHTML = '<span class="material-symbols-outlined rotating">hourglass_empty</span> Loging...'; btn.disabled = true; }
+        if(btn) { btn.innerHTML = 'Submitting...'; btn.disabled = true; }
 
         try {
             const newId = 'FLD-' + Math.floor(Math.random()*9000 + 1000);
@@ -206,10 +195,9 @@ window.client = {
 
             await window.fbDb.collection('fieldJobs').doc(newId).set(payload);
             app.closeModal();
-            alert(`Support call logged! Reference: ${newId}. A technician will call you shortly.`);
+            alert(`Support call logged! Reference: ${newId}.`);
         } catch(err) {
-            console.error(err);
-            alert("Error logging call. Please try again.");
+            alert("Error logging call.");
             if(btn) { btn.innerHTML = 'Log Ticket'; btn.disabled = false; }
         }
     },
@@ -223,7 +211,6 @@ window.client = {
                 </div>
                 <div class="modal-body">
                     <p style="color: #a0a0a0; margin-bottom: 20px;">Choose how we will receive your device.</p>
-                    
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
                         <div class="choice-card active" onclick="this.parentNode.querySelector('.active').classList.remove('active'); this.classList.add('active'); window.repairType='Walk-in'">
                             <span class="material-symbols-outlined">store</span>
@@ -236,19 +223,18 @@ window.client = {
                             <p style="font-size: 0.8rem; color: #888;">We collect from you</p>
                         </div>
                     </div>
-
                     <form onsubmit="client.submitRepairBooking(event)">
                         <div class="form-group">
                             <label>Device Type & Model</label>
-                            <input type="text" id="rep-device" class="form-control" placeholder="e.g. iPhone 13 Pro / HP Laptop" required>
+                            <input type="text" id="rep-device" class="form-control" required placeholder="e.g. MacBook Pro">
                         </div>
                         <div class="form-group">
-                            <label>What is wrong with it?</label>
-                            <textarea id="rep-issue" class="form-control" placeholder="Describe the fault..." required rows="3"></textarea>
+                            <label>Description of Issue</label>
+                            <textarea id="rep-issue" class="form-control" required rows="3"></textarea>
                         </div>
                         <div class="modal-footer" style="margin-top: 24px;">
                             <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancel</button>
-                            <button type="submit" class="btn-primary" style="padding: 10px 24px;">Confirm Booking</button>
+                            <button type="submit" class="btn-primary">Confirm Booking</button>
                         </div>
                     </form>
                 </div>
@@ -260,39 +246,102 @@ window.client = {
 
     async submitRepairBooking(e) {
         e.preventDefault();
-        const btn = e.target.querySelector('.btn-primary');
         const user = window.authSystem.currentUser;
-        
-        const device = document.getElementById('rep-device').value;
-        const issue = document.getElementById('rep-issue').value;
-        const type = window.repairType;
-
-        if(btn) { btn.innerHTML = 'Processing...'; btn.disabled = true; }
-
+        const jobId = 'JOB-' + Math.floor(Math.random()*9000 + 1000);
+        const job = {
+            id: jobId,
+            device: document.getElementById('rep-device').value,
+            issue: document.getElementById('rep-issue').value,
+            type: window.repairType,
+            status: 'Requested',
+            customer: user.firstName + ' ' + (user.lastName || ''),
+            email: user.email,
+            date: new Date().toISOString().split('T')[0]
+        };
         try {
-            const jobId = 'JOB-' + Math.floor(Math.random()*9000 + 1000);
-            const job = {
-                id: jobId,
-                device,
-                issue,
-                type,
-                status: 'Requested',
-                customer: user.firstName + ' ' + (user.lastName || ''),
-                email: user.email,
-                phone: user.phone || 'N/A',
-                date: new Date().toISOString().split('T')[0]
-            };
-
             await window.fbDb.collection('jobs').doc(jobId).set(job);
             app.state.jobs.unshift(job);
             app.closeModal();
-            alert(`Repair Booked! Reference: ${jobId}. ${type === 'Courier' ? 'Our team will call you for collection details.' : 'Please bring your device to our store at your earliest convenience.'}`);
+            alert(`Repair Booked! Reference: ${jobId}`);
+            this.render();
+        } catch(err) { alert("Error booking repair."); }
+    },
+
+    viewQuotation(quoteId) {
+        const quo = app.state.quotations.find(q => q.id === quoteId);
+        if(!quo) return;
+
+        const modalHTML = `
+            <div class="modal-content" style="max-width: 600px;">
+                <div class="modal-header">
+                    <h2>Quotation Details: ${quo.id}</h2>
+                    <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div class="modal-body">
+                    <div style="background: rgba(255,255,255,0.03); padding: 20px; border-radius: 12px; margin-bottom: 24px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+                            <div>
+                                <div style="font-size: 0.8rem; color: #888;">Date</div>
+                                <div>${quo.date}</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="font-size: 0.8rem; color: #888;">Expected Total</div>
+                                <div style="font-size: 1.4rem; font-weight: 700; color: #ffffff;">${quo.amount}</div>
+                            </div>
+                        </div>
+
+                        <div style="border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
+                            <h4 style="margin-bottom: 10px; font-size: 0.9rem; color: var(--primary);">Itemized Breakdown</h4>
+                            ${(quo.items || []).map(item => `
+                                <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px;">
+                                    <span>${item.desc} (x${item.qty})</span>
+                                    <span>R ${(item.unit * item.qty).toFixed(2)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Your Comments / Questions</label>
+                        <textarea id="quo-comment" class="form-control" placeholder="Any specific requests or questions about this repair?" rows="3">${quo.clientComment || ''}</textarea>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 30px;">
+                        <button class="btn-secondary" onclick="client.updateQuotationStatus('${quo.id}', 'Discuss', true)">
+                            <span class="material-symbols-outlined">chat_bubble</span> Contact Me
+                        </button>
+                        <button class="btn-primary" style="background: var(--success);" onclick="client.updateQuotationStatus('${quo.id}', 'Approved', false)">
+                            <span class="material-symbols-outlined">check_circle</span> Approve Repair
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        app.showModal(modalHTML);
+    },
+
+    async updateQuotationStatus(quoteId, status, needsContact) {
+        const comment = document.getElementById('quo-comment').value;
+        try {
+            await window.fbDb.collection('quotations').doc(quoteId).update({
+                status: status,
+                clientComment: comment
+            });
+            const idx = app.state.quotations.findIndex(q => q.id === quoteId);
+            if (idx > -1) {
+                app.state.quotations[idx].status = status;
+                app.state.quotations[idx].clientComment = comment;
+            }
+            app.closeModal();
+            alert(needsContact ? "Request sent! Technician will contact you." : "Quotation approved!");
             this.render();
         } catch(err) {
-            console.error(err);
-            alert("Error booking repair.");
-            if(btn) { btn.innerHTML = 'Confirm Booking'; btn.disabled = false; }
+            alert("Error updating quotation.");
         }
+    },
+
+    viewInvoice(invId) {
+        app.executeDocumentAction('Print', 'Invoice', invId);
     },
 
     showRateJobModal(jobId) {
@@ -303,7 +352,6 @@ window.client = {
                 </div>
                 <div class="modal-body">
                     <p style="color: #a0a0a0; margin-bottom: 24px;">How happy are you with repair <b>${jobId}</b>?</p>
-                    
                     <form onsubmit="client.submitJobRating(event, '${jobId}')">
                         <div class="star-rating" style="margin-bottom: 24px;">
                             <input type="radio" id="star5" name="rating" value="5" required>
@@ -317,11 +365,9 @@ window.client = {
                             <input type="radio" id="star1" name="rating" value="1">
                             <label for="star1">★</label>
                         </div>
-                        
                         <div class="form-group" style="text-align: left;">
-                            <textarea id="rating-fb" class="form-control" placeholder="Any additional comments? (Optional)"></textarea>
+                            <textarea id="rating-fb" class="form-control" placeholder="Any comments?"></textarea>
                         </div>
-                        
                         <div class="modal-footer" style="justify-content: center; margin-top: 24px;">
                             <button type="submit" class="btn-primary" style="background: var(--success); width: 100%;">Submit Rating</button>
                         </div>
@@ -337,36 +383,13 @@ window.client = {
         const formData = new FormData(e.target);
         const rating = parseInt(formData.get('rating'));
         const feedback = document.getElementById('rating-fb').value;
-
         try {
-            await window.fbDb.collection('jobs').doc(jobId).update({
-                rating: rating,
-                feedback: feedback
-            });
-            // Update local state
+            await window.fbDb.collection('jobs').doc(jobId).update({ rating, feedback });
             const idx = app.state.jobs.findIndex(j => j.id === jobId);
             if(idx > -1) app.state.jobs[idx].rating = rating;
-            
             app.closeModal();
-            alert("Thank you for your feedback! It helps us improve.");
+            alert("Thank you for your feedback!");
             this.render();
-        } catch(err) {
-            alert("Could not save rating. Please try again.");
-        }
-    },
-
-    approveQuotation(quoteId) {
-        if(confirm(`Approve quotation ${quoteId}?\nThis tells our team to proceed with the repair immediately.`)) {
-            const idx = app.state.quotations.findIndex(q => q.id === quoteId);
-            if (idx > -1) {
-                app.state.quotations[idx].status = 'Approved';
-                alert(`Quotation ${quoteId} Approved! Techinicans have been notified.`);
-                this.render();
-            }
-        }
-    },
-
-    viewInvoice(invId) {
-        app.executeDocumentAction('Print', 'Invoice', invId);
+        } catch(err) { alert("Error saving rating."); }
     }
 };
