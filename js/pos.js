@@ -40,7 +40,7 @@ window.posSystem = {
                     <div style="padding: 16px; border-bottom: 1px solid #e0e0e0;">
                         <div style="display: flex; gap: 8px;">
                             <input type="text" id="pos-customer" list="crm-customers-list" class="form-control" placeholder="Select existing or type Walk-in">
-                            <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal()" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>
+                            <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal('pos')" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>
                         </div>
                         ${window.app ? window.app.generateCustomerDatalist() : ''}
                     </div>

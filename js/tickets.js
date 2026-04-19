@@ -201,7 +201,7 @@ window.tickets = {
                             <label>Client Selection</label>
                             <div style="display: flex; gap: 8px;">
                                 <input type="text" id="tck-customer" list="crm-customers-list" class="form-control" placeholder="Select existing client or type name" required oninput="app.fillCustomerDetails(this.value, 'tck')">
-                                <button type="button" class="btn-secondary" style="padding: 0 12px;" onclick="customers.showAddCustomerModal()"><span class="material-symbols-outlined">person_add</span></button>
+                                <button type="button" class="btn-secondary" style="padding: 0 12px;" onclick="customers.showAddCustomerModal('tickets')"><span class="material-symbols-outlined">person_add</span></button>
                             </div>
                         </div>
                         <div class="form-row">

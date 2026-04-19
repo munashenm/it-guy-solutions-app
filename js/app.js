@@ -759,7 +759,7 @@ const app = {
                                 <label>Customer Name</label>
                                 <div style="display: flex; gap: 8px;">
                                     <input type="text" id="job-customer" list="crm-customers-list" class="form-control" placeholder="Select existing or type Walk-in" required oninput="app.fillCustomerDetails(this.value, 'job')">
-                                    <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal()" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>
+                                    <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal('job')" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>
                                 </div>
                                 ${this.generateCustomerDatalist()}
                             </div>
@@ -912,7 +912,7 @@ const app = {
                             <label>Client Details (Name or Company)</label>
                             <div style="display: flex; gap: 8px;">
                                 <input type="text" id="callout-client" list="crm-customers-list" class="form-control" placeholder="Select existing or type Walk-in" required oninput="app.fillCustomerDetails(this.value, 'callout')">
-                                <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal()" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>
+                                <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal('callout')" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>
                             </div>
                             ${this.generateCustomerDatalist()}
                         </div>
@@ -1053,7 +1053,7 @@ const app = {
                                 <label>Company / Client Name (Optional)</label>
                                 <div style="display: flex; gap: 8px;">
                                     <input type="text" id="inv-client" list="crm-customers-list" class="form-control" placeholder="e.g. Acme Corp or Walk-in" oninput="app.fillCustomerDetails(this.value, 'inv')">
-                                    <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal()" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>
+                                    <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal('invoice')" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>
                                 </div>
                                 ${this.generateCustomerDatalist()}
                             </div>
@@ -1640,7 +1640,7 @@ const app = {
                                 <label>Company / Client Name</label>
                                 <div style="display: flex; gap: 8px;">
                                     <input type="text" id="quo-client" list="crm-customers-list" class="form-control" placeholder="e.g. Acme Corp or John Doe" value="${data.customer || ''}" required oninput="app.fillCustomerDetails(this.value, 'quo')">
-                                    <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal()" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>
+                                    <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal('quotation')" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>
                                 </div>
                                 ${this.generateCustomerDatalist()}
                             </div>

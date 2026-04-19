@@ -61,7 +61,10 @@ window.customers = {
         `).join('');
     },
 
-    showAddCustomerModal() {
+    lastModalSource: null,
+
+    showAddCustomerModal(source = null) {
+        this.lastModalSource = source;
         const modalHTML = `
             <div class="modal-content" style="max-width: 500px;">
                 <div class="modal-header">
@@ -125,7 +128,67 @@ window.customers = {
         try {
             await window.fbDb.collection('customers').add(payload);
             
-            // Intelligence: If the "Schedule Call-out" or "New Workshop Job" modal was effectively being filled, populate it
+            const source = this.lastModalSource;
+            window.app.closeModal(); // Close "Add Customer" modal
+            
+            // Intelligence: Return to previous modal if any
+            if (source === 'tickets') {
+                await window.tickets.showNewTicketModal();
+                const custEl = document.getElementById('tck-customer');
+                if(custEl) custEl.value = payload.name;
+                const phoneEl = document.getElementById('tck-phone');
+                if(phoneEl) phoneEl.value = payload.phone;
+            } else if (source === 'job') {
+                window.app.showNewJobModal();
+                const custEl = document.getElementById('job-customer');
+                if(custEl) custEl.value = payload.name;
+                const phoneEl = document.getElementById('job-phone');
+                if(phoneEl) phoneEl.value = payload.phone;
+                const emailEl = document.getElementById('job-email');
+                if(emailEl) emailEl.value = payload.email;
+            } else if (source === 'callout') {
+                window.app.showScheduleCalloutModal();
+                const custEl = document.getElementById('callout-client');
+                if(custEl) custEl.value = payload.name;
+                const phoneEl = document.getElementById('callout-phone');
+                if(phoneEl) phoneEl.value = payload.phone;
+                const emailEl = document.getElementById('callout-email');
+                if(emailEl) emailEl.value = payload.email;
+                const addrEl = document.getElementById('callout-address');
+                if(addrEl) addrEl.value = payload.address;
+                const contactEl = document.getElementById('callout-contact-person');
+                if(contactEl) contactEl.value = payload.name;
+            } else if (source === 'invoice') {
+                window.app.showCreateInvoiceModal();
+                const custEl = document.getElementById('inv-client');
+                if(custEl) custEl.value = payload.name;
+                const phoneEl = document.getElementById('inv-phone');
+                if(phoneEl) phoneEl.value = payload.phone;
+                const emailEl = document.getElementById('inv-email');
+                if(emailEl) emailEl.value = payload.email;
+                const addrEl = document.getElementById('inv-address');
+                if(addrEl) addrEl.value = payload.address;
+                const vatEl = document.getElementById('inv-vat');
+                if(vatEl) vatEl.value = payload.vat;
+                const regEl = document.getElementById('inv-reg');
+                if(regEl) regEl.value = payload.regNo;
+            } else if (source === 'quotation') {
+                window.app.showCreateQuotationModal();
+                const custEl = document.getElementById('quo-client');
+                if(custEl) custEl.value = payload.name;
+                const phoneEl = document.getElementById('quo-phone');
+                if(phoneEl) phoneEl.value = payload.phone;
+                const emailEl = document.getElementById('quo-email');
+                if(emailEl) emailEl.value = payload.email;
+                const addrEl = document.getElementById('quo-address');
+                if(addrEl) addrEl.value = payload.address;
+            } else if (source === 'pos' && window.posSystem) {
+                // POS might handle its own customer selection or we might need to populate a specific field
+                const custEl = document.getElementById('pos-customer');
+                if(custEl) custEl.value = payload.name;
+            }
+
+            // Fallback: Populate any visible forms in the background (legacy behavior)
             const activeForms = [
                 { id: 'callout-client', nameEl: 'callout-client', phoneEl: 'callout-phone', emailEl: 'callout-email', addressEl: 'callout-address', contactEl: 'callout-contact-person' },
                 { id: 'job-customer', nameEl: 'job-customer', phoneEl: 'job-phone', emailEl: 'job-email' },
@@ -140,15 +203,8 @@ window.customers = {
                     if (form.emailEl) { const target = document.getElementById(form.emailEl); if(target) target.value = payload.email; }
                     if (form.addressEl) { const target = document.getElementById(form.addressEl); if(target) target.value = payload.address; }
                     if (form.contactEl) { const target = document.getElementById(form.contactEl); if(target) target.value = payload.name; }
-                    if (payload.vat) {
-                        const vatEl = document.getElementById('inv-vat');
-                        if (vatEl) vatEl.value = payload.vat;
-                    }
                 }
             });
-
-            window.app.closeModal(); // Close "Add Customer" modal
-            // The underlying form (Callout/Job/Inv) stays open and is now populated!
         } catch(error) {
             console.error("Error adding customer:", error);
             alert("Failed to save customer. Check connection.");
