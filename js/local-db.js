@@ -337,13 +337,14 @@ window.localAuth = {
                 body: JSON.stringify({ email, password })
             });
 
-            if (data.user && data.token) {
+            if (data && data.user && data.token) {
                 // Use sessionStorage to forget login on browser close
                 sessionStorage.setItem('it-guy-token', data.token);
                 sessionStorage.setItem('it-guy-user', JSON.stringify(data.user));
                 triggerAuthChange(data.user);
             } else {
-                throw new Error("Invalid response format from server");
+                const serverMsg = data && data.error ? data.error : JSON.stringify(data);
+                throw new Error(`Invalid response from server: ${serverMsg}`);
             }
         } catch (e) {
             console.error("Login API Error:", e.message);

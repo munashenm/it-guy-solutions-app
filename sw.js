@@ -22,12 +22,15 @@ self.addEventListener('install', event => {
 
 self.addEventListener('fetch', event => {
   // If request is an API call to our backend, use Network First, fallback to nothing
-  if (event.request.url.includes('/api/')) {
-      event.respondWith(
-          fetch(event.request).catch(() => new Response(JSON.stringify({ error: "Offline" }), { headers: { 'Content-Type': 'application/json' } }))
-      );
-      return;
-  }
+    if (event.request.url.includes('/api/')) {
+        event.respondWith(
+            fetch(event.request).catch(() => new Response(
+                JSON.stringify({ error: "Backend Unreachable. Please check if the Node.js app is running on the server." }), 
+                { status: 503, headers: { 'Content-Type': 'application/json' } }
+            ))
+        );
+        return;
+    }
   
   // For static assets, Cache First, fallback to Network
   event.respondWith(
