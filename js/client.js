@@ -1,13 +1,14 @@
 /**
  * it-guy-solutions-app/js/client.js
  * 
- * Manages the Customer Self-Service Portal logic, 
- * including repair booking, support tickets, and quotations.
+ * Manages the Customer Self-Service Portal logic.
  */
+
+console.log("--- CLIENT.JS LOADED ---");
 
 window.client = {
     init() {
-        console.log("Client Portal Module Initializing...");
+        console.log("--- CLIENT.INIT() CALLED ---");
         this.container = document.getElementById('client-content');
         if (!this.container) {
             console.error("Critical Error: 'client-content' container not found in DOM.");
