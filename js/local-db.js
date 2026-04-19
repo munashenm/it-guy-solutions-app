@@ -67,8 +67,8 @@ async function safeFetch(url, options = {}) {
 
         if (!contentType || !contentType.includes('application/json')) {
             const text = await res.text();
-            console.error('Expected JSON but received:', text.substring(0, 500));
-            throw new Error("Server returned an invalid response (not JSON). Please ensure the backend is running and configured correctly.");
+            const snippet = text.substring(0, 100).replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            throw new Error(`Server returned non-JSON response (200 OK). Snippet: ${snippet}`);
         }
 
         return await res.json();
