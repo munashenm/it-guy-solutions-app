@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
-    <link rel="stylesheet" href="css/style.css?v=2.0">
+    <link rel="stylesheet" href="css/style.css?v=2.1">
     <style>
         .client-header {
             display: flex;
@@ -27,106 +27,58 @@
             align-items: center;
             gap: 12px;
         }
-        .client-logo .logo-icon {
-            font-size: 32px;
+        .highlight {
             color: var(--primary);
-        }
-        .client-container {
-            max-width: 1200px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-        #login-screen {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            background: radial-gradient(circle at top right, #1e2235, #0f111a);
-        }
-        .login-card {
-            max-width: 400px;
-            width: 100%;
-            padding: 40px;
-            text-align: center;
-        }
-        .error-msg {
-            background: rgba(255, 118, 117, 0.1);
-            color: #ff7675;
-            padding: 12px;
-            border-radius: 6px;
-            margin: 16px 0;
-            font-size: 0.85rem;
-            text-align: center;
-            border: 1px solid rgba(255, 118, 117, 0.2);
-        }
-        .success-msg {
-            background: rgba(0, 184, 148, 0.1);
-            color: #00b894;
-            padding: 12px;
-            border-radius: 6px;
-            margin: 16px 0;
-            font-size: 0.85rem;
-            text-align: center;
-            border: 1px solid rgba(0, 184, 148, 0.2);
-        }
-        .auth-btn {
-            width: 100%;
-            justify-content: center;
-            padding: 14px;
-            margin-top: 12px;
+            font-weight: 700;
         }
     </style>
 </head>
-<body class="dark-theme">
-
+<body class="itguy-theme">
     <!-- Login Screen -->
-    <div id="login-screen">
-        <div class="glass-card login-card">
-            <div class="logo-section" style="margin-bottom: 32px;">
-                <span class="material-symbols-outlined logo-icon" style="font-size: 56px; color: var(--primary); margin-bottom: 8px;">terminal</span>
-                <h1 style="font-size: 2rem; margin: 0;">IT Guy<span class="highlight">Portal</span></h1>
-                <p style="color: var(--text-secondary); margin-top: 8px;">Customer Self-Service Area</p>
-            </div>
+    <div id="login-screen" class="glass-bg">
+        <div class="login-wrapper">
+            <div class="login-card glass-card">
+                <div class="logo-section" id="login-logo-container">
+                    <span class="material-symbols-outlined logo-icon" style="font-size: 3rem; color: var(--primary);">terminal</span>
+                    <h1 style="font-size: 2rem; margin: 12px 0 0 0;">IT Guy<span class="highlight">Portal</span></h1>
+                    <p style="color: var(--text-secondary); margin-top: 8px;">Customer Self-Service Area</p>
+                </div>
 
-            <div id="auth-forms-container">
                 <!-- Login View -->
                 <div id="view-login">
-                    <p style="color: var(--text-secondary); text-align: center; margin-bottom: 24px; font-size: 0.95rem;">
-                        Sign in to access your repair tracker, invoices, and quotes.
-                    </p>
-                    <form onsubmit="handleCustomerLogin(event)">
+                    <form id="login-form">
                         <div class="form-group">
                             <label style="text-align: left; display: block;">Email Address</label>
-                            <input type="email" id="login-email" class="form-control" placeholder="e.g. customer@example.com" required>
+                            <input type="email" id="login-email" class="form-control" placeholder="yourname@gmail.com" required autocomplete="email">
                         </div>
                         <div class="form-group">
                             <label style="text-align: left; display: block;">Password</label>
-                            <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
-                        </div>
-                        <div style="text-align: right; margin-bottom: 16px;">
-                            <a href="#" onclick="toggleAuthView('forgot')" style="color: var(--primary); font-size: 0.85rem; text-decoration: none;">Forgot Password?</a>
+                            <input type="password" id="login-password" class="form-control" placeholder="••••••••" required autocomplete="current-password">
                         </div>
                         <div id="login-error" class="error-msg hidden"></div>
-                        <button type="submit" class="btn-primary auth-btn">Sign In</button>
+                        <div style="text-align: right; margin-bottom: 20px;">
+                            <a href="#" onclick="toggleAuthView('forgot')" style="font-size: 0.85rem; color: #666; text-decoration: none;">Forgot Password?</a>
+                        </div>
+                        <button type="submit" class="btn-primary auth-btn">Access My Portal</button>
                     </form>
-                    <p style="margin-top: 20px; font-size: 0.9rem; color: var(--text-secondary);">
-                        Don't have an account? <a href="#" onclick="toggleAuthView('register')" style="color: var(--primary); font-weight: 600; text-decoration: none;">Create one now</a>
+                    <p style="margin-top: 24px; font-size: 0.9rem; color: var(--text-secondary);">
+                        New customer? <a href="#" onclick="toggleAuthView('register')" style="color: var(--primary); font-weight: 600; text-decoration: none;">Create one now</a>
                     </p>
                 </div>
 
                 <!-- Register View -->
                 <div id="view-register" class="hidden">
                     <h2 style="margin-bottom: 8px;">Create Account</h2>
-                    <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.9rem;">Join the IT Guy Portal to track your repairs.</p>
-                    <form onsubmit="handleCustomerRegister(event)">
-                        <div class="form-row">
-                            <div class="form-group">
+                    <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.9rem;">Join the IT Guy family for self-service repairs.</p>
+                    <form onsubmit="handleRegister(event)">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px;">
+                            <div class="form-group" style="margin-bottom: 0;">
                                 <label style="text-align: left; display: block;">First Name</label>
-                                <input type="text" id="reg-firstname" class="form-control" placeholder="John" required>
+                                <input type="text" id="reg-fname" class="form-control" placeholder="John" required>
                             </div>
-                            <div class="form-group">
+                            <div class="form-group" style="margin-bottom: 0;">
                                 <label style="text-align: left; display: block;">Last Name</label>
-                                <input type="text" id="reg-lastname" class="form-control" placeholder="Doe" required>
+                                <input type="text" id="reg-lname" class="form-control" placeholder="Doe">
                             </div>
                         </div>
                         <div class="form-group">
@@ -134,18 +86,18 @@
                             <input type="email" id="reg-email" class="form-control" placeholder="john@example.com" required>
                         </div>
                         <div class="form-group">
-                            <label style="text-align: left; display: block;">Mobile Number</label>
-                            <input type="tel" id="reg-phone" class="form-control" placeholder="082 123 4567" required>
+                            <label style="text-align: left; display: block;">Mobile Phone</label>
+                            <input type="text" id="reg-phone" class="form-control" placeholder="012 345 6789" required>
                         </div>
                         <div class="form-group">
-                            <label style="text-align: left; display: block;">Create Password</label>
-                            <input type="password" id="reg-password" class="form-control" placeholder="Min. 6 characters" required minlength="6">
+                            <label style="text-align: left; display: block;">Password</label>
+                            <input type="password" id="reg-password" class="form-control" placeholder="min 6 chars" required minlength="6">
                         </div>
                         <div id="reg-error" class="error-msg hidden"></div>
                         <button type="submit" class="btn-primary auth-btn">Register Account</button>
                     </form>
                     <p style="margin-top: 20px; font-size: 0.9rem; color: var(--text-secondary);">
-                        Already have an account? <a href="#" onclick="toggleAuthView('login')" style="color: var(--primary); font-weight: 600; text-decoration: none;">Log In</a>
+                        Already have an account? <a href="#" onclick="toggleAuthView('login')" style="color: var(--primary); font-weight: 600; text-decoration: none;">Sign In</a>
                     </p>
                 </div>
 
@@ -196,7 +148,11 @@
 
         <main class="client-container">
             <div id="client-content">
-                <!-- Client.js renders here -->
+                <!-- Portal.js renders here -->
+                 <div style="padding: 60px; text-align: center; color: #444;">
+                     <span class="material-symbols-outlined rotating" style="font-size: 48px;">sync</span>
+                     <p style="margin-top: 15px;">Synchronizing your data...</p>
+                 </div>
             </div>
         </main>
 
@@ -215,15 +171,9 @@
     <!-- Tooltip / Toaster -->
     <div id="notification-bar" class="hidden"></div>
 
-    <!-- Scripts -->
-    <script src="js/local-db.js?v=2.0"></script>
-    <script src="js/firebase-init.js?v=2.0"></script>
-    <script src="js/auth.js?v=2.0"></script>
-    <script src="js/portal.js?v=2.0"></script>
-    <script src="js/pdf.js?v=2.0"></script>
-    
+    <!-- Scripts - REORDERED FOR BOOT RELIABILITY -->
     <script>
-        // Mocking the 'app' functions that client.js expects
+        // Define global app object BEFORE scripts load
         window.app = {
             state: {
                 jobs: [],
@@ -247,82 +197,56 @@
                 }
             },
             initialized: true,
-            init() { console.log("Portal App Mock Initialized"); },
-            applyRolePermissions(user) { console.log("Portal Permissions Applied"); },
+            init() { console.log("Mock App Initialized"); },
+            applyRolePermissions(user) { console.log("Mock App Permissions Applied"); },
             async getNextSequence(prefix) {
-                // Mock sequence
                 return prefix + '-' + (Math.floor(Math.random() * 9000) + 1000);
             },
             executeDocumentAction(action, type, id, data) {
                 if(window.pdfSystem) {
                     window.pdfSystem.generate(type, id, data);
+                } else {
+                    console.warn("PDF System not loaded yet");
                 }
-            },
-            logActivity(type, message) {
-                console.log(`[Activity] ${type}: ${message}`);
             }
         };
-
+    </script>
+    <script src="js/local-db.js?v=2.1"></script>
+    <script src="js/firebase-init.js?v=2.1"></script>
+    <script src="js/auth.js?v=2.1"></script>
+    <script src="js/portal.js?v=2.1"></script>
+    <script src="js/pdf.js?v=2.1"></script>
+    
+    <script>
         function toggleAuthView(view) {
-            document.getElementById('view-login').classList.add('hidden');
-            document.getElementById('view-register').classList.add('hidden');
-            document.getElementById('view-forgot').classList.add('hidden');
+            document.querySelectorAll('#view-login, #view-register, #view-forgot').forEach(v => v.classList.add('hidden'));
+            document.getElementById(`view-${view}`).classList.remove('hidden');
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const btn = e.target.querySelector('button');
+            const err = document.getElementById('reg-error');
             
-            document.getElementById('view-' + view).classList.remove('hidden');
-        }
-
-        async function handleCustomerLogin(e) {
-            e.preventDefault();
-            const email = document.getElementById('login-email').value;
-            const pass = document.getElementById('login-password').value;
-            const errorEl = document.getElementById('login-error');
-            const submitBtn = e.target.querySelector('button[type="submit"]');
-
-            errorEl.classList.add('hidden');
-            submitBtn.disabled = true;
-            submitBtn.innerText = "Authenticating...";
-
-            try {
-                const user = await window.fbAuth.signInWithEmailAndPassword(email, pass);
-                if (user.role !== 'client' && user.role !== 'admin') {
-                    await window.fbAuth.signOut();
-                    throw new Error("This portal is for Customers only. Staff should use the employee portal.");
-                }
-            } catch (err) {
-                errorEl.innerText = "❌ " + err.message;
-                errorEl.classList.remove('hidden');
-                submitBtn.disabled = false;
-                submitBtn.innerText = "Sign In";
-            }
-        }
-
-        async function handleCustomerRegister(e) {
-            e.preventDefault();
-            const firstName = document.getElementById('reg-firstname').value;
-            const lastName = document.getElementById('reg-lastname').value;
             const email = document.getElementById('reg-email').value;
-            const phone = document.getElementById('reg-phone').value;
             const pass = document.getElementById('reg-password').value;
-            const errorEl = document.getElementById('reg-error');
-            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const fname = document.getElementById('reg-fname').value;
+            const lname = document.getElementById('reg-lname').value;
+            const phone = document.getElementById('reg-phone').value;
 
-            errorEl.classList.add('hidden');
-            submitBtn.disabled = true;
-            submitBtn.innerText = "Creating Account...";
+            btn.disabled = true;
+            btn.innerText = "Creating Account...";
+            err.classList.add('hidden');
 
             try {
-                // 1. Create Auth User
-                const user = await window.fbAuth.createUserWithEmailAndPassword(email, pass, firstName, lastName, phone);
-                
-                // 2. The local-db adapter handles the DB entry for 'users' 
-                // in the register endpoint, but we can update local storage if needed.
-                alert("Account created successfully! You can now log in.");
-                toggleAuthView('login');
-            } catch (err) {
-                errorEl.innerText = "❌ " + err.message;
-                errorEl.classList.remove('hidden');
-                submitBtn.disabled = false;
-                submitBtn.innerText = "Register Account";
+                await window.fbAuth.createUserWithEmailAndPassword(email, pass, fname, lname, phone);
+                // Success - now log them in
+                await window.fbAuth.signInWithEmailAndPassword(email, pass);
+            } catch (e) {
+                err.innerText = "❌ Registration Failed: " + e.message;
+                err.classList.remove('hidden');
+                btn.disabled = false;
+                btn.innerText = "Register Account";
             }
         }
 
@@ -349,45 +273,18 @@
             }
         }
 
-        // Initialize Portal
-        document.addEventListener('DOMContentLoaded', () => {
-            // Listen for data ready
-            window.addEventListener('firebase-ready', () => {
-                syncDataAndRender();
-            });
-
-            // Handle Auth changes
-            window.fbAuth.onAuthStateChanged((user) => {
-                if (user && (user.role === 'client' || user.role === 'admin')) {
-                    document.getElementById('login-screen').classList.add('hidden');
-                    document.getElementById('portal-content').classList.remove('hidden');
-                    
-                    document.getElementById('client-name').textContent = user.firstName ? `${user.firstName} ${user.lastName || ''}` : user.email.split('@')[0];
-                    document.getElementById('client-email').textContent = user.email;
-                    
-                    if(window.client) window.client.init();
-                    syncDataAndRender();
-                } else {
-                    document.getElementById('login-screen').classList.remove('hidden');
-                    document.getElementById('portal-content').classList.add('hidden');
-                }
-            });
-        });
-
+        // --- Core Portal Sync ---
         async function syncDataAndRender() {
             try {
-                // Fetch Branding
-                const settingsDoc = await window.fbDb.collection('settings').doc('companyProfile').get();
-                if(settingsDoc.exists) {
-                    const s = settingsDoc.data();
+                console.log("Portal: Syncing data collections...");
+                const companyDoc = await window.fbDb.collection('settings').doc('companyProfile').get();
+                if(companyDoc.exists) {
+                    const s = companyDoc.data();
                     const logo = s.logoUrl || s.brandLogo;
                     if(logo) {
                         const logos = document.querySelectorAll('.logo-section, .client-logo');
                         logos.forEach(l => {
-                            l.innerHTML = `<img src="${logo}" alt="Logo" style="max-height: 60px; max-width: 100%;">`;
-                            if(l.classList.contains('logo-section')) {
-                                l.innerHTML += `<h1 style="font-size: 2rem; margin: 12px 0 0 0;">IT Guy<span class="highlight">Portal</span></h1><p style="color: var(--text-secondary); margin-top: 8px;">Customer Self-Service Area</p>`;
-                            }
+                            l.innerHTML = `<img src="${logo}" alt="Logo" style="max-height: 50px; max-width: 100%;">`;
                         });
                     }
                 }
@@ -401,18 +298,39 @@
                 const iSnap = await window.fbDb.collection('invoices').get();
                 window.app.state.invoices = iSnap.docs.map(d => d.data());
                 
-                if(window.client && window.authSystem.currentUser) window.client.render();
+                console.log("Portal: Collections synced. Triggering render.");
+                if(window.client && window.authSystem && window.authSystem.currentUser) {
+                    window.client.render();
+                } else {
+                    console.warn("Client or Auth not ready during sync cycle.");
+                }
             } catch(e) {
                 console.error("Data sync failed", e);
-                // If it's a 401 or session error, force logout to clear the stuck state
                 if(e.message.toLowerCase().includes('authorized') || e.message.toLowerCase().includes('session')) {
                     if(window.authSystem) window.authSystem.logout();
                 } else {
-                    // Try to render with what we have
-                    if(window.client && window.authSystem.currentUser) window.client.render();
+                    if(window.client && window.authSystem && window.authSystem.currentUser) window.client.render();
                 }
             }
         }
+
+        // Initialize Portal
+        document.addEventListener('DOMContentLoaded', () => {
+            window.addEventListener('firebase-ready', () => {
+                syncDataAndRender();
+            });
+
+            window.fbAuth.onAuthStateChanged((user) => {
+                if (user && (user.role === 'client' || user.role === 'admin')) {
+                    document.getElementById('login-screen').classList.add('hidden');
+                    document.getElementById('portal-content').classList.remove('hidden');
+                    syncDataAndRender();
+                } else {
+                    document.getElementById('login-screen').classList.remove('hidden');
+                    document.getElementById('portal-content').classList.add('hidden');
+                }
+            });
+        });
     </script>
 </body>
 </html>
