@@ -268,6 +268,7 @@ window.pdfGenerator = {
                                 ${dataObj.email ? `<span style="display: block; color: #000000;">${dataObj.email}</span>` : ''}
                                 ${dataObj.phone ? `<span style="display: block; color: #000000;">${dataObj.phone}</span>` : ''}
                                 ${(dataObj.vat || dataObj.vatNumber) ? `<span style="display: block; color: #000000;"><strong>VAT No:</strong> ${dataObj.vat || dataObj.vatNumber}</span>` : ''}
+                                ${dataObj.regNo ? `<span style="display: block; color: #000000;"><strong>Reg #:</strong> ${dataObj.regNo}</span>` : ''}
                             </div>
                             ${dataObj.device ? `
                             <div style="font-size: 13px; color: #000000; text-align: right; background-color: #ffffff; padding: 12px; border: 1px solid #e0e0e0; border-radius: 8px; width: 220px;">

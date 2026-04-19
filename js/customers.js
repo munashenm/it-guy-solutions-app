@@ -88,9 +88,15 @@ window.customers = {
                             <label>Physical Address</label>
                             <input type="text" id="crm-addr" class="form-control" placeholder="123 Main St, City">
                         </div>
-                        <div class="form-group">
-                            <label>VAT Number (Optional)</label>
-                            <input type="text" id="crm-vat" class="form-control" placeholder="e.g. 123456789">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>VAT Number (Optional)</label>
+                                <input type="text" id="crm-vat" class="form-control" placeholder="e.g. 123456789">
+                            </div>
+                            <div class="form-group">
+                                <label>Company Reg # (Optional)</label>
+                                <input type="text" id="crm-reg" class="form-control" placeholder="e.g. 2024/000000/07">
+                            </div>
                         </div>
                         <div class="modal-footer">
                             <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancel</button>
@@ -112,6 +118,7 @@ window.customers = {
             email: document.getElementById('crm-email').value.trim(),
             address: document.getElementById('crm-addr').value.trim(),
             vat: document.getElementById('crm-vat').value.trim(),
+            regNo: document.getElementById('crm-reg').value.trim(),
             createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 

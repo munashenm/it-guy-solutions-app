@@ -454,10 +454,12 @@ const app = {
             const emailEl = document.getElementById(prefix + '-email');
             const addrEl = document.getElementById(prefix + '-address'); 
             const vatEl = document.getElementById(prefix + '-vat'); 
+            const regEl = document.getElementById(prefix + '-reg'); 
             if(phoneEl && c.phone) phoneEl.value = c.phone;
             if(emailEl && c.email) emailEl.value = c.email;
             if(addrEl && c.address) addrEl.value = c.address;
             if(vatEl && c.vat) vatEl.value = c.vat;
+            if(regEl && c.regNo) regEl.value = c.regNo;
         }
     },
     
@@ -1055,9 +1057,14 @@ const app = {
                                 </div>
                                 ${this.generateCustomerDatalist()}
                             </div>
+                        <div class="form-row">
                             <div class="form-group">
                                 <label>VAT Number (Optional)</label>
                                 <input type="text" id="inv-vat" class="form-control" placeholder="e.g. 123456789">
+                            </div>
+                            <div class="form-group">
+                                <label>Company Reg # (Optional)</label>
+                                <input type="text" id="inv-reg" class="form-control" placeholder="e.g. 2024/000000/07">
                             </div>
                         </div>
                         <div class="form-row">
@@ -1157,6 +1164,9 @@ const app = {
             const vatEl = document.getElementById('inv-vat');
             if(vatEl) vatEl.value = sourceObj.vat || '';
             
+            const regEl = document.getElementById('inv-reg');
+            if(regEl) regEl.value = sourceObj.regNo || '';
+
             document.getElementById('inv-phone').value = sourceObj.phone || '';
             document.getElementById('inv-email').value = sourceObj.email || '';
             document.getElementById('inv-address').value = sourceObj.address || '';
@@ -1277,6 +1287,7 @@ const app = {
 
         let client = document.getElementById('inv-client').value;
         const vat = document.getElementById('inv-vat').value;
+        const regNo = document.getElementById('inv-reg').value;
         const phone = document.getElementById('inv-phone').value;
         const email = document.getElementById('inv-email').value;
         const address = document.getElementById('inv-address').value;
@@ -1307,6 +1318,8 @@ const app = {
             const payload = {
                 id: newId,
                 customer: client + (vat ? ' (VAT: ' + vat + ')' : ''),
+                vatNumber: vat,
+                regNo: regNo,
                 phone: phone,
                 email: email,
                 address: address,
