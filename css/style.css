@@ -1126,3 +1126,13 @@ textarea.form-control {
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
     border-color: rgba(255, 255, 255, 0.15);
 }
+
+/* New Item Highlight Animation */
+.new-item-highlight {
+    animation: highlight-green 2s ease-out;
+}
+
+@keyframes highlight-green {
+    0% { background-color: rgba(0, 184, 148, 0.2); }
+    100% { background-color: transparent; }
+}

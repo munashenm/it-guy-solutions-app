@@ -102,12 +102,26 @@ class LocalCollection {
 
     async add(data) {
         const id = this.generateId();
-        await safeFetch(`${API_BASE}/collections/${this.name}/${id}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        this.fetch();
+        const docData = { id, ...data };
+        
+        // Optimistic Update: Push to local cache immediately
+        this.data.unshift(docData);
+        this.emit();
+
+        try {
+            await safeFetch(`${API_BASE}/collections/${this.name}/${id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            // Final sync to ensure everything is matched with server
+            this.fetch();
+        } catch (e) {
+            // Revert on failure
+            this.data = this.data.filter(d => d.id !== id);
+            this.emit();
+            throw e;
+        }
         return { id };
     }
 
@@ -216,12 +230,25 @@ class LocalDoc {
     }
 
     async set(data) {
-        await safeFetch(`${API_BASE}/collections/${this.parent.name}/${this.id}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        this.parent.fetch(); // trigger immediate update
+        const docData = { id: this.id, ...data };
+        
+        // Optimistic update
+        const idx = this.parent.data.findIndex(d => d.id === this.id);
+        if (idx > -1) this.parent.data[idx] = docData;
+        else this.parent.data.unshift(docData);
+        this.parent.emit();
+
+        try {
+            await safeFetch(`${API_BASE}/collections/${this.parent.name}/${this.id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            this.parent.fetch(); 
+        } catch (e) {
+            this.parent.fetch(); // Reload on fail
+            throw e;
+        }
     }
 
     async update(data) {
@@ -231,10 +258,19 @@ class LocalDoc {
     }
 
     async delete() {
-        await safeFetch(`${API_BASE}/collections/${this.parent.name}/${this.id}`, {
-            method: 'DELETE'
-        });
-        this.parent.fetch();
+        // Optimistic delete
+        this.parent.data = this.parent.data.filter(d => d.id !== this.id);
+        this.parent.emit();
+
+        try {
+            await safeFetch(`${API_BASE}/collections/${this.parent.name}/${this.id}`, {
+                method: 'DELETE'
+            });
+            this.parent.fetch();
+        } catch (e) {
+            this.parent.fetch();
+            throw e;
+        }
     }
 }
 
