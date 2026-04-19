@@ -393,6 +393,38 @@ window.localAuth = {
         triggerAuthChange(null);
         // Forced reload ensures all modules reset their state
         setTimeout(() => window.location.reload(), 100);
+    },
+    createUserWithEmailAndPassword: async (email, password, firstName, lastName, phone) => {
+        try {
+            const data = await safeFetch(`${API_BASE}/register`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password, firstName, lastName, phone })
+            });
+            if (data && data.user) {
+                // Return just the user object to match Firebase Auth behavior
+                return data.user;
+            } else {
+                throw new Error(data.error || "Registration failed");
+            }
+        } catch (e) {
+            console.error("Register API Error:", e.message);
+            throw e;
+        }
+    },
+    sendPasswordResetEmail: async (email) => {
+        try {
+            const data = await safeFetch(`${API_BASE}/forgot-password`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            });
+            if (!data.success) throw new Error(data.error || "Reset request failed");
+            return true;
+        } catch (e) {
+            console.error("Forgot Pass API Error:", e.message);
+            throw e;
+        }
     }
 };
 

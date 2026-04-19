@@ -49,6 +49,32 @@
             padding: 40px;
             text-align: center;
         }
+        .error-msg {
+            background: rgba(255, 118, 117, 0.1);
+            color: #ff7675;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 16px 0;
+            font-size: 0.85rem;
+            text-align: center;
+            border: 1px solid rgba(255, 118, 117, 0.2);
+        }
+        .success-msg {
+            background: rgba(0, 184, 148, 0.1);
+            color: #00b894;
+            padding: 12px;
+            border-radius: 6px;
+            margin: 16px 0;
+            font-size: 0.85rem;
+            text-align: center;
+            border: 1px solid rgba(0, 184, 148, 0.2);
+        }
+        .auth-btn {
+            width: 100%;
+            justify-content: center;
+            padding: 14px;
+            margin-top: 12px;
+        }
     </style>
 </head>
 <body class="dark-theme">
@@ -62,27 +88,84 @@
                 <p style="color: var(--text-secondary); margin-top: 8px;">Customer Self-Service Area</p>
             </div>
 
-            <div id="customer-login-form">
-                <p style="color: var(--text-secondary); text-align: center; margin-bottom: 24px; font-size: 0.95rem;">
-                    Sign in to access your repair tracker, invoices, and quotes.
-                </p>
-                
-                <form id="client-login-form" onsubmit="handleCustomerLogin(event)">
-                    <div class="form-group">
-                        <label style="text-align: left; display: block;">Email Address</label>
-                        <input type="email" id="login-email" class="form-control" placeholder="e.g. customer@example.com" required>
-                    </div>
-                    <div class="form-group">
-                        <label style="text-align: left; display: block;">Password</label>
-                        <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
-                    </div>
-                    
-                    <div id="login-error" class="hidden" style="background: rgba(var(--danger-rgb), 0.1); color: var(--danger); padding: 12px; border-radius: 6px; margin: 16px 0; font-size: 0.85rem; text-align: center;"></div>
+            <div id="auth-forms-container">
+                <!-- Login View -->
+                <div id="view-login">
+                    <p style="color: var(--text-secondary); text-align: center; margin-bottom: 24px; font-size: 0.95rem;">
+                        Sign in to access your repair tracker, invoices, and quotes.
+                    </p>
+                    <form onsubmit="handleCustomerLogin(event)">
+                        <div class="form-group">
+                            <label style="text-align: left; display: block;">Email Address</label>
+                            <input type="email" id="login-email" class="form-control" placeholder="e.g. customer@example.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label style="text-align: left; display: block;">Password</label>
+                            <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
+                        </div>
+                        <div style="text-align: right; margin-bottom: 16px;">
+                            <a href="#" onclick="toggleAuthView('forgot')" style="color: var(--primary); font-size: 0.85rem; text-decoration: none;">Forgot Password?</a>
+                        </div>
+                        <div id="login-error" class="error-msg hidden"></div>
+                        <button type="submit" class="btn-primary auth-btn">Sign In</button>
+                    </form>
+                    <p style="margin-top: 20px; font-size: 0.9rem; color: var(--text-secondary);">
+                        Don't have an account? <a href="#" onclick="toggleAuthView('register')" style="color: var(--primary); font-weight: 600; text-decoration: none;">Create one now</a>
+                    </p>
+                </div>
 
-                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 14px; margin-top: 12px;">
-                        Sign In
-                    </button>
-                </form>
+                <!-- Register View -->
+                <div id="view-register" class="hidden">
+                    <h2 style="margin-bottom: 8px;">Create Account</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.9rem;">Join the IT Guy Portal to track your repairs.</p>
+                    <form onsubmit="handleCustomerRegister(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label style="text-align: left; display: block;">First Name</label>
+                                <input type="text" id="reg-firstname" class="form-control" placeholder="John" required>
+                            </div>
+                            <div class="form-group">
+                                <label style="text-align: left; display: block;">Last Name</label>
+                                <input type="text" id="reg-lastname" class="form-control" placeholder="Doe" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label style="text-align: left; display: block;">Email Address</label>
+                            <input type="email" id="reg-email" class="form-control" placeholder="john@example.com" required>
+                        </div>
+                        <div class="form-group">
+                            <label style="text-align: left; display: block;">Mobile Number</label>
+                            <input type="tel" id="reg-phone" class="form-control" placeholder="082 123 4567" required>
+                        </div>
+                        <div class="form-group">
+                            <label style="text-align: left; display: block;">Create Password</label>
+                            <input type="password" id="reg-password" class="form-control" placeholder="Min. 6 characters" required minlength="6">
+                        </div>
+                        <div id="reg-error" class="error-msg hidden"></div>
+                        <button type="submit" class="btn-primary auth-btn">Register Account</button>
+                    </form>
+                    <p style="margin-top: 20px; font-size: 0.9rem; color: var(--text-secondary);">
+                        Already have an account? <a href="#" onclick="toggleAuthView('login')" style="color: var(--primary); font-weight: 600; text-decoration: none;">Log In</a>
+                    </p>
+                </div>
+
+                <!-- Forgot Password View -->
+                <div id="view-forgot" class="hidden">
+                    <h2 style="margin-bottom: 8px;">Reset Password</h2>
+                    <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.9rem;">Enter your email to receive a reset link.</p>
+                    <form onsubmit="handleForgotPassword(event)">
+                        <div class="form-group">
+                            <label style="text-align: left; display: block;">Email Address</label>
+                            <input type="email" id="forgot-email" class="form-control" placeholder="john@example.com" required>
+                        </div>
+                        <div id="forgot-msg" class="success-msg hidden"></div>
+                        <div id="forgot-error" class="error-msg hidden"></div>
+                        <button type="submit" class="btn-primary auth-btn">Send Reset Link</button>
+                    </form>
+                    <p style="margin-top: 20px; font-size: 0.9rem; color: var(--text-secondary);">
+                        Remember your password? <a href="#" onclick="toggleAuthView('login')" style="color: var(--primary); font-weight: 600; text-decoration: none;">Back to Login</a>
+                    </p>
+                </div>
 
                 <div style="margin-top: 32px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 24px;">
                     <a href="index.html" style="color: #666; text-decoration: none; font-size: 0.85rem;">Are you Staff? Go to Employee Login</a>
@@ -160,6 +243,14 @@
             }
         };
 
+        function toggleAuthView(view) {
+            document.getElementById('view-login').classList.add('hidden');
+            document.getElementById('view-register').classList.add('hidden');
+            document.getElementById('view-forgot').classList.add('hidden');
+            
+            document.getElementById('view-' + view).classList.remove('hidden');
+        }
+
         async function handleCustomerLogin(e) {
             e.preventDefault();
             const email = document.getElementById('login-email').value;
@@ -178,10 +269,63 @@
                     throw new Error("This portal is for Customers only. Staff should use the employee portal.");
                 }
             } catch (err) {
-                errorEl.innerText = err.message;
+                errorEl.innerText = "❌ " + err.message;
                 errorEl.classList.remove('hidden');
                 submitBtn.disabled = false;
                 submitBtn.innerText = "Sign In";
+            }
+        }
+
+        async function handleCustomerRegister(e) {
+            e.preventDefault();
+            const firstName = document.getElementById('reg-firstname').value;
+            const lastName = document.getElementById('reg-lastname').value;
+            const email = document.getElementById('reg-email').value;
+            const phone = document.getElementById('reg-phone').value;
+            const pass = document.getElementById('reg-password').value;
+            const errorEl = document.getElementById('reg-error');
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+
+            errorEl.classList.add('hidden');
+            submitBtn.disabled = true;
+            submitBtn.innerText = "Creating Account...";
+
+            try {
+                // 1. Create Auth User
+                const user = await window.fbAuth.createUserWithEmailAndPassword(email, pass, firstName, lastName, phone);
+                
+                // 2. The local-db adapter handles the DB entry for 'users' 
+                // in the register endpoint, but we can update local storage if needed.
+                alert("Account created successfully! You can now log in.");
+                toggleAuthView('login');
+            } catch (err) {
+                errorEl.innerText = "❌ " + err.message;
+                errorEl.classList.remove('hidden');
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Register Account";
+            }
+        }
+
+        async function handleForgotPassword(e) {
+            e.preventDefault();
+            const email = document.getElementById('forgot-email').value;
+            const msgEl = document.getElementById('forgot-msg');
+            const errorEl = document.getElementById('forgot-error');
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+
+            msgEl.classList.add('hidden');
+            errorEl.classList.add('hidden');
+            submitBtn.disabled = true;
+
+            try {
+                await window.fbAuth.sendPasswordResetEmail(email);
+                msgEl.innerText = "✅ Password reset link has been sent to your email!";
+                msgEl.classList.remove('hidden');
+            } catch (err) {
+                errorEl.innerText = "❌ " + err.message;
+                errorEl.classList.remove('hidden');
+            } finally {
+                submitBtn.disabled = false;
             }
         }
 

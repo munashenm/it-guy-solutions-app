@@ -318,6 +318,66 @@ const requireAdmin = (req, res, next) => {
 app.use(['/api/users', '/api/collections', '/api/transaction', '/api/counters', '/api/restore', '/api/backup', '/api/notify'], requireAuth);
 
 // User Registration Endpoint (Now with BCRYPT)
+// Public Registration (No Auth Required)
+app.post('/api/register', async (req, res) => {
+    const { email, password, firstName, lastName, phone } = req.body;
+    if(!email || !password) return res.status(400).json({ error: "Email and Password are required" });
+    
+    // Check if user already exists
+    try {
+        const existing = await db.get("SELECT * FROM users WHERE email = ?", [email]);
+        if(existing) return res.status(400).json({ error: "An account with this email already exists." });
+
+        const uid = 'user-' + Math.random().toString(36).substring(2, 12);
+        const hashedPassword = await bcrypt.hash(password, 12);
+        const role = 'client'; // Force client role for public registration
+        await db.run("INSERT INTO users (uid, email, firstName, lastName, phone, role, password) VALUES (?, ?, ?, ?, ?, ?, ?)", 
+            [uid, email, firstName||'', lastName||'', phone||'', role, hashedPassword]);
+        
+        const userData = { uid, email, firstName: firstName||'', lastName: lastName||'', phone: phone||'', role, createdAt: new Date().toISOString() };
+        await saveDoc('users', uid, userData);
+        res.json({ success: true, user: userData });
+    } catch(err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Password Reset Request (Public)
+app.post('/api/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    try {
+        const user = await db.get("SELECT * FROM users WHERE email = ?", [email]);
+        if(!user) return res.status(404).json({ error: "No user found with this email address." });
+
+        const tempPass = Math.random().toString(36).substring(2, 8).toUpperCase();
+        const hashedPassword = await bcrypt.hash(tempPass, 12);
+        await db.run("UPDATE users SET password = ? WHERE uid = ?", [hashedPassword, user.uid]);
+
+        const rows = await db.all("SELECT data FROM collections WHERE name = ? AND id = ?", ['settings', 'systemSettings']);
+        if (rows && rows.length > 0) {
+            const sys = JSON.parse(rows[0].data);
+            if(sys.smtpHost) {
+                const transporter = nodemailer.createTransport({
+                    host: String(sys.smtpHost).trim(),
+                    port: parseInt(sys.smtpPort) || 465,
+                    secure: String(sys.smtpPort).trim() === '465', 
+                    auth: { user: String(sys.smtpUser).trim(), pass: String(sys.smtpPass).trim() }
+                });
+
+                await transporter.sendMail({
+                    from: `"${sys.emailName || 'IT Guy Solutions'}" <${sys.smtpUser}>`,
+                    to: email,
+                    subject: "Password Reset - IT Guy Solutions",
+                    text: `Hi ${user.firstName || 'Customer'},\n\nYour password has been reset as requested. \n\nTemporary Password: ${tempPass}\n\nPlease login and change your password immediately.\n\nKind Regards,\n${sys.emailName || 'IT Guy Solutions'}`
+                });
+            }
+        }
+        res.json({ success: true, message: "Temporary password sent to your email." });
+    } catch(err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 app.post('/api/users', async (req, res) => {
     const { email, password, role, username, firstName, lastName, employeeId } = req.body;
     if(!email || !password || !role) return res.status(400).json({ error: "Missing required fields" });
