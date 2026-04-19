@@ -142,10 +142,11 @@ window.trackPortal = {
                 if(webBtn && s.website) webBtn.href = s.website.startsWith('http') ? s.website : `https://${s.website}`;
 
                 // Update Logo
-                if(s.logoUrl) {
+                const logo = s.logoUrl || s.brandLogo;
+                if(logo) {
                     const logoContainers = document.querySelectorAll('.logo-section, #login-logo-container');
                     logoContainers.forEach(container => {
-                        container.innerHTML = `<img src="${s.logoUrl}" alt="Logo" style="max-height: 80px; max-width: 100%; margin-bottom: 12px;">`;
+                        container.innerHTML = `<img src="${logo}" alt="Logo" style="max-height: 80px; max-width: 100%; margin-bottom: 12px;">`;
                     });
                 }
 

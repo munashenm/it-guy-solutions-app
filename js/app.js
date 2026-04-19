@@ -166,9 +166,9 @@ const app = {
             root.style.setProperty('--accent-rgb', this.hexToRgb(data.themeColor));
         }
 
-        if(!data.logoUrl) return;
+        if(!data.logoUrl && !data.brandLogo) return;
 
-        const logoUrl = data.logoUrl;
+        const logoUrl = data.logoUrl || data.brandLogo;
 
         // 2. Update Favicon & Apple Touch Icon
         const favicon = document.getElementById('app-favicon');

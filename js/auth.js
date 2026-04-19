@@ -8,20 +8,33 @@ window.authSystem = {
         }
 
         // Fetch branding early for Login/Landing screen
-        const loadBranding = () => {
-            if(window.fbDb) {
-                window.fbDb.collection('settings').doc('companyProfile').get().then(doc => {
-                    if(doc.exists && window.app && typeof window.app.applyBranding === 'function') {
-                        window.app.applyBranding(doc.data());
+        const loadBranding = async () => {
+            if(!window.fbDb) return;
+            try {
+                const doc = await window.fbDb.collection('settings').doc('companyProfile').get();
+                if(doc.exists) {
+                    const data = doc.data();
+                    const logo = data.logoUrl || data.brandLogo;
+                    const loginLogo = document.getElementById('login-logo-container');
+                    
+                    if(loginLogo && logo) {
+                        loginLogo.innerHTML = `<img src="${logo}" alt="Logo" style="max-height: 80px; max-width: 100%; margin-bottom: 15px;">`;
                     }
-                }).catch(e => console.log("Branding fetch silent fail"));
+
+                    // Also try to trigger the main app branding if available
+                    if(window.app && typeof window.app.applyBranding === 'function') {
+                        window.app.applyBranding(data);
+                    }
+                }
+            } catch(e) {
+                console.error("Branding fetch failed:", e);
             }
         };
 
         if (window.fbDb) {
-            setTimeout(loadBranding, 300); // Small delay for local-db to populate
+            setTimeout(loadBranding, 500); 
         } else {
-            window.addEventListener('firebase-ready', () => setTimeout(loadBranding, 300));
+            window.addEventListener('firebase-ready', () => setTimeout(loadBranding, 500));
         }
 
         // Delay slightly to ensure local-db adapter is ready

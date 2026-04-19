@@ -197,10 +197,11 @@
                 const settingsDoc = await window.fbDb.collection('settings').doc('companyProfile').get();
                 if(settingsDoc.exists) {
                     const s = settingsDoc.data();
-                    if(s.logoUrl) {
+                    const logo = s.logoUrl || s.brandLogo;
+                    if(logo) {
                         const logos = document.querySelectorAll('.logo-section, .client-logo');
                         logos.forEach(l => {
-                            l.innerHTML = `<img src="${s.logoUrl}" alt="Logo" style="max-height: 60px; max-width: 100%;">`;
+                            l.innerHTML = `<img src="${logo}" alt="Logo" style="max-height: 60px; max-width: 100%;">`;
                             if(l.classList.contains('logo-section')) {
                                 l.innerHTML += `<h1 style="font-size: 2rem; margin: 12px 0 0 0;">IT Guy<span class="highlight">Portal</span></h1><p style="color: var(--text-secondary); margin-top: 8px;">Customer Self-Service Area</p>`;
                             }
