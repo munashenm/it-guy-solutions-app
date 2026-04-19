@@ -1210,3 +1210,9 @@ textarea.form-control {
     background: var(--primary);
     box-shadow: 0 0 8px var(--primary);
 }
+
+@keyframes pulse-border {
+    0% { border-color: rgba(108, 92, 231, 0.3); box-shadow: 0 0 0 0 rgba(108, 92, 231, 0); }
+    50% { border-color: rgba(108, 92, 231, 0.8); box-shadow: 0 0 15px 5px rgba(108, 92, 231, 0.2); }
+    100% { border-color: rgba(108, 92, 231, 0.3); box-shadow: 0 0 0 0 rgba(108, 92, 231, 0); }
+}

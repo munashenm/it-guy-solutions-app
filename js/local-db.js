@@ -336,6 +336,22 @@ window.localDb = {
 // Real-time Auth Mock with Listeners
 const authListeners = [];
 const triggerAuthChange = (user) => {
+    if (user) {
+        user.updatePassword = async (newPassword) => {
+            const token = sessionStorage.getItem('it-guy-token');
+            const data = await safeFetch(`${API_BASE}/update-password`, {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ password: newPassword })
+            });
+            if (!data || !data.success) throw new Error(data?.error || "Password update failed");
+            return true;
+        };
+    }
+    if (window.localAuth) window.localAuth.currentUser = user;
     authListeners.forEach(cb => cb(user));
 };
 

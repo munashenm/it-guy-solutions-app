@@ -182,11 +182,14 @@
                 <h2 style="margin: 0; font-size: 1.4rem;">IT Guy<span class="highlight">Portal</span></h2>
             </div>
             <div style="display: flex; gap: 16px; align-items: center;">
-                <div id="client-info" style="text-align: right; margin-right: 12px;">
+                <div id="client-info" style="text-align: right; margin-right: 12px; cursor: pointer;" onclick="client.showProfileModal()">
                     <div style="font-size: 0.8rem; color: #a0a0a0;">Welcome back,</div>
                     <div id="client-name" style="font-weight: 600; color: #fff; font-size: 1.1rem;">...</div>
                     <div id="client-email" style="font-size: 0.75rem; color: #777;">...</div>
                 </div>
+                <button class="btn-secondary" onclick="client.showProfileModal()" style="padding: 8px 12px; display: flex; align-items: center; gap: 8px;">
+                    <span class="material-symbols-outlined" style="font-size: 1.2rem;">account_circle</span> Profile
+                </button>
                 <button class="btn-secondary" onclick="authSystem.logout()" style="padding: 8px 16px;">Sign Out</button>
             </div>
         </header>

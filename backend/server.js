@@ -378,7 +378,7 @@ const requireAdmin = (req, res, next) => {
 };
 
 // Apply auth middleware to all secure routes
-app.use(['/api/users', '/api/collections', '/api/transaction', '/api/counters', '/api/restore', '/api/backup', '/api/notify'], requireAuth);
+app.use(['/api/users', '/api/collections', '/api/transaction', '/api/counters', '/api/restore', '/api/backup', '/api/notify', '/api/update-password'], requireAuth);
 
 
 
@@ -434,6 +434,21 @@ app.post('/api/users/admin-password', async (req, res) => {
 
     try {
         const hashedPassword = await bcrypt.hash(newPassword, 12);
+        await db.run("UPDATE users SET password = ? WHERE uid = ?", [hashedPassword, uid]);
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Self-service password update
+app.post('/api/update-password', async (req, res) => {
+    const { password } = req.body;
+    if(!password) return res.status(400).json({ error: "Missing password" });
+    const uid = req.user.uid;
+
+    try {
+        const hashedPassword = await bcrypt.hash(password, 12);
         await db.run("UPDATE users SET password = ? WHERE uid = ?", [hashedPassword, uid]);
         res.json({ success: true });
     } catch (err) {
