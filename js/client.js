@@ -46,7 +46,9 @@ window.client = {
 
     render() {
         if (!window.authSystem || !window.authSystem.currentUser) return;
-        const curEmail = window.authSystem.currentUser.email.toLowerCase();
+        const user = window.authSystem.currentUser;
+        const curEmail = user.email.toLowerCase();
+        const displayName = user.firstName || curEmail.split('@')[0];
         
         // Populate specific mock data for this user to make the demo feel alive
         if (!window.fbAuth) {
@@ -61,184 +63,98 @@ window.client = {
         let html = `
             <div class="section-header">
                 <div>
-                    <h1>Welcome, ${curEmail.split('@')[0]}!</h1>
-                    <p style="color: #a0a0a0; margin-top: 4px;">Manage your repair orders and financials directly from your portal.</p>
+                    <h1 style="font-size: 2.5rem;">Welcome, ${displayName}!</h1>
+                    <p style="color: #a0a0a0; margin-top: 4px;">Track your repairs, approve quotes, and manage your support calls.</p>
                 </div>
-                <button class="btn-primary" style="padding: 14px 28px;" onclick="client.showLogCallModal()">
-                    <span class="material-symbols-outlined">support_agent</span> Log a Support Call
-                </button>
-            </div>
-        `;
-
-        // 1. Quotations Section (Prioritized because it requires approval!)
-        html += `
-            <div style="margin-bottom: 24px;">
-                <h3 style="margin-bottom: 16px; color: #a29bfe; border-bottom: 1px solid #e0e0e0; padding-bottom: 8px;">Pending Quotations</h3>
-                <div class="glass-card" style="padding: 0;">
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Quote #</th>
-                                    <th>Date</th>
-                                    <th>Description Snippet</th>
-                                    <th>Amount</th>
-                                    <th>Status</th>
-                                    <th style="text-align: right;">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${myQuotations.length > 0 ? myQuotations.map(quo => `
-                                    <tr>
-                                        <td><strong>${quo.id}</strong></td>
-                                        <td>${quo.date}</td>
-                                        <td>${quo.items && quo.items.length > 0 ? quo.items[0].desc : 'Repair Services'}</td>
-                                        <td style="font-weight: bold; color: #ffffff;">${quo.amount}</td>
-                                        <td><span class="badge ${quo.status.toLowerCase()}">${quo.status}</span></td>
-                                        <td style="text-align: right;">
-                                            ${quo.status === 'Pending' 
-                                                ? `<button class="btn-primary" style="background: var(--success); font-size: 0.85rem; padding: 6px 12px;" onclick="client.approveQuotation('${quo.id}')">Approve</button>` 
-                                                : `<button class="btn-icon" title="Download PDF" onclick="app.executeDocumentAction('Print', 'Quotation', '${quo.id}')"><span class="material-symbols-outlined">download</span></button>`
-                                            }
-                                        </td>
-                                    </tr>
-                                `).join('') : `<tr><td colspan="6" style="text-align:center; padding: 24px; color: #a0a0a0;">No quotations currently need your review.</td></tr>`}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // 2. Active Jobs Section
-        html += `
-            <div style="margin-bottom: 24px;">
-                <h3 style="margin-bottom: 16px; color: #a29bfe; border-bottom: 1px solid #e0e0e0; padding-bottom: 8px;">My Active Repairs</h3>
-                <div class="glass-card" style="padding: 0;">
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Ticket / Job #</th>
-                                    <th>Date Logged</th>
-                                    <th>Device Logged</th>
-                                    <th>Current Status</th>
-                                    <th style="text-align: right;">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${myJobs.length > 0 ? myJobs.map(job => `
-                                    <tr>
-                                        <td><strong>${job.id}</strong></td>
-                                        <td>${job.date}</td>
-                                        <td>${job.device || 'N/A'}</td>
-                                        <td><span class="badge ${job.status.toLowerCase().replace(/ /g, '-')}">${job.status}</span></td>
-                                        <td style="text-align: right; display: flex; justify-content: flex-end; align-items: center; gap: 8px;">
-                                            ${['Completed', 'Ready For Collection', 'Collected', 'Delivered'].includes(job.status) ? 
-                                                (job.rating ? `<span style="color: #ffca28; margin-top: 2px;" title="You rated this ${job.rating} stars">${'★'.repeat(job.rating)}</span>` : `<button class="btn-primary" style="font-size: 0.8rem; padding: 6px 10px; background: var(--success);" onclick="client.showRateJobModal('${job.id}')">Rate Service</button>`)
-                                            : ''}
-                                            <button class="btn-icon" title="Download Job Card" onclick="app.executeDocumentAction('Print', 'Job Card', '${job.id}')"><span class="material-symbols-outlined">download</span></button>
-                                        </td>
-                                    </tr>
-                                `).join('') : `<tr><td colspan="5" style="text-align:center; padding: 24px; color: #a0a0a0;">You currently have no active jobs in the workshop.</td></tr>`}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // 3. Invoices Section
-        html += `
-            <div style="margin-bottom: 32px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #e0e0e0; padding-bottom: 8px;">
-                    <h3 style="margin: 0; color: #a29bfe;">My Invoices</h3>
-                    <button class="btn-secondary" style="font-size: 0.8rem; padding: 4px 12px;" onclick="client.downloadStatement()">
-                        <span class="material-symbols-outlined" style="font-size: 1rem; margin-right: 4px;">analytics</span> Statement Report
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn-secondary" style="padding: 12px 20px;" onclick="client.showBookRepairModal()">
+                        <span class="material-symbols-outlined">handyman</span> Book a Repair
+                    </button>
+                    <button class="btn-primary" style="padding: 12px 20px;" onclick="client.showLogCallModal()">
+                        <span class="material-symbols-outlined">support_agent</span> Log Support Call
                     </button>
                 </div>
-                <div class="glass-card" style="padding: 0;">
-                    <div class="table-container">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Invoice #</th>
-                                    <th>Date</th>
-                                    <th>Amount Due</th>
-                                    <th>Status</th>
-                                    <th style="text-align: right;">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${myInvoices.length > 0 ? myInvoices.map(inv => `
-                                    <tr>
-                                        <td><strong>${inv.id}</strong></td>
-                                        <td>${inv.date}</td>
-                                        <td style="font-weight: bold;">${inv.amount}</td>
-                                        <td><span class="badge ${inv.status.toLowerCase()}">${inv.status}</span></td>
-                                        <td style="text-align: right;">
-                                            ${inv.status === 'Unpaid' 
-                                                ? `<button class="btn-primary" style="font-size: 0.85rem; padding: 6px 12px;">Pay Online</button>` 
-                                                : `<button class="btn-icon" title="Download PDF" onclick="app.executeDocumentAction('Print', 'Invoice', '${inv.id}')"><span class="material-symbols-outlined">download</span></button>`
-                                            }
-                                        </td>
-                                    </tr>
-                                `).join('') : `<tr><td colspan="5" style="text-align:center; padding: 24px; color: #a0a0a0;">No outstanding invoices.</td></tr>`}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
             </div>
-            
-            <div style="text-align: center; color: #a0a0a0; font-size: 0.9rem; margin-top: 48px;">
-                <p>IT Guy Solutions Support Hotline: <strong>082 123 4567</strong></p>
-                <button class="btn-secondary" style="border: none; background: transparent; text-decoration: underline; margin-top: 8px;" onclick="window.authSystem.logout()">Securely Sign Out</button>
+        `;
+
+        // 1. Pending Actions Section
+        if(myQuotations.some(q => q.status === 'Pending') || myInvoices.some(i => i.status === 'Unpaid')) {
+            html += `
+            <div class="glass-card" style="margin-bottom: 32px; border: 1px solid rgba(108, 92, 231, 0.3); background: rgba(108, 92, 231, 0.05);">
+                <h4 style="margin-bottom: 12px; color: var(--primary);">⚠️ Action Required</h4>
+                <div style="display: flex; flex-wrap: wrap; gap: 16px;">
+                    ${myQuotations.filter(q => q.status === 'Pending').map(q => `
+                        <div class="pending-item">
+                            <span>Quote <strong>${q.id}</strong> requires your approval</span>
+                            <button class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="client.approveQuotation('${q.id}')">View & Action</button>
+                        </div>
+                    `).join('')}
+                    ${myInvoices.filter(i => i.status === 'Unpaid').map(i => `
+                        <div class="pending-item">
+                            <span>Invoice <strong>${i.id}</strong> is ready for payment</span>
+                            <button class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background: var(--success);">Pay Now</button>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>`;
+        }
+
+        // 2. Active Repairs (Tracking)
+        html += `
+            <div style="margin-bottom: 40px;">
+                <h3 style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                    <span class="material-symbols-outlined" style="color: var(--primary);">query_stats</span>
+                    Active Repair Status
+                </h3>
+                <div class="grid-3">
+                    ${myJobs.length > 0 ? myJobs.map(job => `
+                        <div class="glass-card job-track-card">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                                <span class="job-id">${job.id}</span>
+                                <span class="badge ${job.status.toLowerCase().replace(' ', '-')}">${job.status}</span>
+                            </div>
+                            <h4 style="margin-bottom: 5px;">${job.device}</h4>
+                            <p style="font-size: 0.85rem; color: #888;">${job.issue || 'General Maintenance'}</p>
+                            <div class="track-timeline">
+                                <div class="track-step ${['Received', 'In Diagnosis', 'Waiting for Parts', 'Repairing', 'Ready'].includes(job.status) ? 'active' : ''}"></div>
+                                <div class="track-step ${['In Diagnosis', 'Waiting for Parts', 'Repairing', 'Ready'].includes(job.status) ? 'active' : ''}"></div>
+                                <div class="track-step ${['Waiting for Parts', 'Repairing', 'Ready'].includes(job.status) ? 'active' : ''}"></div>
+                                <div class="track-step ${['Repairing', 'Ready'].includes(job.status) ? 'active' : ''}"></div>
+                                <div class="track-step ${['Ready', 'Completed'].includes(job.status) ? 'active' : ''}"></div>
+                                <div class="track-step ${['Received', 'In Diagnosis', 'Waiting for Parts', 'Repairing', 'Ready', 'Collected'].includes(job.status) ? 'active' : ''}"></div>
+                                <div class="track-step ${['In Diagnosis', 'Waiting for Parts', 'Repairing', 'Ready', 'Collected'].includes(job.status) ? 'active' : ''}"></div>
+                                <div class="track-step ${['Waiting for Parts', 'Repairing', 'Ready', 'Collected'].includes(job.status) ? 'active' : ''}"></div>
+                                <div class="track-step ${['Repairing', 'Ready', 'Collected'].includes(job.status) ? 'active' : ''}"></div>
+                                <div class="track-step ${['Ready', 'Collected'].includes(job.status) ? 'active' : ''}"></div>
+                            </div>
+                            
+                            <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #555; font-weight: 500;">
+                                <span>Booked</span>
+                                <span>Ready</span>
+                            </div>
+
+                            ${['Collected', 'Delivered', 'Completed'].includes(job.status) ? `
+                                <div style="margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 12px;">
+                                    ${job.rating ? `
+                                        <div style="color: #fdcb6e; display: flex; align-items: center; gap: 4px;">
+                                            ${'★'.repeat(job.rating)}${'☆'.repeat(5-job.rating)}
+                                            <span style="font-size: 0.8rem; color: #666; margin-left: 8px;">Service Rated</span>
+                                        </div>
+                                    ` : `
+                                        <button class="btn-secondary" style="width: 100%; font-size: 0.8rem; padding: 6px;" onclick="client.showRateJobModal('${job.id}')">Rate Service</button>
+                                    `}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `).join('') : '<p style="grid-column: 1/-1; text-align: center; color: #666; padding: 40px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1);">You currently have no active repairs. Book a repair to get started!</p>'}
+                </div>
             </div>
         `;
 
         this.container.innerHTML = html;
     },
 
-    async downloadStatement() {
-        const curEmail = window.authSystem.currentUser.email.toLowerCase();
-        const myInvoices = (app.state.invoices || []).filter(i => (i.email || '').toLowerCase() === curEmail);
-        
-        if (myInvoices.length === 0) {
-            alert("You have no invoices to generate a statement from.");
-            return;
-        }
-
-        const statementData = {
-            customer: curEmail.split('@')[0],
-            email: curEmail,
-            date: new Date().toLocaleDateString(),
-            invoices: myInvoices.map(i => ({
-                id: i.id,
-                date: i.date,
-                amount: i.amount,
-                status: i.status
-            })),
-            totalInvoiced: myInvoices.reduce((sum, i) => sum + (parseFloat(i.amount.replace(/[^0-9.]/g, '')) || 0), 0),
-            totalOutstanding: myInvoices.filter(i => i.status !== 'Paid').reduce((sum, i) => sum + (parseFloat(i.amount.replace(/[^0-9.]/g, '')) || 0), 0)
-        };
-
-        // We use the Report docType with custom data
-        app.executeDocumentAction('Download', 'Statement', curEmail, statementData);
-    },
-
-    approveQuotation(quoteId) {
-        if(confirm(`Are you sure you want to approve quotation ${quoteId}?\nThis will instruct our technicians to begin the repair process.`)) {
-            const idx = app.state.quotations.findIndex(q => q.id === quoteId);
-            if (idx > -1) {
-                app.state.quotations[idx].status = 'Approved';
-                alert(`Success! Quotation ${quoteId} has been approved.`);
-                this.render(); // Refresh UI
-            }
-        }
-    },
-
     showLogCallModal() {
-        // We reuse the central modal system
         const modalHTML = `
             <div class="modal-content" style="max-width: 500px;">
                 <div class="modal-header">
@@ -246,19 +162,19 @@ window.client = {
                     <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
                 </div>
                 <div class="modal-body">
-                    <p style="color: #a0a0a0; margin-bottom: 24px; font-size: 0.95rem;">Please describe the issue you are experiencing and provide your on-site address if a technician visit is required.</p>
+                    <p style="color: #a0a0a0; margin-bottom: 24px; font-size: 0.95rem;">Need immediate assistance? Provide details and a technician will reach out.</p>
                     <form onsubmit="client.submitCall(event)">
                         <div class="form-group">
-                            <label>Issue Description</label>
-                            <textarea id="cl-desc" class="form-control" placeholder="E.g. The main office printer won't connect to the Wi-Fi..." required rows="4"></textarea>
+                            <label>Description of Issue</label>
+                            <textarea id="cl-desc" class="form-control" placeholder="E.g. Computer won't start after update..." required rows="4"></textarea>
                         </div>
                         <div class="form-group">
-                            <label>On-site Address (Optional if dropping off)</label>
-                            <input type="text" id="cl-addr" class="form-control" placeholder="123 Example Street">
+                            <label>Your Contact Number</label>
+                            <input type="text" id="cl-phone" class="form-control" value="${window.authSystem.currentUser.phone || ''}" required>
                         </div>
                         <div class="modal-footer" style="margin-top: 24px;">
                             <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancel</button>
-                            <button type="submit" class="btn-primary">Submit Ticket</button>
+                            <button type="submit" class="btn-primary" style="min-width: 150px;">Log Ticket</button>
                         </div>
                     </form>
                 </div>
@@ -270,68 +186,144 @@ window.client = {
     async submitCall(e) {
         e.preventDefault();
         const btn = e.target.querySelector('.btn-primary');
-        if(btn) { btn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span> Submitting...'; btn.disabled = true; }
-
         const desc = document.getElementById('cl-desc').value;
-        const curEmail = window.authSystem.currentUser.email;
+        const user = window.authSystem.currentUser;
+
+        if(btn) { btn.innerHTML = '<span class="material-symbols-outlined rotating">hourglass_empty</span> Loging...'; btn.disabled = true; }
 
         try {
-            const newId = await window.app.getNextSequence('FLD');
+            const newId = 'FLD-' + Math.floor(Math.random()*9000 + 1000);
             const payload = {
                 id: newId,
-                customer: curEmail.split('@')[0],
-                email: curEmail,
-                address: document.getElementById('cl-addr').value || 'To be determined',
+                customer: user.firstName + ' ' + (user.lastName || ''),
+                email: user.email,
+                phone: document.getElementById('cl-phone').value,
                 status: 'Requested',
                 description: desc,
                 technician: 'Unassigned',
-                items: [],
-                dateBooked: new Date().toISOString().split('T')[0],
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                dateBooked: new Date().toISOString().split('T')[0]
             };
 
             await window.fbDb.collection('fieldJobs').doc(newId).set(payload);
             app.closeModal();
-            alert("Your support call has been logged successfully! A technician will contact you shortly.");
+            alert(`Support call logged! Reference: ${newId}. A technician will call you shortly.`);
         } catch(err) {
             console.error(err);
-            alert("Server Error: Check your connection and try again.");
-            if(btn) { btn.innerHTML = 'Log Call-out'; btn.disabled = false; }
+            alert("Error logging call. Please try again.");
+            if(btn) { btn.innerHTML = 'Log Ticket'; btn.disabled = false; }
+        }
+    },
+
+    showBookRepairModal() {
+        const modalHTML = `
+            <div class="modal-content" style="max-width: 550px;">
+                <div class="modal-header">
+                    <h2>Book a Repair</h2>
+                    <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div class="modal-body">
+                    <p style="color: #a0a0a0; margin-bottom: 20px;">Choose how we will receive your device.</p>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px;">
+                        <div class="choice-card active" onclick="this.parentNode.querySelector('.active').classList.remove('active'); this.classList.add('active'); window.repairType='Walk-in'">
+                            <span class="material-symbols-outlined">store</span>
+                            <h4>Walk-in</h4>
+                            <p style="font-size: 0.8rem; color: #888;">Bring it to our shop</p>
+                        </div>
+                        <div class="choice-card" onclick="this.parentNode.querySelector('.active').classList.remove('active'); this.classList.add('active'); window.repairType='Courier'">
+                            <span class="material-symbols-outlined">local_shipping</span>
+                            <h4>Courier</h4>
+                            <p style="font-size: 0.8rem; color: #888;">We collect from you</p>
+                        </div>
+                    </div>
+
+                    <form onsubmit="client.submitRepairBooking(event)">
+                        <div class="form-group">
+                            <label>Device Type & Model</label>
+                            <input type="text" id="rep-device" class="form-control" placeholder="e.g. iPhone 13 Pro / HP Laptop" required>
+                        </div>
+                        <div class="form-group">
+                            <label>What is wrong with it?</label>
+                            <textarea id="rep-issue" class="form-control" placeholder="Describe the fault..." required rows="3"></textarea>
+                        </div>
+                        <div class="modal-footer" style="margin-top: 24px;">
+                            <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancel</button>
+                            <button type="submit" class="btn-primary" style="padding: 10px 24px;">Confirm Booking</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        app.showModal(modalHTML);
+        window.repairType = 'Walk-in';
+    },
+
+    async submitRepairBooking(e) {
+        e.preventDefault();
+        const btn = e.target.querySelector('.btn-primary');
+        const user = window.authSystem.currentUser;
+        
+        const device = document.getElementById('rep-device').value;
+        const issue = document.getElementById('rep-issue').value;
+        const type = window.repairType;
+
+        if(btn) { btn.innerHTML = 'Processing...'; btn.disabled = true; }
+
+        try {
+            const jobId = 'JOB-' + Math.floor(Math.random()*9000 + 1000);
+            const job = {
+                id: jobId,
+                device,
+                issue,
+                type,
+                status: 'Requested',
+                customer: user.firstName + ' ' + (user.lastName || ''),
+                email: user.email,
+                phone: user.phone || 'N/A',
+                date: new Date().toISOString().split('T')[0]
+            };
+
+            await window.fbDb.collection('jobs').doc(jobId).set(job);
+            app.state.jobs.unshift(job);
+            app.closeModal();
+            alert(`Repair Booked! Reference: ${jobId}. ${type === 'Courier' ? 'Our team will call you for collection details.' : 'Please bring your device to our store at your earliest convenience.'}`);
+            this.render();
+        } catch(err) {
+            console.error(err);
+            alert("Error booking repair.");
+            if(btn) { btn.innerHTML = 'Confirm Booking'; btn.disabled = false; }
         }
     },
 
     showRateJobModal(jobId) {
         const modalHTML = `
             <div class="modal-content" style="max-width: 450px; text-align: center;">
-                <div class="modal-header" style="justify-content: center; border-bottom: none; padding-bottom: 0;">
-                    <span class="material-symbols-outlined" style="font-size: 48px; color: #ffca28; margin-bottom: 8px;">star</span>
+                <div class="modal-header" style="justify-content: center; border-bottom: none;">
+                    <h2 style="margin: 0;">Service Feedback</h2>
                 </div>
-                <div class="modal-body" style="padding-top: 0;">
-                    <h2 style="margin-bottom: 8px;">Rate Job ${jobId}</h2>
-                    <p style="color: #a0a0a0; margin-bottom: 24px; font-size: 0.95rem;">How was your experience with our team?</p>
+                <div class="modal-body">
+                    <p style="color: #a0a0a0; margin-bottom: 24px;">How happy are you with repair <b>${jobId}</b>?</p>
                     
                     <form onsubmit="client.submitJobRating(event, '${jobId}')">
-                        <div class="star-rating" style="margin-bottom: 16px;">
+                        <div class="star-rating" style="margin-bottom: 24px;">
                             <input type="radio" id="star5" name="rating" value="5" required>
-                            <label for="star5" title="5 stars">★</label>
+                            <label for="star5">★</label>
                             <input type="radio" id="star4" name="rating" value="4">
-                            <label for="star4" title="4 stars">★</label>
+                            <label for="star4">★</label>
                             <input type="radio" id="star3" name="rating" value="3">
-                            <label for="star3" title="3 stars">★</label>
+                            <label for="star3">★</label>
                             <input type="radio" id="star2" name="rating" value="2">
-                            <label for="star2" title="2 stars">★</label>
+                            <label for="star2">★</label>
                             <input type="radio" id="star1" name="rating" value="1">
-                            <label for="star1" title="1 star">★</label>
+                            <label for="star1">★</label>
                         </div>
                         
                         <div class="form-group" style="text-align: left;">
-                            <label>Additional Feedback (Optional)</label>
-                            <textarea id="rating-feedback" class="form-control" rows="3" placeholder="Tell us what you liked or how we can improve..."></textarea>
+                            <textarea id="rating-fb" class="form-control" placeholder="Any additional comments? (Optional)"></textarea>
                         </div>
                         
                         <div class="modal-footer" style="justify-content: center; margin-top: 24px;">
-                            <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancel</button>
-                            <button type="submit" class="btn-primary" style="background: var(--success);">Submit Rating</button>
+                            <button type="submit" class="btn-primary" style="background: var(--success); width: 100%;">Submit Rating</button>
                         </div>
                     </form>
                 </div>
@@ -342,26 +334,39 @@ window.client = {
 
     async submitJobRating(e, jobId) {
         e.preventDefault();
-        const btn = e.target.querySelector('button[type="submit"]');
-        if(btn) { btn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span> Submitting...'; btn.disabled = true; }
-
         const formData = new FormData(e.target);
         const rating = parseInt(formData.get('rating'));
-        const feedback = document.getElementById('rating-feedback').value.trim();
+        const feedback = document.getElementById('rating-fb').value;
 
         try {
             await window.fbDb.collection('jobs').doc(jobId).update({
                 rating: rating,
-                feedback: feedback,
-                ratedAt: firebase.firestore.FieldValue.serverTimestamp()
+                feedback: feedback
             });
+            // Update local state
+            const idx = app.state.jobs.findIndex(j => j.id === jobId);
+            if(idx > -1) app.state.jobs[idx].rating = rating;
+            
             app.closeModal();
-            // Simulating toaster
-            alert("Thank you! Your feedback has been securely submitted to IT Guy management.");
+            alert("Thank you for your feedback! It helps us improve.");
+            this.render();
         } catch(err) {
-            console.error(err);
-            alert("Database Error: Could not save rating.");
-            if(btn) { btn.innerHTML = 'Submit Rating'; btn.disabled = false; }
+            alert("Could not save rating. Please try again.");
         }
+    },
+
+    approveQuotation(quoteId) {
+        if(confirm(`Approve quotation ${quoteId}?\nThis tells our team to proceed with the repair immediately.`)) {
+            const idx = app.state.quotations.findIndex(q => q.id === quoteId);
+            if (idx > -1) {
+                app.state.quotations[idx].status = 'Approved';
+                alert(`Quotation ${quoteId} Approved! Techinicans have been notified.`);
+                this.render();
+            }
+        }
+    },
+
+    viewInvoice(invId) {
+        app.executeDocumentAction('Print', 'Invoice', invId);
     }
 };
