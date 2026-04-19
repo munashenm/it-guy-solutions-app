@@ -8,11 +8,11 @@ const multer = require('multer');
 const fs = require('fs');
 const axios = require('axios');
 
-const uploadDir = path.join(__dirname, 'uploads');
+const uploadDir = path.resolve(__dirname, 'uploads');
 try {
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 } catch (e) {
-    console.error('Could not create uploads directory:', uploadDir, e.message);
+    console.error('CRITICAL: Could not create/verify uploads directory:', uploadDir, e.message);
 }
 const upload = multer({ dest: uploadDir });
 const app = express();
