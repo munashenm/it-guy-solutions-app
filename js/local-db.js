@@ -433,10 +433,13 @@ window.firebase = {
     firestore: {
         FieldValue: {
             serverTimestamp: () => new Date().toISOString(),
-            increment: (val) => {
-                 // Custom logic for increment inside the adapter if needed
-                 return val; 
-            }
+            increment: (val) => val
         }
     }
 };
+
+// Redundant aliases to ensure compatibility across all initialization patterns
+window.fbDb = window.localDb;
+window.fbAuth = window.localAuth;
+
+console.log("IT Guy Local Adapter: Auth & DB Aliases initialized.");
