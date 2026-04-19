@@ -8,12 +8,20 @@ window.authSystem = {
         }
 
         // Fetch branding early for Login/Landing screen
-        if(window.fbDb) {
-            window.fbDb.collection('settings').doc('companyProfile').get().then(doc => {
-                if(doc.exists && window.app && typeof window.app.applyBranding === 'function') {
-                    window.app.applyBranding(doc.data());
-                }
-            }).catch(e => console.log("Branding fetch silent fail"));
+        const loadBranding = () => {
+            if(window.fbDb) {
+                window.fbDb.collection('settings').doc('companyProfile').get().then(doc => {
+                    if(doc.exists && window.app && typeof window.app.applyBranding === 'function') {
+                        window.app.applyBranding(doc.data());
+                    }
+                }).catch(e => console.log("Branding fetch silent fail"));
+            }
+        };
+
+        if (window.fbDb) {
+            setTimeout(loadBranding, 300); // Small delay for local-db to populate
+        } else {
+            window.addEventListener('firebase-ready', () => setTimeout(loadBranding, 300));
         }
 
         // Delay slightly to ensure local-db adapter is ready

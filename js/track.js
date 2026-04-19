@@ -141,6 +141,14 @@ window.trackPortal = {
                 const webBtn = document.getElementById('btn-website');
                 if(webBtn && s.website) webBtn.href = s.website.startsWith('http') ? s.website : `https://${s.website}`;
 
+                // Update Logo
+                if(s.logoUrl) {
+                    const logoContainers = document.querySelectorAll('.logo-section, #login-logo-container');
+                    logoContainers.forEach(container => {
+                        container.innerHTML = `<img src="${s.logoUrl}" alt="Logo" style="max-height: 80px; max-width: 100%; margin-bottom: 12px;">`;
+                    });
+                }
+
                 // Update Contact Links
                 const phone = s.phone || s.supportPhone || '';
                 const cleanPhone = phone.replace(/\s+/g, '');
