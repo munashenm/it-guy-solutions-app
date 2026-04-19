@@ -700,8 +700,10 @@ window.companySettings = {
             this.allStaff = [];
             this.allCustomers = [];
 
-            usersSnap.forEach(doc => {
-                const data = doc.data();
+            const allUsers = usersSnap.docs ? usersSnap.docs.map(d => d.data()) : usersSnap;
+            allUsers.sort((a,b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+            allUsers.forEach(data => {
                 if (['admin', 'technician', 'frontdesk'].includes(data.role)) this.allStaff.push(data);
                 else this.allCustomers.push(data);
             });

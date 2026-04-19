@@ -211,13 +211,33 @@ const saveDoc = async (collectionName, id, data) => {
     }
 };
 
-const getCollection = async (name) => {
+const getCollection = async (name, query = {}) => {
     try {
-        const rows = await db.all(`SELECT id, data FROM collections WHERE name = ?`, [name]);
+        let sql = `SELECT id, data FROM collections WHERE name = ?`;
+        const params = [name];
+
+        if (query.orderBy) {
+            const direction = query.direction === 'desc' ? 'DESC' : 'ASC';
+            // Note: We use json_extract for SQLite or JSON_EXTRACT for MySQL to sort by fields inside the JSON data.
+            // But to keep it simple and safe, we can also sort by the updatedAt column or the id.
+            // For now, let's allow sorting by the updatedAt column if they ask for createdAt/updatedAt.
+            if (query.orderBy === 'createdAt' || query.orderBy === 'updatedAt') {
+                sql += ` ORDER BY updatedAt ${direction}`;
+            } else {
+                sql += ` ORDER BY id ${direction}`;
+            }
+        }
+
+        if (query.limit) {
+            sql += ` LIMIT ?`;
+            params.push(parseInt(query.limit));
+        }
+
+        const rows = await db.all(sql, params);
         return rows.map(r => ({ 
             id: r.id, 
             ...safeJsonParse(r.data, {}, `Collection: ${name}, ID: ${r.id}`) 
-        })).filter(item => !item._parseError); // Optional: filter out completely broken ones or keep them.
+        })).filter(item => !item._parseError);
     } catch (err) {
         logger('error', `Failed to fetch collection: ${name}`, { error: err.message });
         throw err;
@@ -358,7 +378,7 @@ app.delete('/api/users/:uid', async (req, res) => {
 // Generic Collection CRUD
 app.get('/api/collections/:name', async (req, res) => {
     try {
-        const data = await getCollection(req.params.name);
+        const data = await getCollection(req.params.name, req.query);
         res.json(data);
     } catch (e) {
         res.status(500).json({ error: e.message });
