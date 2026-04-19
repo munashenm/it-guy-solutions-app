@@ -233,11 +233,18 @@
             showModal(html) {
                 const container = document.getElementById('modal-container');
                 const body = document.getElementById('modal-body');
-                body.innerHTML = html;
-                container.classList.remove('hidden');
+                if (body) body.innerHTML = html;
+                if (container) {
+                    container.classList.add('active');
+                    container.classList.remove('hidden');
+                }
             },
             closeModal() {
-                document.getElementById('modal-container').classList.add('hidden');
+                const container = document.getElementById('modal-container');
+                if (container) {
+                    container.classList.remove('active');
+                    container.classList.add('hidden');
+                }
             },
             async getNextSequence(prefix) {
                 // Mock sequence
