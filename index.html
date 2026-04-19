@@ -35,7 +35,6 @@
             </div>
             <div class="login-tabs">
                 <button class="login-tab active" onclick="authSystem.switchTab('staff')">Staff Login</button>
-                <button class="login-tab" onclick="authSystem.switchTab('customer')">Customer Portal</button>
             </div>
 
             <div id="login-error" class="hidden" style="background: rgba(var(--danger-rgb), 0.1); color: var(--danger); padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 0.9rem; text-align: center;"></div>
@@ -52,31 +51,13 @@
                 <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; margin-top: 16px; padding: 12px;">Log In</button>
             </form>
 
-            <div id="customer-login-form" class="hidden">
-                <p style="color: var(--text-secondary); text-align: center; margin-bottom: 16px; font-size: 0.9rem;">Receive a one-time code on your mobile.</p>
-                
-                <div id="phone-input-section">
-                    <div class="form-group">
-                        <label>Phone Number</label>
-                        <input type="tel" id="login-phone" class="form-control" placeholder="e.g. +27 82 123 4567">
-                    </div>
-                    <button class="btn-secondary" style="width: 100%; justify-content: center; padding: 12px; margin-top: 8px;" onclick="authSystem.sendOTP()">Send SMS Code</button>
-                    <!-- Verify Container -->
-                    <div id="recaptcha-container" style="margin-top: 16px; display: flex; justify-content: center;"></div>
-                </div>
-                
-                <div id="otp-input-section" class="hidden">
-                    <div class="form-group">
-                        <label>Verification Code</label>
-                        <input type="text" id="login-otp" class="form-control" placeholder="Enter 6-digit code">
-                    </div>
-                    <button class="btn-primary" style="width: 100%; justify-content: center; padding: 12px;" onclick="authSystem.verifyOTP()">Verify & Log In</button>
-                    <button class="btn-icon" style="width: 100%; margin-top: 12px; border-radius: 6px; display: flex; justify-content: center;" onclick="authSystem.resetPhoneInput()">Change Phone Number</button>
-                </div>
-            </div>
+
 
             <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.05); text-align: center;">
                 <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 8px;">Waiting for a repair?</p>
+                <a href="client.html" class="btn-secondary" style="display: inline-flex; justify-content: center; width: auto; padding: 10px 24px; border-radius: 8px; font-size: 0.9rem; border-color: var(--primary); color: var(--primary);">
+                    <span class="material-symbols-outlined" style="font-size: 1.1rem; margin-right: 8px;">person</span> Customer Portal
+                </a>
                 <a href="track.html" class="btn-secondary" style="display: inline-flex; justify-content: center; width: auto; padding: 10px 24px; border-radius: 8px; font-size: 0.9rem;">
                     <span class="material-symbols-outlined" style="font-size: 1.1rem; margin-right: 8px;">analytics</span> Track Job Status
                 </a>

@@ -175,7 +175,10 @@ window.inventory = {
                                 </div>
                             </div>
                             <div class="form-group">
-                                <label>Preferred Supplier</label>
+                                <label style="display: flex; justify-content: space-between; align-items: center;">
+                                    Preferred Supplier
+                                    <button type="button" class="btn-icon" onclick="inventory.showAddSupplierModal('part')" style="color: var(--primary); padding: 0; height: auto;" title="Add New Supplier"><span class="material-symbols-outlined" style="font-size: 1.1rem;">person_add</span></button>
+                                </label>
                                 <select id="part-supplier" class="form-control" style="appearance: auto;">
                                     <option value="">- Select Supplier -</option>
                                     ${(window.app.state.suppliers || []).map(s => `<option value="${s.name}">${s.name}</option>`).join('')}
@@ -423,7 +426,10 @@ window.inventory = {
         }
     },
 
-    showAddSupplierModal() {
+    lastSupplierSource: null,
+
+    showAddSupplierModal(source = null) {
+        this.lastSupplierSource = source;
         const modalHTML = `
             <div class="modal-content" style="max-width: 500px;">
                 <div class="modal-header">
@@ -470,17 +476,31 @@ window.inventory = {
         const btn = e.target.querySelector('button[type="submit"]');
         if(btn) { btn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span> Saving...'; btn.disabled = true; }
 
+        const payload = {
+            name: document.getElementById('sup-name').value,
+            rep: document.getElementById('sup-rep').value,
+            phone: document.getElementById('sup-phone').value,
+            email: document.getElementById('sup-email').value,
+            sla: document.getElementById('sup-sla').value,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+
         try {
-            await window.fbDb.collection('suppliers').add({
-                name: document.getElementById('sup-name').value,
-                rep: document.getElementById('sup-rep').value,
-                phone: document.getElementById('sup-phone').value,
-                email: document.getElementById('sup-email').value,
-                sla: document.getElementById('sup-sla').value,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            });
+            await window.fbDb.collection('suppliers').add(payload);
+            
+            const source = this.lastSupplierSource;
             window.app.closeModal();
-            this.switchTab('suppliers', { currentTarget: document.querySelectorAll('#inventory-view .settings-tab')[1] });
+
+            if (source === 'part') {
+                // Re-open and auto-select
+                this.showAddPartModal();
+                setTimeout(() => {
+                    const sel = document.getElementById('part-supplier');
+                    if(sel) sel.value = payload.name;
+                }, 100);
+            } else {
+                this.switchTab('suppliers', { currentTarget: document.querySelectorAll('#inventory-view .settings-tab')[1] });
+            }
             // onSnapshot refreshes data automatically
         } catch(error) {
             console.error("Error adding supplier:", error);
