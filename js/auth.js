@@ -103,22 +103,7 @@ window.authSystem = {
         await window.fbAuth.signOut();
     },
 
-    switchTab(tab) {
-        const tabs = document.querySelectorAll('.login-tab');
-        tabs.forEach(t => t.classList.remove('active'));
-        
-        document.getElementById('login-form').classList.add('hidden');
-        document.getElementById('customer-login-form').classList.add('hidden');
 
-        if (tab === 'staff') {
-            if(tabs[0]) tabs[0].classList.add('active');
-            document.getElementById('login-form').classList.remove('hidden');
-        } else {
-            if(tabs[1]) tabs[1].classList.add('active');
-            document.getElementById('customer-login-form').classList.remove('hidden');
-            alert("Customer Portal Phone Login is disabled in Local Database mode. Please use Staff Login.");
-        }
-    },
 
 
 };
