@@ -64,32 +64,25 @@
 
             <div id="customer-login-form">
                 <p style="color: var(--text-secondary); text-align: center; margin-bottom: 24px; font-size: 0.95rem;">
-                    Sign in using your mobile number associated with your repairs.
+                    Sign in to access your repair tracker, invoices, and quotes.
                 </p>
                 
-                <div id="phone-input-section">
+                <form id="client-login-form" onsubmit="handleCustomerLogin(event)">
                     <div class="form-group">
-                        <label style="text-align: left; display: block;">Phone Number</label>
-                        <input type="tel" id="login-phone" class="form-control" placeholder="e.g. +27 82 123 4567" style="text-align: center; font-size: 1.1rem;">
+                        <label style="text-align: left; display: block;">Email Address</label>
+                        <input type="email" id="login-email" class="form-control" placeholder="e.g. customer@example.com" required>
                     </div>
-                    <button class="btn-primary" style="width: 100%; justify-content: center; padding: 14px; margin-top: 12px;" onclick="authSystem.sendOTP()">
-                        Send Verification Code
-                    </button>
-                    <div id="recaptcha-container" style="margin-top: 16px; display: flex; justify-content: center;"></div>
-                </div>
-                
-                <div id="otp-input-section" class="hidden">
                     <div class="form-group">
-                        <label style="text-align: left; display: block;">Verification Code</label>
-                        <input type="text" id="login-otp" class="form-control" placeholder="Enter 6-digit code" style="text-align: center; font-size: 1.1rem; letter-spacing: 4px;">
+                        <label style="text-align: left; display: block;">Password</label>
+                        <input type="password" id="login-password" class="form-control" placeholder="••••••••" required>
                     </div>
-                    <button class="btn-primary" style="width: 100%; justify-content: center; padding: 14px;" onclick="authSystem.verifyOTP()">
-                        Verify & Sign In
+                    
+                    <div id="login-error" class="hidden" style="background: rgba(var(--danger-rgb), 0.1); color: var(--danger); padding: 12px; border-radius: 6px; margin: 16px 0; font-size: 0.85rem; text-align: center;"></div>
+
+                    <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 14px; margin-top: 12px;">
+                        Sign In
                     </button>
-                    <button class="btn-icon" style="width: 100%; margin-top: 16px; color: var(--text-secondary);" onclick="authSystem.resetPhoneInput()">
-                        Change Phone Number
-                    </button>
-                </div>
+                </form>
 
                 <div style="margin-top: 32px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 24px;">
                     <a href="index.html" style="color: #666; text-decoration: none; font-size: 0.85rem;">Are you Staff? Go to Employee Login</a>
@@ -167,23 +160,49 @@
             }
         };
 
+        async function handleCustomerLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const pass = document.getElementById('login-password').value;
+            const errorEl = document.getElementById('login-error');
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+
+            errorEl.classList.add('hidden');
+            submitBtn.disabled = true;
+            submitBtn.innerText = "Authenticating...";
+
+            try {
+                const user = await window.fbAuth.signInWithEmailAndPassword(email, pass);
+                if (user.role !== 'client' && user.role !== 'admin') {
+                    await window.fbAuth.signOut();
+                    throw new Error("This portal is for Customers only. Staff should use the employee portal.");
+                }
+            } catch (err) {
+                errorEl.innerText = err.message;
+                errorEl.classList.remove('hidden');
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Sign In";
+            }
+        }
+
         // Initialize Portal
         document.addEventListener('DOMContentLoaded', () => {
             // Listen for data ready
             window.addEventListener('firebase-ready', () => {
-                this.syncDataAndRender();
+                syncDataAndRender();
             });
 
             // Handle Auth changes
             window.fbAuth.onAuthStateChanged((user) => {
-                if (user) {
+                if (user && (user.role === 'client' || user.role === 'admin')) {
                     document.getElementById('login-screen').classList.add('hidden');
                     document.getElementById('portal-content').classList.remove('hidden');
                     
-                    document.getElementById('client-name').textContent = user.email.split('@')[0];
+                    document.getElementById('client-name').textContent = user.firstName ? `${user.firstName} ${user.lastName || ''}` : user.email.split('@')[0];
                     document.getElementById('client-email').textContent = user.email;
                     
-                    window.client.init();
+                    if(window.client) window.client.init();
+                    syncDataAndRender();
                 } else {
                     document.getElementById('login-screen').classList.remove('hidden');
                     document.getElementById('portal-content').classList.add('hidden');
