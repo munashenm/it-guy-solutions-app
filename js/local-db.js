@@ -28,7 +28,7 @@ function resetIdleTimer() {
                     alert('SECURITY LOCK: Your session has expired due to 20 minutes of inactivity. Please log in again.');
                 });
             }
-        }, 20 * 60 * 1000); 
+        }, 20*60*1000); 
     }
 }
 window.addEventListener('mousemove', resetIdleTimer);
@@ -51,60 +51,48 @@ async function safeFetch(url, options = {}) {
         const contentType = res.headers.get('content-type');
         
         if (!res.ok) {
-            // Handle HTTP errors (4xx, 5xx)
             if (contentType && contentType.includes('application/json')) {
                 const errData = await res.json();
                 throw new Error(errData.error || errData.message || `HTTP ${res.status}`);
             } else {
                 const text = await res.text();
-                console.error(`API Error (${res.status}):`, text.substring(0, 500));
-                if (text.includes('<!DOCTYPE html>')) {
+                // If we got HTML but expected JSON, it might be a server-level 404 or 500
+                if (text.trim().startsWith('<')) {
                     throw new Error(`Server returned HTML (likely 404 or 500) instead of JSON. Check if backend is running.`);
                 }
-                throw new Error(`Server Error (${res.status}): ${text.substring(0, 100)}`);
+                throw new Error(text.substring(0, 50) || `HTTP ${res.status}`);
             }
         }
 
-        if (!contentType || !contentType.includes('application/json')) {
-            const text = await res.text();
-            const snippet = text.substring(0, 100).replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            throw new Error(`Server returned non-JSON response (200 OK). Snippet: ${snippet}`);
-        }
+        // Return empty object for empty responses
+        if (res.status === 204) return {};
 
-        return await res.json();
-    } catch (e) {
-        if (e.message.includes('Failed to fetch')) {
-            throw new Error("Connection Refused: Cannot connect to the backend server. Is it running?");
+        if (contentType && contentType.includes('application/json')) {
+            return await res.json();
         }
+        return await res.text();
+    } catch (e) {
         throw e;
     }
 }
 
-window.safeFetch = safeFetch;
-
-class LocalCollection {
+class LocalStorage {
     constructor(name) {
         this.name = name;
-        this.listeners = [];
         this.data = [];
+        this.listeners = [];
         this.pollInterval = null;
-        this.lastDataHash = null;
     }
 
     doc(id) {
-        const finalId = id || this.generateId();
-        return new LocalDoc(this, finalId);
-    }
-
-    generateId() {
-        return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        return new LocalDoc(this, id);
     }
 
     async add(data) {
-        const id = this.generateId();
+        const id = 'autoid-' + Math.random().toString(36).substring(2, 10);
         const docData = { id, ...data };
         
-        // Optimistic Update: Push to local cache immediately
+        // Optimistic update
         this.data.unshift(docData);
         this.emit();
 
@@ -114,10 +102,8 @@ class LocalCollection {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
-            // Final sync to ensure everything is matched with server
             this.fetch();
         } catch (e) {
-            // Revert on failure
             this.data = this.data.filter(d => d.id !== id);
             this.emit();
             throw e;
@@ -128,7 +114,6 @@ class LocalCollection {
     onSnapshot(callback) {
         this.listeners.push(callback);
         this.startPolling();
-        // Initial fetch
         this.fetch();
         return () => {
             this.listeners = this.listeners.filter(l => l !== callback);
@@ -138,15 +123,12 @@ class LocalCollection {
 
     async fetch() {
         try {
-            const data = await safeFetch(`${API_BASE}/collections/${this.name}`);
-            const dataHash = JSON.stringify(data);
-            if (dataHash === this.lastDataHash) return; // Skip if no change
-            
-            this.lastDataHash = dataHash;
+            const raw = await safeFetch(`${API_BASE}/collections/${this.name}`);
+            const data = Array.isArray(raw) ? raw : [];
             this.data = data;
             this.emit();
         } catch (e) {
-            console.error(`Sync error for ${this.name}:`, e.message);
+            console.error(`Fetch error for ${this.name}:`, e.message);
         }
     }
 
@@ -155,9 +137,8 @@ class LocalCollection {
     limit() { return this; }
 
     async get() {
-        const data = await safeFetch(`${API_BASE}/collections/${this.name}`);
-        
-        // Return a mock snapshot
+        const raw = await safeFetch(`${API_BASE}/collections/${this.name}`);
+        const data = Array.isArray(raw) ? raw : [];
         const docs = data.map(d => ({
             id: d.id,
             data: () => d
@@ -172,7 +153,7 @@ class LocalCollection {
 
     emit() {
         const snap = {
-            docs: this.data.map(d => ({
+            docs: (this.data || []).map(d => ({
                 id: d.id,
                 data: () => d
             }))
@@ -182,7 +163,7 @@ class LocalCollection {
 
     startPolling() {
         if (!this.pollInterval) {
-            this.pollInterval = setInterval(() => this.fetch(), 3000);
+            this.pollInterval = setInterval(() => this.fetch(), 5000);
         }
     }
 
@@ -202,21 +183,41 @@ class LocalDoc {
 
     async get() {
         // Find in parent cache or fetch
-        const item = this.parent.data.find(d => d.id === this.id);
+        const item = (this.parent.data || []).find(d => d.id === this.id);
         if (item) return { exists: true, data: () => item };
         
-        const data = await safeFetch(`${API_BASE}/collections/${this.parent.name}`);
-        const found = data.find(d => d.id === this.id);
-        return { 
-            exists: !!found, 
-            data: () => found || null 
-        };
+        try {
+            const raw = await safeFetch(`${API_BASE}/collections/${this.parent.name}`);
+            const data = Array.isArray(raw) ? raw : [];
+            const found = data.find(d => d.id === this.id);
+            return { 
+                exists: !!found, 
+                data: () => found || null 
+            };
+        } catch (e) {
+            console.error(`LocalDoc.get failed for ${this.parent.name}/${this.id}:`, e.message);
+            return { exists: false, data: () => null };
+        }
     }
     
+    async update(data) {
+        const docData = { id: this.id, ...data };
+        const idx = this.parent.data.findIndex(d => d.id === this.id);
+        if (idx > -1) {
+            this.parent.data[idx] = { ...this.parent.data[idx], ...data };
+        }
+        this.parent.emit();
+
+        return await safeFetch(`${API_BASE}/collections/${this.parent.name}/${this.id}`, {
+            method: 'PATCH', // Partial update
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
     onSnapshot(callback) {
-        // A Doc snapshot is just a filtered collection snapshot
         const unsub = this.parent.onSnapshot(snap => {
-            const found = snap.docs.find(d => d.id === this.id);
+            const found = (snap.docs || []).find(d => d.id === this.id);
             if(found) {
                 callback({
                     exists: true,
@@ -231,8 +232,6 @@ class LocalDoc {
 
     async set(data) {
         const docData = { id: this.id, ...data };
-        
-        // Optimistic update
         const idx = this.parent.data.findIndex(d => d.id === this.id);
         if (idx > -1) this.parent.data[idx] = docData;
         else this.parent.data.unshift(docData);
@@ -246,85 +245,24 @@ class LocalDoc {
             });
             this.parent.fetch(); 
         } catch (e) {
-            this.parent.fetch(); // Reload on fail
+            this.parent.fetch(); 
             throw e;
         }
-    }
-
-    async update(data) {
-        const current = await this.get();
-        const updated = { ...current.data(), ...data };
-        await this.set(updated);
+        return { id: this.id };
     }
 
     async delete() {
-        // Optimistic delete
         this.parent.data = this.parent.data.filter(d => d.id !== this.id);
         this.parent.emit();
-
-        try {
-            await safeFetch(`${API_BASE}/collections/${this.parent.name}/${this.id}`, {
-                method: 'DELETE'
-            });
-            this.parent.fetch();
-        } catch (e) {
-            this.parent.fetch();
-            throw e;
-        }
+        return await safeFetch(`${API_BASE}/collections/${this.parent.name}/${this.id}`, { method: 'DELETE' });
     }
 }
-
-class LocalBatch {
-    constructor() {
-        this.ops = [];
-    }
-
-    set(docRef, data) {
-        this.ops.push({ coll: docRef.parent.name, id: docRef.id, data });
-    }
-
-    update(docRef, data) {
-        // For simplicity in mock, update behaves like set in batch
-        this.ops.push({ coll: docRef.parent.name, id: docRef.id, data });
-    }
-
-    async commit() {
-        if (this.ops.length === 0) return;
-        
-        await safeFetch(`${API_BASE}/transaction/batch`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ updates: this.ops })
-        });
-        
-        // Refresh all affected collections in background
-        const uniqueColls = [...new Set(this.ops.map(o => o.coll))];
-        uniqueColls.forEach(c => {
-            // We can't easily find the collection instances here, 
-            // so we rely on the next poll or manual navigation
-        });
-        
-        this.ops = [];
-    }
-}
-
-// Global registry to share collection instances and ensure real-time consistency
-const collectionRegistry = {};
 
 window.localDb = {
-    collection: (name) => {
-        if (!collectionRegistry[name]) {
-            collectionRegistry[name] = new LocalCollection(name);
-        }
-        return collectionRegistry[name];
-    },
-    batch: () => new LocalBatch(),
+    collection: (name) => new LocalStorage(name),
     runTransaction: async (fn) => {
-        // Mock transaction: just run the function with a dummy transaction object
-        // This prevents "runTransaction is not a function" errors.
-        console.warn("DB: runTransaction is mocked. Operations are not truly atomic.");
         const transaction = {
-            get: async (docRef) => await docRef.get(),
+            get: (docRef) => docRef.get(),
             set: (docRef, data) => docRef.set(data),
             update: (docRef, data) => docRef.update(data),
             delete: (docRef) => docRef.delete()
@@ -333,7 +271,6 @@ window.localDb = {
     }
 };
 
-// Real-time Auth Mock with Listeners
 const authListeners = [];
 const triggerAuthChange = (user) => {
     if (user) {
@@ -363,18 +300,16 @@ window.addEventListener('storage', (e) => {
 });
 
 window.localAuth = {
+    currentUser: null,
     onAuthStateChanged: (callback) => {
         authListeners.push(callback);
-        // Immediate initial check
         const storedUser = sessionStorage.getItem('it-guy-user');
         try {
             const user = storedUser ? JSON.parse(storedUser) : null;
             callback(user);
         } catch (e) {
-            console.error("Auth session parse error:", e);
             callback(null);
         }
-        
         return () => {
             const idx = authListeners.indexOf(callback);
             if (idx > -1) authListeners.splice(idx, 1);
@@ -382,7 +317,6 @@ window.localAuth = {
     },
     signInWithEmailAndPassword: async (email, password) => {
         try {
-            console.log(`Attempting login for: ${email}`);
             const data = await safeFetch(`${API_BASE}/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -390,16 +324,13 @@ window.localAuth = {
             });
 
             if (data && data.user && data.token) {
-                // Use sessionStorage to forget login on browser close
                 sessionStorage.setItem('it-guy-token', data.token);
                 sessionStorage.setItem('it-guy-user', JSON.stringify(data.user));
                 triggerAuthChange(data.user);
             } else {
-                const serverMsg = data && data.error ? data.error : JSON.stringify(data);
-                throw new Error(`Invalid response from server: ${serverMsg}`);
+                throw new Error(data?.error || "Login failed");
             }
         } catch (e) {
-            console.error("Login API Error:", e.message);
             throw e;
         }
     },
@@ -407,44 +338,28 @@ window.localAuth = {
         sessionStorage.removeItem('it-guy-user');
         sessionStorage.removeItem('it-guy-token');
         triggerAuthChange(null);
-        // Forced reload ensures all modules reset their state
         setTimeout(() => window.location.reload(), 100);
     },
     createUserWithEmailAndPassword: async (email, password, firstName, lastName, phone) => {
-        try {
-            const data = await safeFetch(`${API_BASE}/register`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password, firstName, lastName, phone })
-            });
-            if (data && data.user) {
-                // Return just the user object to match Firebase Auth behavior
-                return data.user;
-            } else {
-                throw new Error(data.error || "Registration failed");
-            }
-        } catch (e) {
-            console.error("Register API Error:", e.message);
-            throw e;
-        }
+        const data = await safeFetch(`${API_BASE}/register`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password, firstName, lastName, phone })
+        });
+        if (data && data.user) return data.user;
+        throw new Error(data?.error || "Registration failed");
     },
     sendPasswordResetEmail: async (email) => {
-        try {
-            const data = await safeFetch(`${API_BASE}/forgot-password`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email })
-            });
-            if (!data.success) throw new Error(data.error || "Reset request failed");
-            return true;
-        } catch (e) {
-            console.error("Forgot Pass API Error:", e.message);
-            throw e;
-        }
+        const data = await safeFetch(`${API_BASE}/forgot-password`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email })
+        });
+        if (!data.success) throw new Error(data.error || "Reset request failed");
+        return true;
     }
 };
 
-// Global Firebase-like variables for app.js
 window.firebase = {
     firestore: {
         FieldValue: {
@@ -454,8 +369,5 @@ window.firebase = {
     }
 };
 
-// Redundant aliases to ensure compatibility across all initialization patterns
 window.fbDb = window.localDb;
 window.fbAuth = window.localAuth;
-
-console.log("IT Guy Local Adapter: Auth & DB Aliases initialized.");

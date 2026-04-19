@@ -401,6 +401,13 @@
                 if(window.client && window.authSystem.currentUser) window.client.render();
             } catch(e) {
                 console.error("Data sync failed", e);
+                // If it's a 401 or session error, force logout to clear the stuck state
+                if(e.message.toLowerCase().includes('authorized') || e.message.toLowerCase().includes('session')) {
+                    if(window.authSystem) window.authSystem.logout();
+                } else {
+                    // Try to render with what we have
+                    if(window.client && window.authSystem.currentUser) window.client.render();
+                }
             }
         }
     </script>
