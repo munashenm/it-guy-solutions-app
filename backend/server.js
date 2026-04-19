@@ -287,6 +287,11 @@ app.post('/api/login', async (req, res) => {
         } else {
             res.status(401).json({ error: "Invalid credentials" });
         }
+    } catch(err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // ==========================================
 // PUBLIC AUTH ENDPOINTS (No Auth Required)
 // ==========================================
