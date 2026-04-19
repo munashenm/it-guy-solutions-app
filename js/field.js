@@ -9,14 +9,22 @@ window.field = {
             this.container = document.getElementById('field-content');
             if (!this.container) return;
         }
-        let jobs = window.app.state.fieldJobs || [];
-        
         const currentUser = window.authSystem && window.authSystem.currentUser ? window.authSystem.currentUser : null;
         const isTech = currentUser && currentUser.role === 'technician';
+        let jobs = window.app.state.fieldJobs || [];
         
-        if(isTech) {
-            const uName = (currentUser.email ? currentUser.email.split('@')[0] : '').toLowerCase();
-            jobs = jobs.filter(j => j.technician && j.technician.toLowerCase().includes(uName));
+        console.log(`Field View Render: Total Jobs=${jobs.length}, Role=${currentUser?.role}`);
+        
+        if(isTech && currentUser) {
+            const uName = (currentUser.username || (currentUser.email ? currentUser.email.split('@')[0] : '')).toLowerCase();
+            const fName = (currentUser.firstName || '').toLowerCase();
+            
+            jobs = jobs.filter(j => {
+                if (!j.technician) return false;
+                const techField = j.technician.toLowerCase();
+                return techField.includes(uName) || (fName && techField.includes(fName));
+            });
+            console.log(`Technician Filter Applied: Visible Jobs=${jobs.length} for ${uName}`);
         }
         
         let html = `
@@ -25,7 +33,12 @@ window.field = {
                     <h1>Field Services</h1>
                     <p style="color: #a0a0a0; margin-top: 4px;">Manage your on-site call-outs and dispatch routing.</p>
                 </div>
-                ${!isTech ? `<button class="btn-primary" onclick="app.showScheduleCalloutModal()"><span class="material-symbols-outlined">add</span> Schedule Call-out</button>` : ''}
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn-secondary" onclick="field.fetchAndRefresh()" title="Force Sync Data">
+                        <span class="material-symbols-outlined">sync</span> Sync
+                    </button>
+                    ${!isTech ? `<button class="btn-primary" onclick="app.showScheduleCalloutModal()"><span class="material-symbols-outlined">add</span> Schedule Call-out</button>` : ''}
+                </div>
             </div>
             
             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px; margin-top: 16px;">
@@ -581,6 +594,26 @@ window.field = {
             this.showCompletionModal(jobId);
         } catch(e) {
             alert(\"Check-out failed.\");
+        }
+    },
+
+    async fetchAndRefresh() {
+        const btn = document.querySelector('button[onclick="field.fetchAndRefresh()"]');
+        if(btn) btn.classList.add('rotating');
+        
+        try {
+            // Trigger a direct fetch from the database bypassing the local cache
+            const ref = window.fbDb.collection('fieldJobs');
+            const data = await ref.get();
+            console.log("Field direct sync complete:", data.docs.length, "jobs found.");
+            
+            // Manual update to app state
+            window.app.state.fieldJobs = data.docs.map(d => ({ id: d.id, ...d.data() }));
+            this.render();
+        } catch (e) {
+            console.error("Manual sync failed:", e);
+        } finally {
+            if(btn) btn.classList.remove('rotating');
         }
     }
 };
