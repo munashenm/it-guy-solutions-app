@@ -62,7 +62,7 @@
                 Enter your unique Job ID or Field ID to see the latest progress.
             </p>
 
-            <form id="track-form">
+            <form id="track-form" style="margin-bottom: 24px;">
                 <div class="form-group">
                     <label>Job Reference Number</label>
                     <input type="text" id="track-id" class="form-control" placeholder="e.g. JOB-1001" style="text-align: center; font-size: 1.2rem; text-transform: uppercase;" required>
@@ -72,12 +72,29 @@
                 </button>
             </form>
 
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 24px;">
+                <a href="index.html" class="btn-secondary" style="justify-content: center; font-size: 0.85rem; border-color: var(--primary); color: var(--primary);">
+                    <span class="material-symbols-outlined">person</span> Customer Login
+                </a>
+                <a href="https://itguysa.co.za" id="btn-website" class="btn-secondary" style="justify-content: center; font-size: 0.85rem;">
+                    <span class="material-symbols-outlined">language</span> Back to Website
+                </a>
+            </div>
+
             <div id="track-job-result"></div>
         </div>
 
-        <p style="text-align: center; color: #666; font-size: 0.8rem; margin-top: 32px;">
-            &copy; 2024 IT Guy Solutions. All Rights Reserved.<br>
-            <a href="index.html" style="color: var(--primary); text-decoration: none; margin-top: 8px; display: inline-block;">Go to Staff Portal</a>
+        <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 24px; align-items: center;">
+            <p style="color: #666; font-size: 0.85rem;">Need assistance with your repair?</p>
+            <div style="display: flex; gap: 16px;">
+                <a href="tel:+27821234567" id="link-phone" class="btn-icon" style="color: var(--success); background: rgba(0, 184, 148, 0.1); padding: 12px; border-radius: 50%;" title="Call Us"><span class="material-symbols-outlined">call</span></a>
+                <a href="https://wa.me/27821234567" id="link-whatsapp" class="btn-icon" style="color: #25D366; background: rgba(37, 211, 102, 0.1); padding: 12px; border-radius: 50%;" title="WhatsApp Us"><span class="material-symbols-outlined">chat</span></a>
+                <a href="mailto:support@itguysa.co.za" id="link-email" class="btn-icon" style="color: var(--primary); background: rgba(108, 92, 231, 0.1); padding: 12px; border-radius: 50%;" title="Email Support"><span class="material-symbols-outlined">mail</span></a>
+            </div>
+        </div>
+
+        <p style="text-align: center; color: #444; font-size: 0.75rem; margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 20px;">
+            &copy; 2024 IT Guy Solutions. All Rights Reserved.
         </p>
     </div>
 

@@ -8,6 +8,9 @@ window.trackPortal = {
             form.addEventListener('submit', (e) => this.handleTrackSubmit(e));
         }
 
+        // Fetch dynamic branding/contact info
+        this.fetchSettings();
+
         // Auto-fill from URL param if present (?id=JOB-123)
         const urlParams = new URLSearchParams(window.location.search);
         const urlId = urlParams.get('id');
@@ -125,6 +128,39 @@ window.trackPortal = {
                 </div>
             </div>
         `;
+    },
+
+    async fetchSettings() {
+        if(!window.fbDb) return;
+        try {
+            const doc = await window.fbDb.collection('settings').doc('companyProfile').get();
+            if(doc.exists) {
+                const s = doc.data();
+                
+                // Update Website
+                const webBtn = document.getElementById('btn-website');
+                if(webBtn && s.website) webBtn.href = s.website.startsWith('http') ? s.website : `https://${s.website}`;
+
+                // Update Contact Links
+                const phone = s.phone || s.supportPhone || '';
+                const cleanPhone = phone.replace(/\s+/g, '');
+                
+                if(phone) {
+                    const phoneBtn = document.getElementById('link-phone');
+                    if(phoneBtn) phoneBtn.href = `tel:${cleanPhone}`;
+                    
+                    const waBtn = document.getElementById('link-whatsapp');
+                    if(waBtn) waBtn.href = `https://wa.me/${cleanPhone.replace('+', '')}`;
+                }
+
+                if(s.email || s.supportEmail) {
+                    const emailBtn = document.getElementById('link-email');
+                    if(emailBtn) emailBtn.href = `mailto:${s.email || s.supportEmail}`;
+                }
+            }
+        } catch(e) {
+            console.log("Settings fetch silent fail in Tracking Portal");
+        }
     }
 };
 
