@@ -128,19 +128,51 @@ class LocalStorage {
             const raw = await safeFetch(`${API_BASE}/collections/${this.name}`);
             const data = Array.isArray(raw) ? raw : [];
             this.data = data;
+            
+            // Clear global sync error if this was a recovery
+            if (this._hasSyncError) {
+                this._hasSyncError = false;
+                this.updateGlobalSyncStatus();
+            }
+            
             this.emit();
         } catch (e) {
             console.error(`Fetch error for ${this.name}:`, e.message);
-            if (window.app && window.app.showToast) {
-                window.app.showToast(`Sync issue: ${this.name}. Retrying...`, "warning");
+            
+            // Only notify if status just changed to error
+            if (!this._hasSyncError) {
+                this._hasSyncError = true;
+                this.updateGlobalSyncStatus();
+                
+                // Throttle toast to once every 30 seconds globally
+                const now = Date.now();
+                if (!window._lastSyncToast || (now - window._lastSyncToast > 30000)) {
+                    if (window.app && window.app.showToast) {
+                        window.app.showToast(`Sync issue: Connection to server unstable.`, "warning");
+                    }
+                    window._lastSyncToast = now;
+                }
             }
-            // Retry once after 5s
-            if(!this._retryPending) {
-                this._retryPending = true;
-                setTimeout(() => {
-                    this._retryPending = false;
-                    this.fetch();
-                }, 5000);
+            
+            // Automatic retry managed by the interval, no need for manual timeout here
+        }
+    }
+
+    updateGlobalSyncStatus() {
+        const collections = Object.values(window.localDb._collections);
+        const hasAnyError = collections.some(c => c._hasSyncError);
+        
+        const dot = document.getElementById('db-status-dot');
+        const text = document.getElementById('db-status-text');
+        
+        if (dot && text) {
+            if (hasAnyError) {
+                dot.style.background = '#ff7675';
+                text.textContent = 'Sync Interrupted';
+                text.style.color = '#ff7675';
+            } else {
+                // Only reset if system is generally healthy
+                if (window.app && window.app.checkSystemHealth) window.app.checkSystemHealth();
             }
         }
     }
@@ -190,7 +222,8 @@ class LocalStorage {
 
     startPolling() {
         if (!this.pollInterval) {
-            this.pollInterval = setInterval(() => this.fetch(), 5000);
+            // Increased interval to 15s to reduce server load/rate-limiting
+            this.pollInterval = setInterval(() => this.fetch(), 15000);
         }
     }
 
