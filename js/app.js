@@ -22,6 +22,7 @@ const app = {
         this.cacheDOM();
         this.bindEvents();
         this.startSync();
+        this.initStabilityHandlers();
         
         // Handle initial route
         this.handleRouting();
@@ -218,15 +219,97 @@ const app = {
             if(window.purchases && activeView === 'purchases-view') purchases.render();
             if(window.expenses && activeView === 'expenses-view') expenses.render();
             if(window.wiki && activeView === 'wiki-view') wiki.render();
+            
+            // Post-render UX: Inject labels for mobile card-view
+            this.injectTableLabels();
         } catch (e) {
             console.error("Critical error during view refresh:", e);
         }
+    },
+
+    initStabilityHandlers() {
+        console.log("Initializing Stability Handlers...");
+        
+        // 1. Global Error Tracking
+        window.onerror = (message, source, lineno, colno, error) => {
+            console.error("Global JS Error:", message, "at", source, ":", lineno);
+            this.showToast("An unexpected error occurred. We have logged it.", "error");
+            this.logActivity('JS Error', `${message} @ ${source}:${lineno}`);
+            return false;
+        };
+
+        window.onunhandledrejection = (event) => {
+            console.error("Unhandled Promise Rejection:", event.reason);
+            this.showToast("Sync issue detected. Retrying...", "warning");
+        };
+
+        // 2. Network Monitoring
+        window.addEventListener('online', () => {
+            this.showToast("Internet connection restored.", "success");
+        });
+        window.addEventListener('offline', () => {
+            this.showToast("You are currently offline. Changes may not save.", "warning");
+        });
+
+        // 3. Search Keyboard Navigation State
+        this._searchIndex = -1;
+        this._searchItems = [];
+    },
+
+    showToast(message, type = 'info', duration = 4000) {
+        let container = document.getElementById('toast-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'toast-container';
+            container.className = 'toast-container';
+            document.body.appendChild(container);
+        }
+
+        const icons = {
+            success: 'check_circle',
+            warning: 'warning',
+            error: 'error',
+            info: 'info'
+        };
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `
+            <span class="material-symbols-outlined toast-icon">${icons[type]}</span>
+            <div class="toast-message">${message}</div>
+        `;
+
+        container.appendChild(toast);
+
+        setTimeout(() => {
+            toast.classList.add('removing');
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    },
+
+    injectTableLabels() {
+        // Find all tables and inject data-label for mobile card responsiveness
+        const tables = document.querySelectorAll('table');
+        tables.forEach(table => {
+            const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText.trim());
+            const rows = table.querySelectorAll('tbody tr');
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                cells.forEach((cell, i) => {
+                    if (headers[i]) {
+                        cell.setAttribute('data-label', headers[i]);
+                    }
+                });
+            });
+        });
     },
 
     handleGlobalSearch(query) {
         const resultsEl = document.getElementById('global-search-results');
         if (!query || query.length < 2) {
             if(resultsEl) resultsEl.classList.add('hidden');
+            this._searchIndex = -1;
+            this._searchItems = [];
             return;
         }
         
@@ -335,6 +418,10 @@ const app = {
 
         resultsEl.innerHTML = html;
         resultsEl.classList.remove('hidden');
+        
+        // Cache items for keyboard nav
+        this._searchItems = results.jobs.concat(results.quotations, results.invoices, results.inventory);
+        this._searchIndex = -1;
     },
 
     openDocumentPreview(type, docId) {
@@ -501,6 +588,7 @@ const app = {
             searchInput.addEventListener('focus', (e) => {
                 if(e.target.value.length >= 2) this.handleGlobalSearch(e.target.value);
             });
+            searchInput.addEventListener('keydown', (e) => this.handleSearchKeyboard(e));
         }
 
         // Hide search dropdown on click outside
@@ -526,6 +614,40 @@ const app = {
                 window.location.hash = '#company';
             });
         }
+    },
+
+    handleSearchKeyboard(e) {
+        const dropdown = document.getElementById('global-search-results');
+        if (!dropdown || dropdown.classList.contains('hidden')) return;
+
+        const items = dropdown.querySelectorAll('.search-item');
+        if (!items.length) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this._searchIndex = (this._searchIndex + 1) % items.length;
+            this.highlightSearchItem(items);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this._searchIndex = (this._searchIndex - 1 + items.length) % items.length;
+            this.highlightSearchItem(items);
+        } else if (e.key === 'Enter' && this._searchIndex > -1) {
+            e.preventDefault();
+            items[this._searchIndex].click();
+        } else if (e.key === 'Escape') {
+            dropdown.classList.add('hidden');
+        }
+    },
+
+    highlightSearchItem(items) {
+        items.forEach((item, idx) => {
+            if (idx === this._searchIndex) {
+                item.classList.add('highlighted');
+                item.scrollIntoView({ block: 'nearest' });
+            } else {
+                item.classList.remove('highlighted');
+            }
+        });
     },
 
     handleRouting() {
