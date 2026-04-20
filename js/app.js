@@ -720,41 +720,52 @@ const app = {
         }
     },
 
-    navigate(viewId, navItem) {
+    async navigate(viewId, navItem) {
+        if(this.isNavigating) return;
+        this.isNavigating = true;
+        
         console.log(`Navigating to ${viewId}`);
         
-        // Update Nav Active State
+        // 1. Update Nav Active State
         this.navItems.forEach(nav => nav.classList.remove('active'));
         if(navItem) {
             navItem.classList.add('active');
         } else {
-            // Fallback: try to find the nav item for this view
             const fallbackNav = Array.from(this.navItems).find(nav => nav.getAttribute('data-target') === viewId);
             if(fallbackNav) fallbackNav.classList.add('active');
         }
 
-        // Update View Active State
+        // 2. Animate Out
+        const currentActive = document.querySelector('.view-section.active');
+        if(currentActive && currentActive.id !== viewId) {
+            currentActive.style.opacity = '0';
+            currentActive.style.transform = 'translate3d(0, -10px, 0)';
+            await new Promise(r => setTimeout(r, 200));
+        }
+
+        // 3. Update View Active State
         this.viewSections.forEach(section => {
-            section.classList.remove('active');
+            section.classList.remove('active', 'entry-anim');
             section.classList.add('hidden');
-            section.style.display = 'none'; // Forced hide for stability
+            section.style.display = 'none';
         });
 
         const target = document.getElementById(viewId);
         if(target) {
             target.classList.remove('hidden');
+            target.style.display = 'block';
+            
+            // Force reflow for animation
+            void target.offsetWidth;
+            
             target.classList.add('active');
-            target.style.display = 'block'; // Forced show
             this.state.currentView = viewId;
             
-            // Trigger module specific renders if needed
             this.refreshActiveViews();
-            
-            // Scroll to top
-            window.scrollTo(0, 0);
-        } else {
-            console.error(`CRITICAL: Navigation target not found: ${viewId}`);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
+        
+        this.isNavigating = false;
     },
 
     switchTab(viewId) {
