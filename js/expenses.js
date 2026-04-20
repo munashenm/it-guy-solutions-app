@@ -216,7 +216,7 @@ window.expenses = {
             }
 
             const currentUser = window.authSystem?.currentUser;
-            const uName = currentUser?.email?.split('@')[0] || 'Unknown';
+            const uName = (currentUser?.email?.split('@')[0] || 'Unknown').toLowerCase();
 
             const id = 'EXP-' + Date.now();
             await window.fbDb.collection('expenses').doc(id).set({
@@ -230,10 +230,10 @@ window.expenses = {
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
             window.app.closeModal();
-            alert("Expense logged successfully.");
+            window.app.showToast("Expense logged successfully.", "success");
         } catch(err) {
             console.error(err);
-            alert("Failed to save expense.");
+            window.app.showToast("Failed to save expense.", "error");
         }
     },
 
@@ -259,8 +259,9 @@ window.expenses = {
         if(!confirm("Delete this expense record?")) return;
         try {
             await window.fbDb.collection('expenses').doc(id).delete();
+            window.app.showToast("Expense record deleted.", "info");
         } catch(err) {
-            alert("Delete failed.");
+            window.app.showToast("Delete failed.", "error");
         }
     }
 };
