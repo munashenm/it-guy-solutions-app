@@ -569,12 +569,36 @@ app.post('/api/transaction/batch', async (req, res) => {
             if (!u || typeof u.coll !== 'string' || typeof u.id !== 'string') {
                 throw new Error('Invalid batch item: missing coll or id');
             }
-            let jsonData;
-            try {
-                jsonData = u.data === undefined ? '{}' : JSON.stringify(u.data);
-            } catch (stringifyErr) {
-                throw new Error(`Cannot serialize batch item ${u.coll}/${u.id}: ${stringifyErr.message}`);
+
+            // 1. Fetch current data for the document
+            const row = await db.get("SELECT data FROM collections WHERE name = ? AND id = ?", [u.coll, u.id]);
+            let currentData = row ? safeJsonParse(row.data, {}, `Batch Read: ${u.coll}/${u.id}`) : {};
+            
+            // 2. Perform the update/set merge logic
+            let newData = { ...currentData };
+            
+            if (u.method === 'delete') {
+                 if (type === 'mysql') await tx.execute("DELETE FROM collections WHERE name = ? AND id = ?", [u.coll, u.id]);
+                 else await db.run("DELETE FROM collections WHERE name = ? AND id = ?", [u.coll, u.id]);
+                 continue;
             }
+
+            if (u.method === 'set') {
+                newData = u.data; // Complete overwrite
+            } else {
+                // Partial update / Merge
+                for (const key in u.data) {
+                    const val = u.data[key];
+                    if (val && typeof val === 'object' && val._type === 'increment') {
+                        const baseVal = Number(currentData[key]) || 0;
+                        newData[key] = baseVal + val.value;
+                    } else {
+                        newData[key] = val;
+                    }
+                }
+            }
+
+            const jsonData = JSON.stringify(newData);
             if (type === 'mysql') {
                 const sql = `INSERT INTO collections (id, name, data, updatedAt) VALUES (?, ?, ?, CURRENT_TIMESTAMP) 
                              ON DUPLICATE KEY UPDATE name = VALUES(name), data = VALUES(data), updatedAt = CURRENT_TIMESTAMP`;

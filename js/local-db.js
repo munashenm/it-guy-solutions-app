@@ -314,6 +314,32 @@ window.localDb = {
             delete: (docRef) => docRef.delete()
         };
         return await fn(transaction);
+    },
+    batch: function() {
+        const operations = [];
+        return {
+            update: (docRef, data) => {
+                operations.push({ coll: docRef.parent.name, id: docRef.id, method: 'update', data });
+            },
+            set: (docRef, data) => {
+                operations.push({ coll: docRef.parent.name, id: docRef.id, method: 'set', data });
+            },
+            delete: (docRef) => {
+                operations.push({ coll: docRef.parent.name, id: docRef.id, method: 'delete' });
+            },
+            commit: async () => {
+                const res = await safeFetch(`${API_BASE}/transaction/batch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ updates: operations })
+                });
+                const uniqueColls = [...new Set(operations.map(o => o.coll))];
+                uniqueColls.forEach(c => {
+                    if (window.localDb._collections[c]) window.localDb._collections[c].fetch();
+                });
+                return res;
+            }
+        };
     }
 };
 
@@ -410,7 +436,7 @@ window.firebase = {
     firestore: {
         FieldValue: {
             serverTimestamp: () => new Date().toISOString(),
-            increment: (val) => val
+            increment: (val) => ({ _type: 'increment', value: val })
         }
     }
 };

@@ -21,7 +21,11 @@ window.repair = {
             jobs = jobs.filter(j => j.technician && j.technician.toLowerCase().includes(uName));
         }
         
-        jobs = jobs.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        jobs = jobs.sort((a,b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+            return dateB - dateA;
+        });
         
         let html = `
             <div class="pos-wrapper" style="display: grid; grid-template-columns: 320px 1fr; gap: 24px; height: calc(100vh - 100px);">

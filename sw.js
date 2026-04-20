@@ -1,4 +1,4 @@
-const CACHE_NAME = 'itguy-app-1';
+const CACHE_NAME = 'itguy-app-2.5.1';
 const urlsToCache = [
   '/',
   '/index.html',
