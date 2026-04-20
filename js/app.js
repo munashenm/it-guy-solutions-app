@@ -2199,8 +2199,8 @@ const app = {
                 }
             } else {
                 // Admin
-                if(target === 'client-view') {
-                    item.classList.add('hidden'); // hide the outward client view for internal staff
+                if(target === 'client-view' || target === 'field-view' || target === 'mystock-view') {
+                    item.classList.add('hidden'); // Admin only manages global inventory/jobs
                 }
                 // Important: team-view and company-view are visible to admins
             }
