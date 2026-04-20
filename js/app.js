@@ -238,7 +238,7 @@ const app = {
         if(!dot || !text) return;
 
         try {
-            const status = await window.fbDb.safeFetch(`${window.API_BASE}/status`);
+            const status = await window.localDb.safeFetch(`${window.API_BASE}/status`);
             const isHealthy = status.dbStatus === 'Connected';
             
             dot.style.background = isHealthy ? '#00b894' : '#ff7675';

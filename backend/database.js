@@ -23,9 +23,20 @@ class Database {
                 database: process.env.DB_NAME,
                 waitForConnections: true,
                 connectionLimit: 10,
-                queueLimit: 0
+                queueLimit: 0,
+                enableKeepAlive: true,
+                keepAliveInitialDelay: 10000
             });
-            // Verify connection immediately
+            
+            // Re-connection Heartbeat (every 30s)
+            setInterval(async () => {
+                try {
+                    const [rows] = await this.pool.execute('SELECT 1');
+                } catch(e) {
+                    console.error("DB: MySQL Heartbeat failed, pool will auto-reconnect on next query.");
+                }
+            }, 30000);
+
             try {
                 const connection = await this.pool.getConnection();
                 await connection.query('SELECT 1');
@@ -33,7 +44,6 @@ class Database {
                 console.log("DB: MySQL Ready and Connected.");
             } catch (err) {
                 console.error("DB: MySQL Connection Warning during init:", err.message);
-                console.log("DB: Application will attempt to reconnect on first query.");
             }
         } else {
             console.log("DB: Initializing Stable SQLite Mode...");
@@ -93,6 +103,20 @@ class Database {
     }
 
     // Helper for Transactions
+    async beginTransaction() {
+        if (this.type === 'mysql') {
+            const connection = await this.pool.getConnection();
+            try {
+                await connection.beginTransaction();
+                return connection;
+            } catch (err) {
+                if (connection) connection.release();
+                throw err;
+            }
+        }
+        return null; // SQLite handles it differently or we use serial mode
+    }
+
     async serialize(fn) {
         if (this.type === 'mysql') {
             const connection = await this.pool.getConnection();

@@ -332,6 +332,7 @@ class LocalDoc {
 }
 
 window.localDb = {
+    safeFetch: safeFetch,
     _collections: {},
     collection: function(name) {
         if (!this._collections[name]) {
@@ -422,7 +423,7 @@ window.localAuth = {
     },
     signInWithEmailAndPassword: async (email, password) => {
         try {
-            const data = await safeFetch(`${API_BASE}/login`, {
+            const data = await window.localDb.safeFetch(`${API_BASE}/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
