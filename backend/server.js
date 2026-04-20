@@ -592,6 +592,12 @@ app.post('/api/transaction/batch', async (req, res) => {
                     if (val && typeof val === 'object' && val._type === 'increment') {
                         const baseVal = Number(currentData[key]) || 0;
                         newData[key] = baseVal + val.value;
+                    } else if (val && typeof val === 'object' && val._type === 'arrayUnion') {
+                        const arr = Array.isArray(currentData[key]) ? currentData[key] : [];
+                        // Check if value already exists to prevent duplicates (mimic Firestore)
+                        const exists = arr.some(item => JSON.stringify(item) === JSON.stringify(val.value));
+                        if (!exists) arr.push(val.value);
+                        newData[key] = arr;
                     } else {
                         newData[key] = val;
                     }

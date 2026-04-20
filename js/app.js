@@ -1387,6 +1387,103 @@ const app = {
         }
     },
 
+    },
+
+    showScheduleCalloutModal() {
+        const dateStr = new Date().toISOString().split('T')[0];
+        const customers = this.state.customers || [];
+        const techs = ['Unassigned', 'Admin User', 'Tech John', 'Tech Sarah']; // Could be dynamic
+        
+        const modalHTML = `
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2>Schedule Field Call-out</h2>
+                    <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div class="modal-body">
+                    <form onsubmit="app.scheduleCalloutAction(event)">
+                        <div class="form-group">
+                            <label>Client / Customer</label>
+                            <input type="text" id="call-client" class="form-control" placeholder="Search or Type Client Name..." list="customers-list" required>
+                            <datalist id="customers-list">
+                                ${customers.map(c => `<option value="${c.name || c.id}">${c.company || ''}</option>`).join('')}
+                            </datalist>
+                        </div>
+                        <div class="form-group">
+                            <label>Service Address</label>
+                            <input type="text" id="call-address" class="form-control" placeholder="123 Street Name, Suburb" required onfocus="app.autoFillClientAddress()">
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Date</label>
+                                <input type="date" id="call-date" class="form-control" value="${dateStr}" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Preferred Time</label>
+                                <input type="time" id="call-time" class="form-control" value="09:00">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Assign Technician</label>
+                            <select id="call-tech" class="form-control" style="appearance: auto;">
+                                ${techs.map(t => `<option value="${t}">${t}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Problem / Description</label>
+                            <textarea id="call-desc" class="form-control" rows="3" placeholder="Describe the issue to resolve on-site..." required></textarea>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancel</button>
+                            <button type="submit" class="btn-primary">Book Call-out</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        `;
+        this.showModal(modalHTML);
+    },
+
+    autoFillClientAddress() {
+        const clientName = document.getElementById('call-client').value;
+        const client = (this.state.customers || []).find(c => (c.name || c.id) === clientName || c.company === clientName);
+        if (client && client.address) {
+            document.getElementById('call-address').value = client.address;
+        }
+    },
+
+    async scheduleCalloutAction(e) {
+        e.preventDefault();
+        const btn = e.target.querySelector('button[type="submit"]');
+        if(btn) { btn.innerHTML = 'Scheduling...'; btn.disabled = true; }
+
+        const jobData = {
+            id: 'CALL-' + Math.floor(1000 + Math.random() * 9000),
+            customer: document.getElementById('call-client').value,
+            address: document.getElementById('call-address').value,
+            date: document.getElementById('call-date').value,
+            time: document.getElementById('call-time').value,
+            technician: document.getElementById('call-tech').value,
+            desc: document.getElementById('call-desc').value,
+            status: 'Scheduled',
+            items: [],
+            notes: [],
+            createdAt: new Date().toISOString()
+        };
+
+        try {
+            await window.fbDb.collection('fieldJobs').doc(jobData.id).set(jobData);
+            this.logActivity('Call-out Scheduled', `Scheduled ${jobData.id} for ${jobData.customer} on ${jobData.date}`);
+            this.closeModal();
+            // Refresh view
+            if (window.field) window.field.render();
+        } catch (err) {
+            console.error(err);
+            alert("Error scheduling call-out: " + err.message);
+            if(btn) { btn.innerHTML = 'Book Call-out'; btn.disabled = false; }
+        }
+    },
+
     async handleCreateInvoice(e) {
         e.preventDefault();
         const btn = e.target.querySelector('button[type="submit"]');

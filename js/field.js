@@ -16,16 +16,25 @@ window.field = {
         console.log(`Field View Render: Total Jobs=${jobs.length}, Role=${currentUser?.role}`);
         
         if(isTech && currentUser) {
-            const uName = (currentUser.username || (currentUser.email ? currentUser.email.split('@')[0] : '')).toLowerCase();
+            const uMail = (currentUser.email || '').toLowerCase();
+            const uName = (uMail.split('@')[0] || '').toLowerCase();
             const fName = (currentUser.firstName || '').toLowerCase();
             
             jobs = jobs.filter(j => {
                 if (!j.technician) return false;
                 const techField = j.technician.toLowerCase();
-                return techField.includes(uName) || (fName && techField.includes(fName));
+                // Match by full email, email prefix, or first name
+                return techField.includes(uMail) || techField.includes(uName) || (fName && techField.includes(fName));
             });
-            console.log(`Technician Filter Applied: Visible Jobs=${jobs.length} for ${uName}`);
+            console.log(`Technician Filter: ${jobs.length} jobs for ${uName}`);
         }
+        
+        // Sorting: Newest first based on createdAt
+        jobs = jobs.sort((a, b) => {
+            const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+            const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+            return dateB - dateA;
+        });
         
         let html = `
             <div class="section-header">

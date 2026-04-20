@@ -470,7 +470,8 @@ window.firebase = {
     firestore: {
         FieldValue: {
             serverTimestamp: () => new Date().toISOString(),
-            increment: (val) => ({ _type: 'increment', value: val })
+            increment: (val) => ({ _type: 'increment', value: val }),
+            arrayUnion: (val) => ({ _type: 'arrayUnion', value: val })
         }
     }
 };
