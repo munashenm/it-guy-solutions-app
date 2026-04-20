@@ -24,6 +24,10 @@ const app = {
         this.startSync();
         this.initStabilityHandlers();
         
+        // System Health Check
+        this.checkSystemHealth();
+        setInterval(() => this.checkSystemHealth(), 60000); 
+        
         // Handle initial route
         this.handleRouting();
         
@@ -224,6 +228,33 @@ const app = {
             this.injectTableLabels();
         } catch (e) {
             console.error("Critical error during view refresh:", e);
+        }
+    },
+
+    async checkSystemHealth() {
+        const dot = document.getElementById('db-status-dot');
+        const text = document.getElementById('db-status-text');
+        const label = document.getElementById('db-type-label');
+        if(!dot || !text) return;
+
+        try {
+            const status = await window.fbDb.safeFetch(`${window.API_BASE}/status`);
+            const isHealthy = status.dbStatus === 'Connected';
+            
+            dot.style.background = isHealthy ? '#00b894' : '#ff7675';
+            text.textContent = isHealthy ? 'System Online' : 'DB Sync Error';
+            text.style.color = isHealthy ? '#00b894' : '#ff7675';
+            const engineInfo = status.dbType ? `${status.dbType.toUpperCase()} Engine` : 'Engine Unknown';
+            label.textContent = `${engineInfo} | v2.5`;
+            
+            if (!isHealthy && status.dbError) {
+                console.error("Database Health Warning:", status.dbError);
+            }
+        } catch(e) {
+             dot.style.background = '#ff7675';
+             text.textContent = 'Server Offline';
+             text.style.color = '#ff7675';
+             label.textContent = 'Connection Refused';
         }
     },
 

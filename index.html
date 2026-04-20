@@ -142,8 +142,15 @@
                     <span>Settings</span>
                 </a>
             </nav>
-            
-            <!-- Sidebar footer removed, Profile moved to topbar -->
+
+            <!-- Sidebar Footer with Health Status -->
+            <div class="sidebar-footer" style="margin-top: auto; padding: 16px; border-top: 1px solid rgba(255,255,255,0.05); font-size: 0.75rem;">
+                <div style="display: flex; align-items: center; gap: 8px; color: #a0a0a0;">
+                    <div id="db-status-dot" style="width: 8px; height: 8px; border-radius: 50%; background: #555;"></div>
+                    <span id="db-status-text">System IDLE</span>
+                </div>
+                <div id="db-type-label" style="color: #666; margin-top: 4px; font-family: monospace; font-size: 0.7rem;"></div>
+            </div>
         </aside>
 
         <!-- Main Content Area -->

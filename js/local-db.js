@@ -131,6 +131,17 @@ class LocalStorage {
             this.emit();
         } catch (e) {
             console.error(`Fetch error for ${this.name}:`, e.message);
+            if (window.app && window.app.showToast) {
+                window.app.showToast(`Sync issue: ${this.name}. Retrying...`, "warning");
+            }
+            // Retry once after 5s
+            if(!this._retryPending) {
+                this._retryPending = true;
+                setTimeout(() => {
+                    this._retryPending = false;
+                    this.fetch();
+                }, 5000);
+            }
         }
     }
 

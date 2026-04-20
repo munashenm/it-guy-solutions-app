@@ -32,12 +32,24 @@ app.use('/api', (req, res, next) => {
     next();
 });
 
-// Heartbeat status for production diagnostics
-app.get('/api/status', (req, res) => {
+// Improved Heartbeat status for production diagnostics
+app.get('/api/status', async (req, res) => {
+    let dbStatus = "Connected";
+    let dbError = null;
+    try {
+        await db.get("SELECT 1");
+    } catch(e) {
+        dbStatus = "Error";
+        dbError = e.message;
+    }
+
     res.json({ 
         status: "online", 
         timestamp: new Date().toISOString(),
         dbType: process.env.DB_TYPE || 'sqlite',
+        dbStatus: dbStatus,
+        dbError: dbError,
+        environment: process.env.NODE_ENV || 'production',
         message: "IT Guy Backend is reachable and healthy."
     });
 });
