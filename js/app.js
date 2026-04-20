@@ -13,7 +13,8 @@ const app = {
         knowledgeBase: [],
         customers: [],
         tickets: [],
-        settings: {}
+        settings: {},
+        _lastCreatedDoc: null // Temporary cache for immediate document actions
     },
     unsubscribes: [],
 
@@ -337,90 +338,82 @@ const app = {
     },
 
     openDocumentPreview(type, docId) {
-        const resultsEl = document.getElementById('global-search-results');
-        if (resultsEl) resultsEl.classList.add('hidden');
+        const dropdown = document.getElementById('global-search-results');
+        if(dropdown) dropdown.classList.add('hidden');
         
-        let data = null;
-        let title = "";
-        let actionsHTML = "";
+        let doc = null;
+        if(type === 'job') doc = [...(this.state.jobs || []), ...(this.state.fieldJobs || [])].find(x => x.id === docId);
+        if(type === 'invoice') doc = (this.state.invoices || []).find(x => x.id === docId);
+        if(type === 'quotation') doc = (this.state.quotations || []).find(x => x.id === docId);
 
-        if (type === 'invoice') {
-            data = (this.state.invoices || []).find(i => i.id === docId);
-            title = "Invoice Preview";
-            if (data) {
-                actionsHTML = `
-                    <button class="btn-primary" onclick="app.executeDocumentAction('Print', 'Invoice', '${docId}')"><span class="material-symbols-outlined">print</span> Print</button>
-                    <button class="btn-primary" onclick="app.executeDocumentAction('Download', 'Invoice', '${docId}')"><span class="material-symbols-outlined">download</span> Download PDF</button>
-                    <button class="btn-primary" style="background: #128C7E; border-color: #128C7E;" onclick="app.executeDocumentAction('WhatsApp', 'Invoice', '${docId}', '${data.phone || ''}')"><span class="material-symbols-outlined">chat</span> WhatsApp</button>
-                    ${data.status !== 'Paid' ? `<button class="btn-secondary" style="background: var(--success); border-color: #00b894; color: white;" onclick="alert('Simulation: Marked ${data.id} as Paid')"><span class="material-symbols-outlined">check_circle</span> Mark Paid</button>` : ''}
-                `;
-            }
-        } else if (type === 'quotation') {
-            data = (this.state.quotations || []).find(q => q.id === docId);
-            title = "Quotation Preview";
-            if (data) {
-                actionsHTML = `
-                    <button class="btn-primary" onclick="app.executeDocumentAction('Print', 'Quotation', '${docId}')"><span class="material-symbols-outlined">print</span> Print</button>
-                    <button class="btn-primary" onclick="app.executeDocumentAction('Download', 'Quotation', '${docId}')"><span class="material-symbols-outlined">download</span> Download PDF</button>
-                    <button class="btn-secondary" onclick="quotation.editQuotation('${docId}')"><span class="material-symbols-outlined">edit</span> Edit</button>
-                    ${data.status !== 'Invoiced' ? `<button class="btn-primary" style="background: var(--accent); border-color: var(--accent);" onclick="app.convertQuoteToInvoice('${docId}')"><span class="material-symbols-outlined">receipt</span> Invoice</button>` : ''}
-                    <button class="btn-primary" style="background: #128C7E; border-color: #128C7E;" onclick="app.executeDocumentAction('WhatsApp', 'Quotation', '${docId}', '${data.phone || ''}')"><span class="material-symbols-outlined">chat</span> WhatsApp</button>
-                `;
-            }
-        } else if (type === 'job') {
-            data = (this.state.jobs || []).find(j => j.id === docId) || (this.state.fieldJobs || []).find(f => f.id === docId);
-            title = "Job Card Preview";
-            if (data) {
-                actionsHTML = `
-                    <button class="btn-primary" onclick="app.executeDocumentAction('Print', 'Job Card', '${docId}')"><span class="material-symbols-outlined">print</span> Print</button>
-                    <button class="btn-primary" onclick="app.executeDocumentAction('Download', 'Job Card', '${docId}')"><span class="material-symbols-outlined">download</span> Download PDF</button>
-                    <button class="btn-secondary" onclick="app.navigateToDocument('job', '${docId}')"><span class="material-symbols-outlined">open_in_new</span> Go to Workshop</button>
-                `;
-            }
+        // Check cache if not found in state
+        if (!doc && this.state._lastCreatedDoc && this.state._lastCreatedDoc.id === docId) {
+            doc = this.state._lastCreatedDoc;
         }
 
-
-        if (!data) {
-            alert("Document not found!");
+        if(!doc) {
+            alert("Error: Document not found in current session.");
             return;
         }
 
-        const modalHTML = `
-            <div class="modal-content" style="max-width: 500px;">
-                <div class="modal-header">
-                    <h2>${title}</h2>
-                    <button class="close-modal" onclick="app.closeModal()">&times;</button>
+        let actionsHTML = '';
+        let detailsHTML = `
+            <div style="text-align: center; margin-bottom: 24px;">
+                <h1 style="font-size: 2.5rem; color: var(--accent); margin: 0;">${doc.id}</h1>
+                <p style="color: #a0a0a0;">${type.charAt(0).toUpperCase() + type.slice(1)} Document</p>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; background: rgba(255,255,255,0.03); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
+                <div>
+                    <label style="font-size: 0.75rem; text-transform: uppercase; color: #747d8c; margin-bottom: 4px; display: block;">Customer</label>
+                    <div style="font-weight: 600;">${doc.customer || doc.customerName || 'N/A'}</div>
                 </div>
-                <div class="modal-body" style="padding: 24px;">
-                    <div style="background: rgba(255,255,255,0.05); padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                            <span style="color: #a0a0a0;">Document ID:</span>
-                            <span style="font-weight: bold; color: #ffffff;">${docId}</span>
-                        </div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                            <span style="color: #a0a0a0;">Customer:</span>
-                            <span style="font-weight: bold; color: #ffffff;">${data.customer || data.customerName || 'Walk-in'}</span>
-                        </div>
-                        ${data.amount ? `
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                            <span style="color: #a0a0a0;">Amount:</span>
-                            <span style="font-weight: bold; color: #ffffff;">R ${data.amount}</span>
-                        </div>
-                        ` : ''}
-                        <div style="display: flex; justify-content: space-between;">
-                            <span style="color: #a0a0a0;">Status:</span>
-                            <span class="badge ${data.status?.toLowerCase() || 'pending'}">${data.status || 'Active'}</span>
-                        </div>
-                    </div>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr; gap: 12px;">
-                        ${actionsHTML}
-                    </div>
+                <div>
+                    <label style="font-size: 0.75rem; text-transform: uppercase; color: #747d8c; margin-bottom: 4px; display: block;">Status / Total</label>
+                    <div style="font-weight: 600;">${doc.status || 'Pending'} / R ${doc.amount || '0.00'}</div>
+                </div>
+                <div style="grid-column: span 2;">
+                    <label style="font-size: 0.75rem; text-transform: uppercase; color: #747d8c; margin-bottom: 4px; display: block;">Associated Info</label>
+                    <div style="color: #a0a0a0;">${doc.device || doc.date || 'No extra info'}</div>
                 </div>
             </div>
         `;
 
-        this.showModal(modalHTML);
+        if(type === 'invoice') {
+            actionsHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <button class="btn-primary" onclick="app.executeDocumentAction('Print', 'Invoice', '${doc.id}')"><span class="material-symbols-outlined">download</span> Download (Reprint)</button>
+                    <button class="btn-primary" onclick="app.showSendModal('${doc.id}', 'Invoice')" style="background: var(--accent);"><span class="material-symbols-outlined">send</span> Resend to Client</button>
+                    <button class="btn-secondary" onclick="app.markInvoiceAsPaid('${doc.id}')" style="grid-column: span 2; justify-content: center; border-color: var(--success); color: var(--success);"><span class="material-symbols-outlined">payments</span> Mark as Paid</button>
+                </div>
+            `;
+        } else if(type === 'quotation') {
+            actionsHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <button class="btn-primary" onclick="app.openEditQuotationModal('${doc.id}')"><span class="material-symbols-outlined">edit</span> Edit Quotation</button>
+                    <button class="btn-primary" onclick="app.convertQuoteToInvoice('${doc.id}')" style="background: var(--success);"><span class="material-symbols-outlined">receipt_long</span> Convert to Invoice</button>
+                    <button class="btn-secondary" onclick="app.executeDocumentAction('Print', 'Quotation', '${doc.id}')" style="grid-column: span 2; justify-content: center;"><span class="material-symbols-outlined">download</span> Download PDF</button>
+                </div>
+            `;
+        } else if(type === 'job') {
+            actionsHTML = `
+                <button class="btn-primary" onclick="app.closeModal(); app.navigateToDocument('job', '${doc.id}')" style="width: 100%; justify-content: center; padding: 14px;">
+                    <span class="material-symbols-outlined">open_in_new</span> Open in Service Workspace
+                </button>
+            `;
+        }
+
+        this.showModal(`
+            <div class="modal-content" style="max-width: 500px;">
+                <div class="modal-header">
+                    <h2>Document Preview</h2>
+                    <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div class="modal-body">
+                    ${detailsHTML}
+                    ${actionsHTML}
+                </div>
+            </div>
+        `);
     },
 
     navigateToDocument(type, id) {
@@ -624,86 +617,17 @@ const app = {
             docType = 'Quotation';
         }
 
+        // Check cache if not found in state
+        if (!doc && this.state._lastCreatedDoc && this.state._lastCreatedDoc.id === docId) {
+            doc = this.state._lastCreatedDoc;
+        }
+
         const clientName = doc ? (doc.customer || doc.customerName || 'N/A') : 'N/A';
         const amount = doc ? (doc.amount || '') : '';
         const email = doc ? (doc.email || '') : '';
         const phone = doc ? (doc.phone || '') : '';
 
         this.showDocumentActionModal(docType, docId, clientName, amount, email, phone);
-    },
-
-    openDocumentPreview(type, id) {
-        const dropdown = document.getElementById('global-search-results');
-        if(dropdown) dropdown.classList.add('hidden');
-        
-        let doc = null;
-        if(type === 'job') doc = [...(this.state.jobs || []), ...(this.state.fieldJobs || [])].find(x => x.id === id);
-        if(type === 'invoice') doc = (this.state.invoices || []).find(x => x.id === id);
-        if(type === 'quotation') doc = (this.state.quotations || []).find(x => x.id === id);
-
-        if(!doc) {
-            alert("Error: Document not found in current session.");
-            return;
-        }
-
-        let actionsHTML = '';
-        let detailsHTML = `
-            <div style="text-align: center; margin-bottom: 24px;">
-                <h1 style="font-size: 2.5rem; color: var(--accent); margin: 0;">${doc.id}</h1>
-                <p style="color: #a0a0a0;">${type.charAt(0).toUpperCase() + type.slice(1)} Document</p>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; background: rgba(255,255,255,0.03); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
-                <div>
-                    <label style="font-size: 0.75rem; text-transform: uppercase; color: #747d8c; margin-bottom: 4px; display: block;">Customer</label>
-                    <div style="font-weight: 600;">${doc.customer || doc.customerName || 'N/A'}</div>
-                </div>
-                <div>
-                    <label style="font-size: 0.75rem; text-transform: uppercase; color: #747d8c; margin-bottom: 4px; display: block;">Status / Total</label>
-                    <div style="font-weight: 600;">${doc.status || 'Pending'} / R ${doc.amount || '0.00'}</div>
-                </div>
-                <div style="grid-column: span 2;">
-                    <label style="font-size: 0.75rem; text-transform: uppercase; color: #747d8c; margin-bottom: 4px; display: block;">Associated Info</label>
-                    <div style="color: #a0a0a0;">${doc.device || doc.date || 'No extra info'}</div>
-                </div>
-            </div>
-        `;
-
-        if(type === 'invoice') {
-            actionsHTML = `
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <button class="btn-primary" onclick="app.executeDocumentAction('Print', 'Invoice', '${doc.id}')"><span class="material-symbols-outlined">download</span> Download (Reprint)</button>
-                    <button class="btn-primary" onclick="app.showSendModal('${doc.id}', 'Invoice')" style="background: var(--accent);"><span class="material-symbols-outlined">send</span> Resend to Client</button>
-                    <button class="btn-secondary" onclick="app.markInvoiceAsPaid('${doc.id}')" style="grid-column: span 2; justify-content: center; border-color: var(--success); color: var(--success);"><span class="material-symbols-outlined">payments</span> Mark as Paid</button>
-                </div>
-            `;
-        } else if(type === 'quotation') {
-            actionsHTML = `
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
-                    <button class="btn-primary" onclick="app.openEditQuotationModal('${doc.id}')"><span class="material-symbols-outlined">edit</span> Edit Quotation</button>
-                    <button class="btn-primary" onclick="app.convertQuoteToInvoice('${doc.id}')" style="background: var(--success);"><span class="material-symbols-outlined">receipt_long</span> Convert to Invoice</button>
-                    <button class="btn-secondary" onclick="app.executeDocumentAction('Print', 'Quotation', '${doc.id}')" style="grid-column: span 2; justify-content: center;"><span class="material-symbols-outlined">download</span> Download PDF</button>
-                </div>
-            `;
-        } else if(type === 'job') {
-            actionsHTML = `
-                <button class="btn-primary" onclick="app.closeModal(); app.navigateToDocument('job', '${doc.id}')" style="width: 100%; justify-content: center; padding: 14px;">
-                    <span class="material-symbols-outlined">open_in_new</span> Open in Service Workspace
-                </button>
-            `;
-        }
-
-        this.showModal(`
-            <div class="modal-content" style="max-width: 500px;">
-                <div class="modal-header">
-                    <h2>Document Preview</h2>
-                    <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
-                </div>
-                <div class="modal-body">
-                    ${detailsHTML}
-                    ${actionsHTML}
-                </div>
-            </div>
-        `);
     },
 
     async markInvoiceAsPaid(id) {
@@ -880,6 +804,7 @@ const app = {
             };
             
             await window.fbDb.collection('jobs').doc(newId).set(payload);
+            this.state._lastCreatedDoc = payload; // Cache for immediate actions
             this.closeModal();
             
             // Trigger the modal to choose Print, Download, Email, or WhatsApp
@@ -1006,6 +931,7 @@ const app = {
             };
             
             await window.fbDb.collection('fieldJobs').doc(newId).set(payload);
+            this.state._lastCreatedDoc = payload; // Cache for immediate actions
             this.closeModal();
 
             const notifyMethod = email ? 'Email' : 'WhatsApp';
@@ -1333,7 +1259,8 @@ const app = {
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
             
-            await window.fbDb.collection('invoices').doc(newId).set(payload);
+            await window.fbDb.collection('invoices').doc(newId).set(payload, { merge: true });
+            this.state._lastCreatedDoc = payload; // Cache for immediate actions
             this.logActivity('Invoice Created', `Generated ${newId} for ${client} (Amount: ${amount})`);
             this.closeModal(); // closes current modal
             
@@ -1399,8 +1326,14 @@ const app = {
         }
 
         let dataObj = null;
-        if (docType === 'Invoice') dataObj = app.state.invoices.find(i => i.id === docId);
-        if (docType === 'Quotation') dataObj = (app.state.quotations || []).find(q => q.id === docId);
+        
+        // 0. Check immediate cache first (for just-created items)
+        if (this.state._lastCreatedDoc && this.state._lastCreatedDoc.id === docId) {
+            dataObj = this.state._lastCreatedDoc;
+        }
+
+        if (!dataObj && docType === 'Invoice') dataObj = app.state.invoices.find(i => i.id === docId);
+        if (!dataObj && docType === 'Quotation') dataObj = (app.state.quotations || []).find(q => q.id === docId);
         if (docType === 'Cash Receipt') dataObj = (app.state.sales || []).find(s => s.id === docId);
         if (docType === 'Job Card') {
             dataObj = (app.state.jobs || []).find(j => j.id === docId) || (app.state.fieldJobs || []).find(f => f.id === docId);
@@ -1883,6 +1816,7 @@ const app = {
             if(!existingId) payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
             
             await window.fbDb.collection('quotations').doc(newId).set(payload, { merge: true });
+            this.state._lastCreatedDoc = payload; // Cache for immediate actions
             this.closeModal();
             
             setTimeout(() => {
