@@ -33,12 +33,12 @@ window.inventory = {
                         <table id="stock-table">
                             <thead>
                                 <tr>
+                                    <th>Type</th>
                                     <th>SKU / Serial</th>
                                     <th>Part / Item Name</th>
                                     <th>Category</th>
                                     <th>Stock Lvl</th>
-                                    <th>Cost Price</th>
-                                    <th>Selling Price</th>
+                                    <th>Unit Pricing</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
@@ -85,6 +85,7 @@ window.inventory = {
         
         return window.app.state.inventory.map(item => `
             <tr>
+                <td><span class="badge" style="background: ${item.itemType === 'Service' ? 'rgba(108, 92, 231, 0.1)' : 'rgba(255,255,255,0.05)'}; color: ${item.itemType === 'Service' ? 'var(--accent)' : '#fff'};">${item.itemType === 'Service' ? 'Service' : 'Stock'}</span></td>
                 <td>
                     <strong>${item.sku}</strong>
                     ${item.serial ? `<br><small style="color: #a29bfe; font-size: 0.75rem;">SN: ${item.serial}</small>` : ''}
@@ -95,13 +96,17 @@ window.inventory = {
                 </td>
                 <td><span class="badge pending">${item.category}</span></td>
                 <td>
+                    ${item.itemType === 'Service' ? '<span style="color: #a0a0a0;">N/A</span>' : `
                     <span style="color: ${parseInt(item.qty || item.stock || 0) < 5 ? 'var(--danger)' : 'var(--text-primary)'}; font-weight: ${parseInt(item.qty || item.stock || 0) < 5 ? 'bold' : 'normal'}">
                         ${item.qty !== undefined ? item.qty : (item.stock || 0)} 
                         ${parseInt(item.qty || item.stock || 0) < 5 ? '⚠️' : ''}
                     </span>
+                    `}
                 </td>
-                <td style="color: #a0a0a0">R ${item.cost || item.buyPrice || '0.00'}</td>
-                <td style="font-weight: 500">R ${item.sell || item.sellPrice || '0.00'}</td>
+                <td style="font-weight: 500">
+                    <span style="color: #a0a0a0; font-size: 0.8rem;">Sell:</span> R ${item.sell || item.sellPrice || '0.00'}<br>
+                    <span style="color: #a0a0a0; font-size: 0.8rem;">Cost:</span> R ${item.cost || item.buyPrice || '0.00'}
+                </td>
                 <td>
                     <div style="display: flex; gap: 8px;">
                         <button class="btn-icon" onclick="inventory.showIssueStockModal('${item.id}')" title="Issue to Technician" style="color: var(--warning);"><span class="material-symbols-outlined" style="font-size: 1.1rem">person_pin</span></button>
@@ -140,10 +145,17 @@ window.inventory = {
                 <div class="modal-body">
                     <form onsubmit="inventory.handleAddPart(event)">
                         <div class="form-group">
-                            <label>Part / Item Name</label>
-                            <input type="text" id="part-name" class="form-control" placeholder="e.g. 500GB SSD Crucial" required>
+                            <label>Item Type</label>
+                            <select id="part-type" class="form-control" style="appearance: auto;" onchange="inventory.toggleStockInputs(this.value)">
+                                <option value="Stock">Physical Stock (Hardware, Cables, etc.)</option>
+                                <option value="Service">Service / Labour (Repairs, Travel, etc.)</option>
+                            </select>
                         </div>
-                        <div class="form-row">
+                        <div class="form-group">
+                            <label>Part / Item Name</label>
+                            <input type="text" id="part-name" class="form-control" placeholder="e.g. 500GB SSD or Labour - 1 Hour" required>
+                        </div>
+                        <div class="form-row" id="row-sku-serial">
                             <div class="form-group">
                                 <label>SKU / Barcode</label>
                                 <input type="text" id="part-sku" class="form-control" placeholder="e.g. CRU-500-SSD" required>
@@ -195,7 +207,7 @@ window.inventory = {
                                 <input type="text" id="part-sell" class="form-control" placeholder="R 850.00" required>
                             </div>
                         </div>
-                        <div class="form-group">
+                        <div class="form-group" id="row-qty">
                             <label>Initial Quantity</label>
                             <input type="number" id="part-qty" class="form-control" value="1" min="0">
                         </div>
@@ -217,6 +229,7 @@ window.inventory = {
 
         try {
             await window.fbDb.collection('inventory').add({
+                itemType: document.getElementById('part-type')?.value || 'Stock',
                 sku: document.getElementById('part-sku')?.value || '',
                 serial: document.getElementById('part-serial')?.value || '',
                 name: document.getElementById('part-name')?.value || '',
@@ -249,10 +262,17 @@ window.inventory = {
                 <div class="modal-body">
                     <form onsubmit="inventory.handleEditPart(event, '${id}')">
                         <div class="form-group">
+                            <label>Item Type</label>
+                            <select id="edit-part-type" class="form-control" style="appearance: auto;" onchange="inventory.toggleStockInputs(this.value, 'edit')">
+                                <option value="Stock" ${item.itemType === 'Stock' ? 'selected' : ''}>Physical Stock</option>
+                                <option value="Service" ${item.itemType === 'Service' ? 'selected' : ''}>Service / Labour</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label>Part / Item Name</label>
                             <input type="text" id="edit-part-name" class="form-control" value="${item.name}" required>
                         </div>
-                        <div class="form-row">
+                        <div class="form-row" id="edit-row-sku-serial" class="${item.itemType === 'Service' ? 'hidden' : ''}">
                             <div class="form-group">
                                 <label>SKU / Barcode</label>
                                 <input type="text" id="edit-part-sku" class="form-control" value="${item.sku}" required>
@@ -296,7 +316,7 @@ window.inventory = {
                                 <input type="text" id="edit-part-sell" class="form-control" value="${item.sell}" required>
                             </div>
                         </div>
-                        <div class="form-group">
+                        <div class="form-group" id="edit-row-qty" class="${item.itemType === 'Service' ? 'hidden' : ''}">
                             <label>Current Quantity</label>
                             <input type="number" id="edit-part-qty" class="form-control" value="${item.qty}" min="0">
                         </div>
@@ -318,6 +338,7 @@ window.inventory = {
 
         try {
             await window.fbDb.collection('inventory').doc(id).update({
+                itemType: document.getElementById('edit-part-type')?.value || 'Stock',
                 sku: document.getElementById('edit-part-sku')?.value || '',
                 serial: document.getElementById('edit-part-serial')?.value || '',
                 name: document.getElementById('edit-part-name')?.value || '',
@@ -610,5 +631,18 @@ window.inventory = {
             btn.innerHTML = "Handover Stock";
             btn.disabled = false;
         }
+    },
+
+    toggleStockInputs(type, prefix = 'part') {
+        const isService = type === 'Service';
+        const skuRow = document.getElementById(prefix === 'edit' ? 'edit-row-sku-serial' : 'row-sku-serial');
+        const qtyRow = document.getElementById(prefix === 'edit' ? 'edit-row-qty' : 'row-qty');
+        
+        if (skuRow) skuRow.classList.toggle('hidden', isService);
+        if (qtyRow) qtyRow.classList.toggle('hidden', isService);
+
+        // Required field adjustments
+        const skuInput = document.getElementById(prefix === 'edit' ? 'edit-part-sku' : 'part-sku');
+        if (skuInput) skuInput.required = !isService;
     }
 };

@@ -550,6 +550,33 @@ const app = {
         </datalist>`;
     },
     
+    generateInventoryDatalist() {
+        if(!this.state.inventory) return '';
+        return `<datalist id="inventory-items-list">
+            ${this.state.inventory.map(i => `<option value="${i.name}" data-price="${i.sell}" data-type="${i.itemType || 'Hardware'}">SKU: ${i.sku} | R ${i.sell}</option>`).join('')}
+        </datalist>`;
+    },
+
+    fillLinePriceFromInventory(input, prefix) {
+        const val = input.value;
+        const item = (this.state.inventory || []).find(i => i.name === val);
+        if (item) {
+            const row = input.closest('.quo-item-row, .inv-item-row');
+            if (row) {
+                const priceInput = row.querySelector(`.${prefix}-unit`);
+                const typeSelect = row.querySelector(`.${prefix}-type`);
+                if (priceInput) {
+                    priceInput.value = item.sell;
+                    this[prefix === 'quo' ? 'calcQuotationTotal' : 'calcInvoiceTotal']();
+                }
+                if (typeSelect) {
+                    const typeMap = { 'Service': 'Labour', 'Stock': 'Hardware' };
+                    typeSelect.value = typeMap[item.itemType] || item.itemType || 'Hardware';
+                }
+            }
+        }
+    },
+    
     async getNextSequence(prefix) {
         try {
             const data = await window.safeFetch(`${window.API_BASE}/counters/${prefix}`, { method: 'POST' });
@@ -1104,6 +1131,7 @@ const app = {
                                     <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal('invoice')" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>
                                 </div>
                                 ${this.generateCustomerDatalist()}
+                                ${this.generateInventoryDatalist()}
                             </div>
                         <div class="form-row">
                             <div class="form-group">
@@ -1255,7 +1283,7 @@ const app = {
                         </select>
                     </div>
                     <div class="form-group" style="flex: 2; margin-bottom: 0;">
-                        <input type="text" class="form-control item-desc" placeholder="Description" value="${desc}" required>
+                        <input type="text" class="form-control item-desc" placeholder="Description" value="${desc}" list="inventory-items-list" oninput="app.fillLinePriceFromInventory(this, 'inv')" required>
                     </div>
                 </div>
                 <div class="form-row" style="margin-bottom: 0;">
@@ -1698,6 +1726,7 @@ const app = {
                                     <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal('quotation')" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>
                                 </div>
                                 ${this.generateCustomerDatalist()}
+                                ${this.generateInventoryDatalist()}
                             </div>
                             <div class="form-group">
                                 <label>Phone Number</label>
@@ -1825,7 +1854,7 @@ const app = {
                         </select>
                     </div>
                     <div class="form-group" style="flex: 2; margin-bottom: 0;">
-                        <input type="text" class="form-control quo-desc" placeholder="Description" value="${desc}" required>
+                        <input type="text" class="form-control quo-desc" placeholder="Description" value="${desc}" list="inventory-items-list" oninput="app.fillLinePriceFromInventory(this, 'quo')" required>
                     </div>
                 </div>
                 <div class="form-row" style="margin-bottom: 0;">
