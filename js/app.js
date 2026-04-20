@@ -1387,8 +1387,6 @@ const app = {
         }
     },
 
-    },
-
     showScheduleCalloutModal() {
         const dateStr = new Date().toISOString().split('T')[0];
         const customers = this.state.customers || [];
