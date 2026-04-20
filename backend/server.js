@@ -506,6 +506,17 @@ app.get('/api/collections/:name', async (req, res) => {
     }
 });
 
+app.get('/api/collections/:name/:id', async (req, res) => {
+    try {
+        const row = await db.get("SELECT data FROM collections WHERE name = ? AND id = ?", [req.params.name, req.params.id]);
+        if (!row) return res.status(404).json({ error: "Document not found" });
+        const data = safeJsonParse(row.data, {}, `Collection: ${req.params.name}, ID: ${req.params.id}`);
+        res.json({ id: req.params.id, ...data });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.post('/api/collections/:name/:id', async (req, res) => {
     try {
         await saveDoc(req.params.name, req.params.id, req.body);

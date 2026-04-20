@@ -1398,7 +1398,7 @@ const app = {
              btn.disabled = true;
         }
 
-        let dataObj = {};
+        let dataObj = null;
         if (docType === 'Invoice') dataObj = app.state.invoices.find(i => i.id === docId);
         if (docType === 'Quotation') dataObj = (app.state.quotations || []).find(q => q.id === docId);
         if (docType === 'Cash Receipt') dataObj = (app.state.sales || []).find(s => s.id === docId);

@@ -187,16 +187,27 @@ class LocalDoc {
         if (item) return { exists: true, data: () => item };
         
         try {
-            const raw = await safeFetch(`${API_BASE}/collections/${this.parent.name}`);
-            const data = Array.isArray(raw) ? raw : [];
-            const found = data.find(d => d.id === this.id);
-            return { 
-                exists: !!found, 
-                data: () => found || null 
-            };
-        } catch (e) {
-            console.error(`LocalDoc.get failed for ${this.parent.name}/${this.id}:`, e.message);
+            // Efficient single-doc fetch
+            const doc = await safeFetch(`${API_BASE}/collections/${this.parent.name}/${this.id}`);
+            if (doc && doc.id) {
+                // Optionally update parent cache
+                return { exists: true, data: () => doc };
+            }
             return { exists: false, data: () => null };
+        } catch (e) {
+            // Fallback to searching the whole collection for backwards compatibility with older backends
+            try {
+                const raw = await safeFetch(`${API_BASE}/collections/${this.parent.name}`);
+                const data = Array.isArray(raw) ? raw : [];
+                const found = data.find(d => d.id === this.id);
+                return { 
+                    exists: !!found, 
+                    data: () => found || null 
+                };
+            } catch (e2) {
+                console.error(`LocalDoc.get failed for ${this.parent.name}/${this.id}:`, e2.message);
+                return { exists: false, data: () => null };
+            }
         }
     }
     
@@ -259,7 +270,13 @@ class LocalDoc {
 }
 
 window.localDb = {
-    collection: (name) => new LocalStorage(name),
+    _collections: {},
+    collection: function(name) {
+        if (!this._collections[name]) {
+            this._collections[name] = new LocalStorage(name);
+        }
+        return this._collections[name];
+    },
     runTransaction: async (fn) => {
         const transaction = {
             get: (docRef) => docRef.get(),
