@@ -81,6 +81,7 @@ class LocalStorage {
         this.name = name;
         this.data = [];
         this.listeners = [];
+        this._pending = {}; // Cache for recently created/updated items
         this.pollInterval = null;
     }
 
@@ -104,6 +105,7 @@ class LocalStorage {
             });
             this.fetch();
         } catch (e) {
+            delete this.parent._pending[id];
             this.data = this.data.filter(d => d.id !== id);
             this.emit();
             throw e;
@@ -152,12 +154,26 @@ class LocalStorage {
     }
 
     emit() {
-        const snap = {
-            docs: (this.data || []).map(d => ({
-                id: d.id,
-                data: () => d
-            }))
-        };
+        const snapDocs = (this.data || []).map(d => ({
+            id: d.id,
+            data: () => d
+        }));
+
+        // Merge pending items that aren't in the main list yet
+        for (const id in this._pending) {
+            const found = snapDocs.find(d => d.id === id);
+            if (!found) {
+                snapDocs.unshift({
+                    id: id,
+                    data: () => this._pending[id]
+                });
+            } else {
+                // Item has successfully synced to server list, remove from pending
+                delete this._pending[id];
+            }
+        }
+
+        const snap = { docs: snapDocs };
         this.listeners.forEach(l => l(snap));
     }
 
@@ -213,6 +229,7 @@ class LocalDoc {
     
     async update(data) {
         const docData = { id: this.id, ...data };
+        this.parent._pending[this.id] = docData; // Track as pending
         const idx = this.parent.data.findIndex(d => d.id === this.id);
         if (idx > -1) {
             this.parent.data[idx] = { ...this.parent.data[idx], ...data };
@@ -243,6 +260,7 @@ class LocalDoc {
 
     async set(data) {
         const docData = { id: this.id, ...data };
+        this.parent._pending[this.id] = docData; // Track as pending
         const idx = this.parent.data.findIndex(d => d.id === this.id);
         if (idx > -1) this.parent.data[idx] = docData;
         else this.parent.data.unshift(docData);
