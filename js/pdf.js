@@ -178,6 +178,8 @@ window.pdfGenerator = {
             left: -10000px;
             top: 0px;
             z-index: -9999;
+            overflow: hidden; /* Prevent horizontal scrollbars during capture */
+            max-width: 794px !important;
         `;
         document.body.appendChild(container);
 
@@ -282,11 +284,11 @@ window.pdfGenerator = {
                 let bodyHTML = '';
                 if (docType === 'Invoice' || docType === 'Quotation' || docType === 'Cash Receipt') {
                     bodyHTML = `
-                        <table style="width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 40px; font-size: 14px; font-family: ${fontStack}; color: #000000; background-color: #ffffff; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
+                        <table style="width: 100% !important; border-collapse: separate; border-spacing: 0; margin-bottom: 40px; font-size: 14px; font-family: ${fontStack}; color: #000000; background-color: #ffffff; border: 1px solid #eee; border-radius: 10px; overflow: hidden; table-layout: fixed;">
                             <thead>
                                 <tr style="background-color: ${themeColor}; color: #ffffff;">
-                                    <th style="padding: 18px 15px; text-align: left; font-weight: 600;">Item</th>
-                                    <th style="padding: 18px 15px; text-align: left; width: 45%; font-weight: 600;">Description</th>
+                                    <th style="padding: 18px 15px; text-align: left; font-weight: 600; width: 80px;">Item</th>
+                                    <th style="padding: 18px 15px; text-align: left; width: auto; font-weight: 600; word-wrap: break-word;">Description</th>
                                     <th style="padding: 18px 15px; text-align: right; font-weight: 600;">Price</th>
                                     <th style="padding: 18px 15px; text-align: center; font-weight: 600;">Qty</th>
                                     <th style="padding: 18px 15px; text-align: right; font-weight: 600;">Total</th>
@@ -299,8 +301,8 @@ window.pdfGenerator = {
                                     const total = unit * qty;
                                     return `
                                         <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#fcfcff'}; border-bottom: 1px solid #f0f0f0;">
-                                            <td style="padding: 15px 15px; color: #000000; font-size: 12px;">${item.type || 'Item'}</td>
-                                            <td style="padding: 15px 15px;"><strong style="color: #000000;">${item.desc || item.name}</strong></td>
+                                            <td style="padding: 15px; border-bottom: 1px solid #eee; font-weight: 600; color: ${themeColor}; width: 80px;">${item.type || 'Item'}</td>
+                                            <td style="padding: 15px; border-bottom: 1px solid #eee; line-height: 1.5; word-wrap: break-word;">${item.desc || item.name}</td>
                                             <td style="padding: 15px 15px; text-align: right; color: #000000;">R ${unit.toFixed(2)}</td>
                                             <td style="padding: 15px 15px; text-align: center; color: #000000;">${qty}</td>
                                             <td style="padding: 15px 15px; text-align: right; font-weight: 700; color: #000000;">R ${total.toFixed(2)}</td>
@@ -429,11 +431,22 @@ window.pdfGenerator = {
             if(document.fonts) await document.fonts.ready;
             await new Promise(r => setTimeout(r, 2000));
 
+            // Hardened Capture Options
             const canvas = await window.html2canvas(container, {
                 scale: 2,
                 useCORS: true,
                 backgroundColor: '#ffffff',
-                windowWidth: 794
+                windowWidth: 1200, // Use a larger window width to avoid triggering mobile media queries
+                width: 794,        // Strictly capture only the intended 794px width
+                height: container.offsetHeight,
+                logging: false,
+                onclone: (clonedDoc) => {
+                    const clonedContainer = clonedDoc.getElementById('pdf-render-page');
+                    if (clonedContainer) {
+                        clonedContainer.style.left = '0';
+                        clonedContainer.style.position = 'relative';
+                    }
+                }
             });
 
             const imgData = canvas.toDataURL('image/jpeg', 0.95);

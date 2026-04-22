@@ -1585,3 +1585,19 @@ textarea.form-control {
     animation: fadeIn 0.5s ease-out forwards;
 }
 
+/* --- PDF GENERATION FIXES --- */
+#pdf-render-page {
+    width: 794px !important;
+    max-width: 794px !important;
+    overflow: hidden !important;
+}
+
+#pdf-render-page * {
+    max-width: none !important;
+    box-sizing: border-box !important;
+}
+
+#pdf-render-page table {
+    width: 100% !important;
+}
+
