@@ -43,7 +43,8 @@ const app = {
             { name: 'mystock', ref: window.mystock },
             { name: 'posSystem', ref: window.posSystem },
             { name: 'reports', ref: window.reports },
-            { name: 'customers', ref: window.customers }
+            { name: 'customers', ref: window.customers },
+            { name: 'adminPanel', ref: window.adminPanel }
         ];
 
         modules.forEach(m => {
