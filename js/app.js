@@ -112,9 +112,6 @@ const app = {
         register('jobs', 'jobs');
         register('repairs', 'jobs'); // Support old/seeded repair collection name
         register('fieldJobs', 'fieldJobs');
-        register('companyProfile', 'settings');
-        register('documentSettings', 'settings');
-        register('systemSettings', 'settings');
         register('activityLog', 'activityLog');
         register('invoices', 'invoices');
         register('quotations', 'quotations');
@@ -129,12 +126,20 @@ const app = {
         register('expenses', 'expenses');
         register('knowledgeBase', 'knowledgeBase');
         
-        
-        // Branding & Settings Sync
+        // Settings Sync (handled individually for object-mapping instead of arrays)
+        const docSettingsUnsub = window.fbDb.collection('settings').doc('documentSettings').onSnapshot(doc => {
+            if(doc.exists) {
+                this.state.settings = { ...(this.state.settings || {}), ...doc.data() };
+                this.refreshActiveViews();
+            }
+        });
+        this.unsubscribes.push(docSettingsUnsub);
+
         const profileUnsub = window.fbDb.collection('settings').doc('companyProfile').onSnapshot(doc => {
             if(doc.exists) {
                 const data = doc.data();
                 this.state.companyProfile = data;
+                this.state.settings = { ...(this.state.settings || {}), ...data };
                 this.applyBranding(data);
             }
         });
@@ -142,7 +147,7 @@ const app = {
 
         const settingsUnsub = window.fbDb.collection('settings').doc('systemSettings').onSnapshot(doc => {
             if(doc.exists) {
-                this.state.settings = doc.data();
+                this.state.settings = { ...(this.state.settings || {}), ...doc.data() };
                 this.refreshActiveViews();
             }
         });
@@ -834,31 +839,7 @@ const app = {
         }
     },
 
-    async convertQuoteToInvoice(id) {
-        const quote = (this.state.quotations || []).find(x => x.id === id);
-        if(!quote) return;
-        if(!confirm(`Are you sure you want to convert Quotation ${id} to a new Invoice?`)) return;
 
-        try {
-            const nextInvId = await this.getNextSequence("INV");
-            const invoicePayload = {
-                ...quote,
-                id: nextInvId,
-                status: 'Unpaid',
-                quotationId: id,
-                createdAt: firebase.firestore.FieldValue.serverTimestamp()
-            };
-            delete invoicePayload.updatedAt; // set new timestamp
-
-            await window.fbDb.collection('invoices').doc(nextInvId).set(invoicePayload);
-            alert(`Quotation ${id} successfully converted to Invoice ${nextInvId}!`);
-            this.closeModal();
-            window.location.hash = '#invoices';
-        } catch(e) {
-            console.error(e);
-            alert("Error converting to invoice: " + e.message);
-        }
-    },
 
     showNewJobModal() {
         const modalHTML = `

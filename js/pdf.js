@@ -96,7 +96,7 @@ window.pdfGenerator = {
             if(!iframe) {
                 iframe = document.createElement('iframe');
                 iframe.id = 'pdf-print-iframe';
-                iframe.style.cssText = 'position:fixed; top:0; left:0; width:0; height:0; border:none; visibility:hidden;';
+                iframe.style.cssText = 'position:fixed; top:0; left:0; width:1000px; height:1400px; border:none; visibility:hidden; z-index:-9999;';
                 document.body.appendChild(iframe);
             }
             

@@ -43,7 +43,7 @@ window.quotation = {
                                     <td>
                                         <button class="btn-icon" title="Convert to Invoice" onclick="app.convertQuoteToInvoice('${quo.id}')"><span class="material-symbols-outlined">receipt_long</span></button>
                                         <button class="btn-icon" title="Send to Client" onclick="app.showSendModal('${quo.id}', 'Quotation')"><span class="material-symbols-outlined">send</span></button>
-                                        <button class="btn-icon" title="Download PDF"><span class="material-symbols-outlined">download</span></button>
+                                        <button class="btn-icon" title="Download PDF" onclick="app.executeDocumentAction('Download', 'Quotation', '${quo.id}', this)"><span class="material-symbols-outlined">download</span></button>
                                     </td>
                                 </tr>
                             `).join('') : `<tr><td colspan="6" style="text-align:center; padding: 24px;">No quotations generated yet</td></tr>`}
