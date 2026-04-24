@@ -1,5 +1,16 @@
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
+
+// Emergency Logging for Startup Crashes
+process.on('uncaughtException', (err) => {
+    const msg = `[${new Date().toISOString()}] UNCAUGHT EXCEPTION: ${err.message}\n${err.stack}\n`;
+    fs.appendFileSync(path.join(__dirname, 'emergency_error.txt'), msg);
+    process.exit(1);
+});
+
 const express = require('express');
+
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const path = require('path');
@@ -8,6 +19,11 @@ const rateLimit = require('express-rate-limit');
 const db = require('./database');
 const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
+
+// Global Unhandled Rejection Handler
+process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
 
 // Route Imports
