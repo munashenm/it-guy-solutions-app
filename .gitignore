@@ -1,28 +1,8 @@
-# Node dependencies
 node_modules/
-npm-debug.log
-yarn-error.log
-
-# Environment variables (Secrets)
+uploads/*
+!uploads/.gitkeep
+database.sqlite
+database.sqlite.bak
 .env
-.env.production
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# Build/Deployment artifacts
-deploy_temp/
-itguy-deploy.zip
-deploy.zip
-deploy/
-
-# Editors and OS
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
-
-# Database (local copies)
-backend/database.sqlite
-backend/uploads/
+.env.*.local

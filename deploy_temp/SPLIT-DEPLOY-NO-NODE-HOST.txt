@@ -1,0 +1,45 @@
+When your web host has NO Node.js (e.g. home.pl shared hosting)
+================================================================
+
+This project needs a Node.js server for /api (login, database, settings).
+
+You have two realistic paths:
+
+------------------------------------------------------------
+OPTION A — Upgrade hosting where Node can run
+------------------------------------------------------------
+Examples:
+  • home.pl VPS or dedicated server (SSH, you install Node yourself)
+  • Any host with “Node.js”, “Passenger”, or a VPS (DigitalOcean, Hetzner, etc.)
+
+You then deploy the full zip as in INSTALL-APP-TECHGUY-PL.txt / DEPLOY-CPANEL.txt.
+
+------------------------------------------------------------
+OPTION B — Split: static site on home.pl, API elsewhere (no Node on home.pl)
+------------------------------------------------------------
+1) Put the API on a Node-capable service, for example:
+     • A small VPS (same provider or another) with Node + PM2
+     • Or a PaaS that runs Node (Railway, Render, Fly.io, etc.)
+   Deploy only the "backend" folder there: npm install, .env with MySQL.
+   Your MySQL can stay on home.pl if the panel allows remote DB access;
+   otherwise run MySQL on the same machine as Node or use the PaaS database.
+
+2) Note the public API base URL, must end with /api, e.g.:
+     https://your-api-name.onrender.com/api
+
+3) On home.pl, upload ONLY the frontend (no backend folder required for pure static):
+     index.html, css/, js/
+   Edit index.html in the <head> and UNCOMMENT / set ONE line:
+
+     <meta name="itguy-api-base" content="https://your-api-name.onrender.com/api">
+
+   (Use your real API URL; no trailing slash after "api".)
+
+4) CORS: the bundled server uses app.use(cors()) so browser calls from
+   https://app.techguy.pl to your API host are allowed by default.
+
+5) HTTPS: both the static site and the API URL should use https://.
+
+Limitations of split deploy:
+  • You maintain two places (static files + Node service).
+  • Database must be reachable from the Node server (firewall / remote MySQL).
