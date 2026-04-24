@@ -39,7 +39,7 @@ window.addEventListener('scroll', resetIdleTimer);
 /**
  * Robust fetch helper that checks content-type and provides detailed errors
  */
-async function safeFetch(url, options = {}) {
+async function safeFetch(url, options = {}, retries = 3) {
     if (!options.headers) options.headers = {};
     if (!options.headers['Authorization']) {
         const token = sessionStorage.getItem('it-guy-token');
@@ -51,20 +51,25 @@ async function safeFetch(url, options = {}) {
         const contentType = res.headers.get('content-type');
         
         if (!res.ok) {
+            // Handle session expiry specifically
+            if (res.status === 401) {
+                console.warn("Session expired. Redirecting to login...");
+                if (window.authSystem) window.authSystem.logout();
+                throw new Error("Your session has expired. Please log in again.");
+            }
+
             if (contentType && contentType.includes('application/json')) {
                 const errData = await res.json();
                 throw new Error(errData.error || errData.message || `HTTP ${res.status}`);
             } else {
                 const text = await res.text();
-                // If we got HTML but expected JSON, it might be a server-level 404 or 500
                 if (text.trim().startsWith('<')) {
-                    throw new Error(`Server returned HTML (likely 404 or 500) instead of JSON. Check if backend is running.`);
+                    throw new Error(`Server error: The requested resource could not be processed.`);
                 }
                 throw new Error(text.substring(0, 50) || `HTTP ${res.status}`);
             }
         }
 
-        // Return empty object for empty responses
         if (res.status === 204) return {};
 
         if (contentType && contentType.includes('application/json')) {
@@ -72,9 +77,15 @@ async function safeFetch(url, options = {}) {
         }
         return await res.text();
     } catch (e) {
+        if (retries > 0 && (e.message.includes('fetch') || e.name === 'TypeError')) {
+            console.warn(`Fetch failed, retrying... (${retries} left). URL: ${url}`);
+            await new Promise(r => setTimeout(r, 1000 * (4 - retries))); // Exponential-ish backoff
+            return safeFetch(url, options, retries - 1);
+        }
         throw e;
     }
 }
+
 
 class LocalStorage {
     constructor(name) {
@@ -382,14 +393,14 @@ const triggerAuthChange = (user) => {
     if (user) {
         user.updatePassword = async (newPassword) => {
             const token = sessionStorage.getItem('it-guy-token');
-            const data = await safeFetch(`${API_BASE}/update-password`, {
+            const data = await safeFetch(`${API_BASE}/users/password`, {
                 method: 'POST',
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ password: newPassword })
+                body: JSON.stringify({ uid: user.uid, oldPassword: user.oldPassword, newPassword: newPassword })
             });
+
             if (!data || !data.success) throw new Error(data?.error || "Password update failed");
             return true;
         };

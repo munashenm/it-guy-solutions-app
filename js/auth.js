@@ -112,10 +112,11 @@ window.authSystem = {
             btn.disabled = false;
 
             if (error.message.includes('fetch') || error.message.includes('NetworkError')) {
-                errorEl.innerText = "❌ SERVER OFFLINE: Please run 'npm start' in the backend folder.";
+                errorEl.innerText = "❌ Connection Error: Unable to reach the server. Please check your internet or try again later.";
             } else {
                 errorEl.innerText = "❌ " + (error.message || "Invalid Email or Password");
             }
+
             errorEl.classList.remove('hidden');
         }
     },

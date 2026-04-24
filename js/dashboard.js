@@ -133,7 +133,7 @@ window.dashboard = {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${jobs.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).slice(0, 5).map(job => `
+                                ${jobs.sort((a,b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 5).map(job => `
                                     <tr>
                                         <td><strong>${job.id}</strong></td>
                                         <td>${job.customer}</td>

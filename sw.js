@@ -25,12 +25,13 @@ self.addEventListener('fetch', event => {
     if (event.request.url.includes('/api/')) {
         event.respondWith(
             fetch(event.request).catch(() => new Response(
-                JSON.stringify({ error: "Backend Unreachable. Please check if the Node.js app is running on the server." }), 
+                JSON.stringify({ error: "Service temporarily unavailable. Please check your connection or try again later." }), 
                 { status: 503, headers: { 'Content-Type': 'application/json' } }
             ))
         );
         return;
     }
+
   
   // For static assets, Cache First, fallback to Network
   event.respondWith(
