@@ -1,7 +1,15 @@
-const sqlite3 = require('sqlite3').verbose();
 const mysql = require('mysql2/promise');
 const path = require('path');
-require('dotenv').config();
+const fs = require('fs');
+
+// Hardened .env loading
+const envPath = path.resolve(__dirname, '.env');
+if (fs.existsSync(envPath)) {
+    require('dotenv').config({ path: envPath });
+} else {
+    require('dotenv').config();
+}
+
 
 /**
  * Database Abstraction for IT Guy Solutions
@@ -47,12 +55,19 @@ class Database {
             }
         } else {
             console.log("DB: Initializing Stable SQLite Mode...");
+            let sqlite3;
+            try {
+                sqlite3 = require('sqlite3').verbose();
+            } catch (e) {
+                throw new Error("SQLite library (sqlite3) is missing. If you are using MySQL, set DB_TYPE=mysql in your .env file.");
+            }
             const dbPath = path.resolve(__dirname, 'database.sqlite');
             this.sqlite = new sqlite3.Database(dbPath, (err) => {
                 if (err) console.error("DB: SQLite Connection Error:", err.message);
                 else console.log(`DB: SQLite Connection Successful at ${dbPath}`);
             });
         }
+
     }
 
     // Generic Run (Insert/Update/Delete)
