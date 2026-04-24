@@ -2,9 +2,14 @@ const fs = require('fs');
 const path = require('path');
 
 const logDir = path.resolve(__dirname, '../logs');
-if (!fs.existsSync(logDir)) {
-    fs.mkdirSync(logDir, { recursive: true });
+try {
+    if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+    }
+} catch (e) {
+    console.warn(`Logger: Could not create log directory. ${e.message}`);
 }
+
 
 const logger = {
     info: (message, meta = {}) => log('info', message, meta),

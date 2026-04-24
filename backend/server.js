@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
@@ -7,6 +8,7 @@ const rateLimit = require('express-rate-limit');
 const db = require('./database');
 const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
+
 
 // Route Imports
 const authRoutes = require('./routes/auth');

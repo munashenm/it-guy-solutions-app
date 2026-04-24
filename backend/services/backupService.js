@@ -2,12 +2,17 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../utils/logger');
 
-const dbPath = path.resolve(__dirname, '../../database.sqlite');
+const dbPath = path.resolve(__dirname, '../database.sqlite');
 const backupDir = path.resolve(__dirname, '../backups');
 
-if (!fs.existsSync(backupDir)) {
-    fs.mkdirSync(backupDir, { recursive: true });
+try {
+    if (!fs.existsSync(backupDir)) {
+        fs.mkdirSync(backupDir, { recursive: true });
+    }
+} catch (e) {
+    console.warn(`Backup Service: Could not create backup directory. ${e.message}`);
 }
+
 
 function automatedDailyBackup() {
     try {
