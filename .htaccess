@@ -1,5 +1,9 @@
-# IT Guy Solutions — Apache (cPanel subdomain document root)
-# If cPanel injects Passenger/Node.js directives here, keep them ABOVE this block.
+# FORCE NODE.JS (PASSENGER) TO START
+PassengerAppRoot "/home/itguysaco/public_html/app.itguysa.co.za"
+PassengerBaseURI "/"
+PassengerAppType node
+PassengerStartupFile app.js
+
 
 Options -Indexes
 
