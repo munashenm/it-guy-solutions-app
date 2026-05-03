@@ -36,9 +36,12 @@ app.get('/api/status', (req, res) => {
 try {
     appDb = require('./database');
     
-    // Asynchronously initialize the database pool
+    // Defer DB Init to let Passenger register the app as "Online" first
     if (appDb && typeof appDb.init === 'function') {
-        appDb.init().catch(e => console.error("Database Init Failed:", e));
+        setTimeout(() => {
+            console.log("Deferred DB Init starting...");
+            appDb.init().catch(e => console.error("Database Init Failed:", e));
+        }, 2000);
     }
 
     const authRoutes = require('./routes/auth');
