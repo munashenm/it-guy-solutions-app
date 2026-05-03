@@ -35,6 +35,12 @@ app.get('/api/status', (req, res) => {
 // 4. Load Routes Safely
 try {
     appDb = require('./database');
+    
+    // Asynchronously initialize the database pool
+    if (appDb && typeof appDb.init === 'function') {
+        appDb.init().catch(e => console.error("Database Init Failed:", e));
+    }
+
     const authRoutes = require('./routes/auth');
     const userRoutes = require('./routes/users');
     const collectionRoutes = require('./routes/collections');
