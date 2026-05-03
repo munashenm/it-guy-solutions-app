@@ -74,85 +74,113 @@ const app = {
         }
     },
 
+    viewCollections: {
+        'dashboard-view': ['jobs', 'fieldJobs', 'invoices', 'quotations', 'sales', 'activityLog'],
+        'repair-view': ['jobs', 'customers', 'inventory', 'users'],
+        'field-view': ['fieldJobs', 'techStock', 'inventory', 'users'],
+        'quotations-view': ['quotations', 'customers', 'inventory'],
+        'invoices-view': ['invoices', 'customers', 'inventory'],
+        'inventory-view': ['inventory', 'suppliers'],
+        'mystock-view': ['techStock', 'inventory'],
+        'pos-view': ['inventory', 'sales', 'customers'],
+        'customers-view': ['customers', 'jobs', 'invoices', 'quotations'],
+        'reports-view': ['sales', 'invoices', 'expenses', 'jobs'],
+        'tickets-view': ['tickets', 'customers'],
+        'purchases-view': ['purchaseOrders', 'suppliers', 'inventory'],
+        'expenses-view': ['expenses'],
+        'wiki-view': ['knowledgeBase'],
+        'profile-view': ['users']
+    },
+
     startSync() {
         if(!window.fbDb) return;
         if(this.syncStarted) return;
         this.syncStarted = true;
         
-        this.unsubscribes.forEach(u => u());
-        this.unsubscribes = [];
-        this._syncRawData = {}; // Internal cache to handle multi-collection merges
+        console.log("Starting Core Sync...");
+        this.unsubscribes = this.unsubscribes || [];
+        this._activeCollections = new Set();
+        this._syncRawData = {}; 
 
-        const register = (coll, stateKey) => {
+        // Always sync core settings for branding and logic
+        this.requestSync(['settings', 'companyProfile', 'systemSettings']);
+        
+        // Initial sync for current view
+        const hash = window.location.hash || '#dashboard';
+        const initialView = hash.replace('#', '') + '-view';
+        this.updateViewSync(initialView);
+    },
+
+    updateViewSync(viewId) {
+        if (!viewId) return;
+        const required = this.viewCollections[viewId] || [];
+        // Add users by default for role checks
+        if (!required.includes('users')) required.push('users');
+        
+        this.requestSync(required);
+    },
+
+    requestSync(collections) {
+        if (!Array.isArray(collections)) return;
+        
+        collections.forEach(coll => {
+            if (this._activeCollections.has(coll)) return;
+            
+            console.log(`📡 Activating sync for: ${coll}`);
+            this._activeCollections.add(coll);
+
+            if (coll === 'settings' || coll === 'companyProfile' || coll === 'systemSettings') {
+                this.syncDocument('settings', coll === 'settings' ? 'documentSettings' : coll);
+                return;
+            }
+
+            const stateKey = this.getCollectionStateKey(coll);
             const unsub = window.fbDb.collection(coll).onSnapshot(snap => {
                 if(!this._syncRawData[stateKey]) this._syncRawData[stateKey] = {};
                 this._syncRawData[stateKey][coll] = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                
-                // Rebuild the merged state array from all registered collections for this key
                 this.state[stateKey] = Object.values(this._syncRawData[stateKey]).flat();
                 
-                // One-time data migration/check for inventory
-                if(stateKey === 'inventory') {
-                    this.state.inventory.forEach(item => {
-                        if(item.stock !== undefined && item.qty === undefined) {
-                            console.log(`Migrating schema for ${item.id}...`);
-                            window.fbDb.collection('inventory').doc(item.id).update({
-                                qty: parseInt(item.stock) || 0,
-                                cost: item.buyPrice || item.cost || '0.00',
-                                sell: item.sellPrice || item.sell || '0.00'
-                            });
-                        }
-                    });
-                }
-
+                if(stateKey === 'inventory') this.migrateInventorySchema();
                 this.refreshActiveViews();
             });
             this.unsubscribes.push(unsub);
-        };
-
-        register('jobs', 'jobs');
-        register('repairs', 'jobs'); // Support old/seeded repair collection name
-        register('fieldJobs', 'fieldJobs');
-        register('activityLog', 'activityLog');
-        register('invoices', 'invoices');
-        register('quotations', 'quotations');
-        register('inventory', 'inventory');
-        register('techStock', 'techStock');
-        register('suppliers', 'suppliers');
-        register('customers', 'customers');
-        register('users', 'users');
-        register('sales', 'sales');
-        register('tickets', 'tickets');
-        register('purchaseOrders', 'purchaseOrders');
-        register('expenses', 'expenses');
-        register('knowledgeBase', 'knowledgeBase');
-        
-        // Settings Sync (handled individually for object-mapping instead of arrays)
-        const docSettingsUnsub = window.fbDb.collection('settings').doc('documentSettings').onSnapshot(doc => {
-            if(doc.exists) {
-                this.state.settings = { ...(this.state.settings || {}), ...doc.data() };
-                this.refreshActiveViews();
-            }
         });
-        this.unsubscribes.push(docSettingsUnsub);
+    },
 
-        const profileUnsub = window.fbDb.collection('settings').doc('companyProfile').onSnapshot(doc => {
+    getCollectionStateKey(coll) {
+        const mapping = { 'repairs': 'jobs' };
+        return mapping[coll] || coll;
+    },
+
+    syncDocument(coll, docId) {
+        const unsub = window.fbDb.collection(coll).doc(docId).onSnapshot(doc => {
             if(doc.exists) {
                 const data = doc.data();
-                this.state.companyProfile = data;
-                this.state.settings = { ...(this.state.settings || {}), ...data };
-                this.applyBranding(data);
+                if (docId === 'companyProfile') {
+                    this.state.companyProfile = data;
+                    this.state.settings = { ...(this.state.settings || {}), ...data };
+                    this.applyBranding(data);
+                } else {
+                    this.state.settings = { ...(this.state.settings || {}), ...data };
+                    this.refreshActiveViews();
+                }
             }
         });
-        this.unsubscribes.push(profileUnsub);
+        this.unsubscribes.push(unsub);
+    },
 
-        const settingsUnsub = window.fbDb.collection('settings').doc('systemSettings').onSnapshot(doc => {
-            if(doc.exists) {
-                this.state.settings = { ...(this.state.settings || {}), ...doc.data() };
-                this.refreshActiveViews();
+    migrateInventorySchema() {
+        if (!this.state.inventory) return;
+        this.state.inventory.forEach(item => {
+            if(item.stock !== undefined && item.qty === undefined) {
+                console.log(`Migrating schema for ${item.id}...`);
+                window.fbDb.collection('inventory').doc(item.id).update({
+                    qty: parseInt(item.stock) || 0,
+                    cost: item.buyPrice || item.cost || '0.00',
+                    sell: item.sellPrice || item.sell || '0.00'
+                });
             }
         });
-        this.unsubscribes.push(settingsUnsub);
     },
 
     applyBranding(data) {
@@ -633,17 +661,39 @@ const app = {
     },
 
     bindEvents() {
+        // Mobile Sidebar Toggle
+        const menuBtn = document.getElementById('mobile-menu-toggle');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        const sidebar = document.querySelector('.sidebar');
+
+        const toggleSidebar = (force = null) => {
+            const isOpen = force !== null ? force : sidebar.classList.contains('open');
+            sidebar.classList.toggle('open', !isOpen);
+            if (backdrop) backdrop.classList.toggle('active', !isOpen);
+        };
+
+        if (menuBtn) menuBtn.onclick = () => toggleSidebar();
+        if (backdrop) backdrop.onclick = () => toggleSidebar(true);
+
         this.navItems.forEach(item => {
             item.addEventListener('click', (e) => {
                 // If on mobile, close the sidebar when navigating
                 if (window.innerWidth <= 992) {
-                    const sidebar = document.querySelector('.sidebar');
-                    if (sidebar) sidebar.classList.remove('open');
+                    toggleSidebar(true);
                 }
             });
         });
 
         window.addEventListener('hashchange', () => this.handleRouting());
+
+        // Global Error Handling for Stability
+        window.onerror = (msg, url, line, col, error) => {
+            console.error("Global Error:", {msg, url, line, col, error});
+            if (typeof app.showToast === 'function') {
+                app.showToast("An unexpected error occurred. We've logged it for review.", "error");
+            }
+            return false;
+        };
 
         // Global Search Binding
         const searchInput = document.getElementById('global-search-input');
@@ -766,6 +816,9 @@ const app = {
             
             target.classList.add('active');
             this.state.currentView = viewId;
+            
+            // Adaptive Sync: Activate data streams for this view
+            this.updateViewSync(viewId);
             
             this.refreshActiveViews();
             window.scrollTo({ top: 0, behavior: 'smooth' });
