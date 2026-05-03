@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0f111a">
     <link rel="manifest" href="manifest.json">
-    <link id="app-favicon" rel="icon" type="image/x-icon" href="favicon.ico">
-    <link id="app-apple-touch-icon" rel="apple-touch-icon" href="https://ui-avatars.com/api/?name=IT&background=6c5ce7&color=fff&rounded=true&size=192">
-    <title>IT Guy Solutions App</title>
+    <link id="app-favicon" rel="icon" type="image/x-icon" href="img/favicon.ico">
+    <link id="app-apple-touch-icon" rel="apple-touch-icon" href="img/logo.png">
+    <title>Staff Portal - IT Guy Solutions</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -45,13 +45,17 @@
     <!-- Login Overlay -->
     <div id="login-screen" class="login-wrapper hidden">
         <div class="glass-card login-glass-panel" style="max-width: 400px; width: 100%; padding: 32px;">
-            <div style="text-align: center; margin-bottom: 24px;">
-                <div id="login-logo-container">
-                    <span class="material-symbols-outlined logo-icon" style="font-size: 48px; color: var(--primary);">terminal</span>
+            <div class="logo-section" style="text-align: center; margin-bottom: 24px;">
+            <div id="login-logo-container">
+                <!-- Static Logo Fallback (Fastest Load) -->
+                <img src="img/logo.png" alt="Logo" style="max-height: 80px; max-width: 100%; margin-bottom: 15px;" onerror="this.style.display='none'; document.getElementById('login-logo-fallback').classList.remove('hidden')">
+                <div id="login-logo-fallback" class="hidden">
+                    <span class="material-symbols-outlined" style="font-size: 56px; color: var(--primary); margin-bottom: 8px;">terminal</span>
+                    <h1 style="font-size: 2rem; margin: 0;">IT Guy<span class="highlight">Solutions</span></h1>
                 </div>
-                <h2 style="font-size: 1.8rem; margin: 8px 0;">IT Guy<span class="highlight">Solutions</span></h2>
-                <p style="color: var(--text-secondary);">Sign in to access the portal</p>
             </div>
+            <p style="color: var(--text-secondary); margin-top: 8px;">Employee & Technician Access</p>
+        </div>
 
 
             <div id="login-error" class="hidden" style="background: rgba(var(--danger-rgb), 0.1); color: var(--danger); padding: 12px; border-radius: 6px; margin-bottom: 16px; font-size: 0.9rem; text-align: center;"></div>

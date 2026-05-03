@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link id="app-favicon" rel="icon" type="image/x-icon" href="img/favicon.ico">
+    <link id="app-apple-touch-icon" rel="apple-touch-icon" href="img/logo.png">
     <title>Job Tracking - IT Guy Solutions</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -50,9 +52,13 @@
 <body class="dark-theme">
 
     <div class="track-container">
-        <div class="logo-section">
-            <span class="material-symbols-outlined logo-icon">terminal</span>
-            <h1 style="font-size: 2rem; margin: 0;">IT Guy<span class="highlight">Solutions</span></h1>
+        <div class="logo-section" id="login-logo-container">
+            <!-- Static Logo Fallback (Fastest Load) -->
+            <img src="img/logo.png" alt="Logo" style="max-height: 80px; max-width: 100%; margin-bottom: 15px;" onerror="this.style.display='none'; document.getElementById('login-logo-fallback').classList.remove('hidden')">
+            <div id="login-logo-fallback" class="hidden">
+                <span class="material-symbols-outlined logo-icon">terminal</span>
+                <h1 style="font-size: 2rem; margin: 0;">IT Guy<span class="highlight">Solutions</span></h1>
+            </div>
             <p style="color: var(--text-secondary); margin-top: 8px;">Public Service Tracking Portal</p>
         </div>
 
