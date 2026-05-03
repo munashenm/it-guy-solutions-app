@@ -10,56 +10,67 @@ const JWT_SECRET = process.env.JWT_SECRET || 'it-guy-secret-key-2024';
 
 router.post('/login', async (req, res, next) => {
     const { email, password } = req.body;
-    console.log(`Auth: Login attempt for ${email}`);
+    const logId = Math.random().toString(36).substring(7);
+    console.log(`[${logId}] Auth: Login attempt for ${email}`);
+    
     try {
+        if (!db || (!db.pool && db.type === 'mysql')) {
+            console.error(`[${logId}] Auth Error: Database not connected yet.`);
+            return res.status(503).json({ error: "Database is still initializing. Please wait 5 seconds and try again." });
+        }
+
+        console.log(`[${logId}] Auth: Searching for user...`);
         const row = await db.get("SELECT * FROM users WHERE email = ? OR username = ?", [email, email]);
         
         if (row) {
-            console.log(`Auth: User found ${row.email}, role: ${row.role}`);
+            console.log(`[${logId}] Auth: User found. Checking password...`);
             let isValid = false;
             let needsMigration = false;
 
-            // Debug: Check password format
             const isHashed = row.password && (row.password.startsWith('$2a$') || row.password.startsWith('$2b$'));
-            console.log(`Auth: Password is hashed: ${isHashed}`);
-
-            if (isHashed) {
-                isValid = await bcrypt.compare(password, row.password);
-                console.log(`Auth: Bcrypt comparison result: ${isValid}`);
-            } else {
-                isValid = (row.password === password);
-                if (isValid) needsMigration = true;
-                console.log(`Auth: Plaintext comparison result: ${isValid}`);
+            
+            try {
+                if (isHashed) {
+                    isValid = await bcrypt.compare(password, row.password);
+                } else {
+                    isValid = (row.password === password);
+                    if (isValid) needsMigration = true;
+                }
+            } catch (bcryptErr) {
+                console.error(`[${logId}] Auth: Password comparison failed:`, bcryptErr.message);
+                throw new Error("Security module error during password check.");
             }
 
             if (isValid) {
+                console.log(`[${logId}] Auth: Password valid. Signing token...`);
                 const token = jwt.sign(
                     { uid: row.uid, email: row.email, role: row.role },
                     JWT_SECRET,
                     { expiresIn: '24h' }
                 );
                 
+                console.log(`[${logId}] Auth: Updating session...`);
                 if (needsMigration) {
                     const hashedPassword = await bcrypt.hash(password, 12);
                     await db.run("UPDATE users SET sessionToken = ?, password = ? WHERE uid = ?", [token, hashedPassword, row.uid]);
-                    logger.info(`Auth: Migrated user ${email} to Bcrypt.`);
                 } else {
                     await db.run("UPDATE users SET sessionToken = ? WHERE uid = ?", [token, row.uid]);
                 }
 
                 const { password: _p, ...user } = row;
+                console.log(`[${logId}] Auth: Login successful.`);
                 res.json({ user, token });
             } else {
-                logger.warn(`Auth: Invalid password for ${email}`);
+                console.warn(`[${logId}] Auth: Invalid password.`);
                 res.status(401).json({ error: "Invalid credentials" });
             }
         } else {
-            logger.warn(`Auth: No user found for ${email}`);
+            console.warn(`[${logId}] Auth: No user found.`);
             res.status(401).json({ error: "Invalid credentials" });
         }
     } catch(err) {
-        logger.error(`Auth: Login error for ${email}`, err);
-        next(err);
+        console.error(`[${logId}] Auth CRITICAL ERROR:`, err.message);
+        res.status(500).json({ error: "Server login error", details: err.message });
     }
 });
 
