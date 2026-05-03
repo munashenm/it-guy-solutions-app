@@ -265,7 +265,14 @@ class LocalStorage {
             return base + backoff;
         };
 
-        this.pollInterval = setInterval(poll, 15000);
+        const scheduler = () => {
+            this.pollTimeout = setTimeout(async () => {
+                await poll();
+                scheduler(); // Schedule next poll
+            }, getInterval());
+        };
+
+        scheduler();
         
         // Listen for visibility changes to resume immediately when user returns
         if (!window._visibilityInited) {
@@ -282,9 +289,9 @@ class LocalStorage {
     }
 
     stopPolling() {
-        if (this.pollInterval) {
-            clearInterval(this.pollInterval);
-            this.pollInterval = null;
+        if (this.pollTimeout) {
+            clearTimeout(this.pollTimeout);
+            this.pollTimeout = null;
         }
     }
 }

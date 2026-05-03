@@ -10,11 +10,14 @@ process.on('uncaughtException', (err) => {
 });
 
 const express = require('express');
-
 const bodyParser = require('body-parser');
-const cors = require('cors');
-const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
+
+// Resilience Layer: Load optional security modules safely
+let helmet, cors, rateLimit;
+try { helmet = require('helmet'); } catch(e) { console.error("⚠️ Resilience Warning: 'helmet' missing. App continuing without extra security headers."); }
+try { cors = require('cors'); } catch(e) { console.error("⚠️ Resilience Warning: 'cors' missing. App continuing with default CORS."); }
+try { rateLimit = require('express-rate-limit'); } catch(e) { console.error("⚠️ Resilience Warning: 'express-rate-limit' missing. API throttling disabled."); }
+
 const db = require('./database');
 const logger = require('./utils/logger');
 const errorHandler = require('./middleware/errorHandler');
@@ -35,19 +38,25 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Security Middleware
-app.use(helmet({
-    contentSecurityPolicy: false, // Disabled for simplicity in SPA setup, can be hardened later
-}));
-app.use(cors()); // CORS is handled but can be restricted to specific domains in production
+if (helmet) {
+    app.use(helmet({
+        contentSecurityPolicy: false, 
+    }));
+}
+if (cors) {
+    app.use(cors()); 
+}
 app.set('trust proxy', 1);
 
 // Rate Limiting
-const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 500, // Limit each IP to 500 requests per windowMs
-    message: { error: "Too many requests from this IP, please try again after 15 minutes" }
-});
-app.use('/api', limiter);
+if (rateLimit) {
+    const limiter = rateLimit({
+        windowMs: 15 * 60 * 1000, // 15 minutes
+        max: 500, // Limit each IP to 500 requests per windowMs
+        message: { error: "Too many requests from this IP, please try again after 15 minutes" }
+    });
+    app.use('/api', limiter);
+}
 
 app.use(bodyParser.json({ limit: '50mb' }));
 
