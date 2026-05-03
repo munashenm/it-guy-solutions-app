@@ -4,6 +4,17 @@ const db = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const logger = require('../utils/logger');
 
+router.get('/settings/companyProfile', async (req, res, next) => {
+    try {
+        const row = await db.get("SELECT data FROM collections WHERE name = 'settings' AND id = 'companyProfile'");
+        if (!row) return res.status(404).json({ error: "Document not found" });
+        const data = safeJsonParse(row.data, {}, `Public Branding Fetch`);
+        res.json({ id: 'companyProfile', ...data });
+    } catch (e) {
+        next(e);
+    }
+});
+
 router.use(requireAuth);
 
 const safeJsonParse = (str, fallback = {}, context = '') => {

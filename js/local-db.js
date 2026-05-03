@@ -53,9 +53,19 @@ async function safeFetch(url, options = {}, retries = 3) {
         if (!res.ok) {
             // Handle session expiry specifically
             if (res.status === 401) {
-                console.warn("Session expired. Redirecting to login...");
-                if (window.authSystem) window.authSystem.logout();
-                throw new Error("Your session has expired. Please log in again.");
+                // DO NOT trigger logout/reload if we are already trying to login!
+                if (!url.endsWith('/login') && !url.includes('/settings/companyProfile')) {
+                    console.warn("Session expired or unauthorized. Redirecting to login...");
+                    if (window.authSystem && typeof window.authSystem.logout === 'function') {
+                        window.authSystem.logout();
+                    }
+                }
+                
+                if (contentType && contentType.includes('application/json')) {
+                    const errData = await res.json();
+                    throw new Error(errData.error || errData.message || "Unauthorized");
+                }
+                throw new Error("Unauthorized access. Please log in.");
             }
 
             if (contentType && contentType.includes('application/json')) {
