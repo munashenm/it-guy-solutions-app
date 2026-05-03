@@ -116,8 +116,8 @@ router.post('/register', async (req, res, next) => {
 
         res.json({ success: true, user: userData, token: token });
     } catch(err) {
-        console.error(`[${logId}] Auth CRITICAL ERROR:`, err.message);
-        res.status(500).json({ error: "Server login error", details: err.message });
+        console.error(`Auth Registration Error:`, err.message);
+        res.status(500).json({ error: "Registration error", details: err.message });
     }
 });
 
