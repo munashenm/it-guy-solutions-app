@@ -72,17 +72,21 @@ try {
         app.use('/api', limiter);
     }
 
-    app.use(bodyParser.json({ limit: '50mb' }));
+    // Optimized memory for shared hosting
+    app.use(bodyParser.json({ limit: '10mb' })); 
 
-    // Database Initialization
+    // 2. Database Initialization (Resilient Pattern)
     if (logger && logger.info) logger.info('Boot: Connecting to Database...');
-    db.init().then(async () => {
+    
+    // We don't await this so the server can start even if DB is slow
+    db.init().then(() => {
         if (logger && logger.info) logger.info('Boot: Database Connection Established');
     }).catch(err => {
         if (logger && logger.error) logger.error('Boot: Critical Database Error', { error: err.message });
+        // Don't exit, allow /api/status to still report the error
     });
 
-    // API Routes
+    // 3. API Routes
     if (logger && logger.info) logger.info('Boot: Registering Routes...');
     app.use('/api', authRoutes);
     app.use('/api/users', userRoutes);
