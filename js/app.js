@@ -1438,28 +1438,36 @@ const app = {
         ).join('');
 
         const rowHTML = `
-            <div id="${rowId}" class="invoice-item-row" style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; margin-bottom: 8px; border: 1px dashed var(--border);">
-                <div class="form-row" style="margin-bottom: 8px;">
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <select class="form-control item-type" required style="appearance: auto;">
-                            <option value="" disabled ${!type ? 'selected' : ''}>Select type</option>
-                            ${typeOptions}
-                        </select>
-                    </div>
-                    <div class="form-group" style="flex: 2; margin-bottom: 0;">
-                        <input type="text" class="form-control item-desc" placeholder="Description" value="${desc}" list="inventory-items-list" oninput="app.fillLinePriceFromInventory(this, 'inv')" required>
-                    </div>
+            <div id="${rowId}" class="invoice-item-row" style="background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.1); position: relative;">
+                <button type="button" class="btn-icon" style="position: absolute; top: 12px; right: 12px; color: #ff7675; background: rgba(255,118,117,0.1);" onclick="app.removeInvoiceItemLine('${rowId}')" title="Remove Line">
+                    <span class="material-symbols-outlined" style="font-size: 1.2rem;">delete</span>
+                </button>
+
+                <div class="form-group" style="margin-bottom: 12px; padding-right: 40px;">
+                    <label style="font-size: 0.7rem; color: var(--accent); text-transform: uppercase;">Item Category</label>
+                    <select class="form-control item-type" required style="appearance: auto; background: rgba(0,0,0,0.2);">
+                        <option value="" disabled ${!type ? 'selected' : ''}>Select Category</option>
+                        ${typeOptions}
+                    </select>
                 </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 0.7rem; color: var(--accent); text-transform: uppercase;">Description / Service Details</label>
+                    <input type="text" class="form-control item-desc" placeholder="e.g. SSD Upgrade or Labour" value="${desc}" list="inventory-items-list" oninput="app.fillLinePriceFromInventory(this, 'inv')" required>
+                </div>
+
                 <div class="form-row" style="margin-bottom: 0;">
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <input type="number" class="form-control item-unit" placeholder="Unit Price" oninput="app.calcInvoiceTotal()" value="${unit}" required min="0" step="0.01">
+                    <div class="form-group">
+                        <label style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">Unit Price (R)</label>
+                        <input type="number" class="form-control item-unit" placeholder="0.00" oninput="app.calcInvoiceTotal()" value="${unit}" required min="0" step="0.01">
                     </div>
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <div class="form-group">
+                        <label style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">Quantity</label>
                         <input type="number" class="form-control item-qty" value="${qty}" min="1" oninput="app.calcInvoiceTotal()" required>
                     </div>
-                    <div class="form-group" style="flex: 1; display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
-                        <span class="item-row-total" style="flex: 1; text-align: right; color: #a0a0a0;">R0.00</span>
-                        <button type="button" class="btn-icon" style="color: #ff4444;" onclick="app.removeInvoiceItemLine('${rowId}')" title="Remove Line"><span class="material-symbols-outlined" style="font-size: 1.2rem;">delete</span></button>
+                    <div class="form-group" style="display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end;">
+                        <span style="font-size: 0.65rem; color: #a0a0a0; text-transform: uppercase; margin-bottom: 4px;">Line Total</span>
+                        <span class="item-row-total" style="font-weight: 700; color: #00b894; font-size: 1.1rem;">R0.00</span>
                     </div>
                 </div>
             </div>
@@ -2104,28 +2112,36 @@ const app = {
         ).join('');
 
         const rowHTML = `
-            <div id="${rowId}" class="quo-item-row" style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; margin-bottom: 8px; border: 1px dashed var(--border);">
-                <div class="form-row" style="margin-bottom: 8px;">
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <select class="form-control quo-type" required style="appearance: auto;">
-                            <option value="" disabled ${!type ? 'selected' : ''}>Select type</option>
-                            ${typeOptions}
-                        </select>
-                    </div>
-                    <div class="form-group" style="flex: 2; margin-bottom: 0;">
-                        <input type="text" class="form-control quo-desc" placeholder="Description" value="${desc}" list="inventory-items-list" oninput="app.fillLinePriceFromInventory(this, 'quo')" required>
-                    </div>
+            <div id="${rowId}" class="quo-item-row" style="background: rgba(255,255,255,0.03); padding: 16px; border-radius: 12px; margin-bottom: 16px; border: 1px solid rgba(255,255,255,0.1); position: relative;">
+                <button type="button" class="btn-icon" style="position: absolute; top: 12px; right: 12px; color: #ff7675; background: rgba(255,118,117,0.1);" onclick="app.removeQuotationItemLine('${rowId}')" title="Remove Line">
+                    <span class="material-symbols-outlined" style="font-size: 1.2rem;">delete</span>
+                </button>
+
+                <div class="form-group" style="margin-bottom: 12px; padding-right: 40px;">
+                    <label style="font-size: 0.7rem; color: var(--accent); text-transform: uppercase;">Item Category</label>
+                    <select class="form-control quo-type" required style="appearance: auto; background: rgba(0,0,0,0.2);">
+                        <option value="" disabled ${!type ? 'selected' : ''}>Select Category</option>
+                        ${typeOptions}
+                    </select>
                 </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label style="font-size: 0.7rem; color: var(--accent); text-transform: uppercase;">Description / Service Details</label>
+                    <input type="text" class="form-control quo-desc" placeholder="e.g. SSD Upgrade or Labour" value="${desc}" list="inventory-items-list" oninput="app.fillLinePriceFromInventory(this, 'quo')" required>
+                </div>
+
                 <div class="form-row" style="margin-bottom: 0;">
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
-                        <input type="number" class="form-control quo-unit" placeholder="Unit Price" oninput="app.calcQuotationTotal()" value="${unit}" required min="0" step="0.01">
+                    <div class="form-group">
+                        <label style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">Unit Price (R)</label>
+                        <input type="number" class="form-control quo-unit" placeholder="0.00" oninput="app.calcQuotationTotal()" value="${unit}" required min="0" step="0.01">
                     </div>
-                    <div class="form-group" style="flex: 1; margin-bottom: 0;">
+                    <div class="form-group">
+                        <label style="font-size: 0.7rem; color: var(--text-secondary); text-transform: uppercase;">Quantity</label>
                         <input type="number" class="form-control quo-qty" value="${qty}" min="1" oninput="app.calcQuotationTotal()" required>
                     </div>
-                    <div class="form-group" style="flex: 1; display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
-                        <span class="quo-row-total" style="flex: 1; text-align: right; color: #a0a0a0;">R0.00</span>
-                        <button type="button" class="btn-icon" style="color: #ff4444;" onclick="app.removeQuotationItemLine('${rowId}')" title="Remove Line"><span class="material-symbols-outlined" style="font-size: 1.2rem;">delete</span></button>
+                    <div class="form-group" style="display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-end;">
+                        <span style="font-size: 0.65rem; color: #a0a0a0; text-transform: uppercase; margin-bottom: 4px;">Line Total</span>
+                        <span class="quo-row-total" style="font-weight: 700; color: #00b894; font-size: 1.1rem;">R0.00</span>
                     </div>
                 </div>
             </div>

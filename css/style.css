@@ -879,10 +879,12 @@ textarea.form-control {
 .form-row {
     display: flex;
     gap: 16px;
+    flex-wrap: wrap; /* Allow wrapping */
 }
 
 .form-row .form-group {
     flex: 1;
+    min-width: 250px; /* Force stack on smaller areas */
 }
 
 .modal-footer {
