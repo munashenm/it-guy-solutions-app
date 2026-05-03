@@ -1,79 +1,75 @@
-// IT Guy Solutions - Extreme Compatibility Version (v2.8)
+// IT Guy Solutions - Diagnostic Version (v3.0)
 const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 
-// 1. Emergency Error Logging
+const logFile = path.join(__dirname, 'startup_log.txt');
+function diagLog(msg) {
+    const entry = `[${new Date().toISOString()}] ${msg}\n`;
+    fs.appendFileSync(logFile, entry);
+    console.log(entry);
+}
+
+// Clear old log
+try { fs.writeFileSync(logFile, "--- STARTUP DIARY ---\n"); } catch(e) {}
+
+diagLog("Step 1: Core modules loaded.");
+
 process.on('uncaughtException', (err) => {
-    const msg = `[${new Date().toISOString()}] CRITICAL: ${err.message}\n${err.stack}\n`;
+    const msg = `[${new Date().toISOString()}] CRITICAL ERROR: ${err.message}\n${err.stack}\n`;
     try { fs.appendFileSync(path.join(__dirname, 'emergency_error.txt'), msg); } catch(e) {}
-    console.error(msg);
+    diagLog("FATAL CRASH: " + err.message);
     process.exit(1);
 });
 
 const app = express();
+diagLog("Step 2: Express initialized.");
 
-// 2. Core Middleware (Minimal)
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname)));
+diagLog("Step 3: Middleware applied.");
 
-// 3. Status Heartbeat
 let appDb = null;
-
 app.get('/api/status', (req, res) => {
     res.json({ 
         status: "online", 
         dbStatus: (appDb && appDb.pool) ? "Connected" : "Initializing",
-        dbType: process.env.DB_TYPE || 'mysql',
-        version: "2.9-Stable",
+        version: "3.0-Diag",
         timestamp: new Date().toISOString() 
     });
 });
 
-// 4. Load Routes Safely
 try {
+    diagLog("Step 4: Requiring database.js...");
     appDb = require('./database');
+    diagLog("Step 5: database.js loaded.");
     
-    // Defer DB Init to let Passenger register the app as "Online" first
-    if (appDb && typeof appDb.init === 'function') {
-        setTimeout(() => {
-            console.log("Deferred DB Init starting...");
-            appDb.init().catch(e => console.error("Database Init Failed:", e));
-        }, 2000);
-    }
+    setTimeout(() => {
+        diagLog("Step 10: Deferred DB Init starting...");
+        if (appDb && appDb.init) appDb.init().catch(e => diagLog("DB Init Error: " + e.message));
+    }, 5000);
 
-    const authRoutes = require('./routes/auth');
-    const userRoutes = require('./routes/users');
-    const collectionRoutes = require('./routes/collections');
-    const systemRoutes = require('./routes/system');
+    diagLog("Step 6: Loading Auth routes...");
+    app.use('/api/auth', require('./routes/auth'));
+    
+    diagLog("Step 7: Loading User routes...");
+    app.use('/api/users', require('./routes/users'));
+    
+    diagLog("Step 8: Loading Collection routes...");
+    app.use('/api/collections', require('./routes/collections'));
+    
+    diagLog("Step 9: Loading System routes...");
+    app.use('/api', require('./routes/system'));
 
-    // Optional Security (Fail-safe)
-    try { const cors = require('cors'); app.use(cors()); } catch(e) {}
-    try { const helmet = require('helmet'); app.use(helmet()); } catch(e) {}
-
-    app.use('/api/auth', authRoutes);
-    app.use('/api/users', userRoutes);
-    app.use('/api/collections', collectionRoutes);
-    app.use('/api', systemRoutes);
 } catch (err) {
-    console.error("Route Loading Error:", err);
+    diagLog("ROUTE LOADING ERROR: " + err.message);
 }
 
-// 5. Global Error Handler
-app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ error: 'Internal Server Error', details: err.message });
-});
-
-// 6. The "Zombie Process" Bypass
-// By using port 0, Node will find any available port.
-// Passenger will STILL intercept this call and route traffic perfectly.
-// This permanently prevents the "EADDRINUSE" crash.
 const port = process.env.PORT || 0; 
 const server = app.listen(port, () => {
-    console.log(`Server v2.8 running on port ${server.address().port}`);
+    diagLog(`Step 11: Server listening on port ${server.address().port}`);
 });
 
 module.exports = app;
