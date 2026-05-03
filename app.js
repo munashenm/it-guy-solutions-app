@@ -52,6 +52,7 @@ try {
         res.json({ 
             status: "online", 
             dbStatus: (db && db.pool) ? "Connected" : "Initializing",
+            dbType: process.env.DB_TYPE || 'mysql',
             timestamp: new Date().toISOString(), 
             message: "Heartbeat check passed." 
         });

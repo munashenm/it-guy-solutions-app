@@ -441,6 +441,13 @@ window.localDb = {
                 return res;
             }
         };
+    },
+    syncAll: function() {
+        Object.values(this._collections).forEach(coll => {
+            if (coll.listeners && coll.listeners.length > 0) {
+                coll.fetch().catch(e => console.warn(`Silent sync error for ${coll.name}:`, e));
+            }
+        });
     }
 };
 

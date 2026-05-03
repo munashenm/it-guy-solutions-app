@@ -66,6 +66,9 @@ window.dashboard = {
                     <h1>Business Insights</h1>
                     <p>Financial health and operational performance for ${new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date())}</p>
                 </div>
+                <div class="header-actions">
+                    <button class="btn-secondary" onclick="app.refreshAllData()" title="Refresh Dashboard"><span class="material-symbols-outlined">refresh</span></button>
+                </div>
             </div>
             
             <div class="dashboard-grid">

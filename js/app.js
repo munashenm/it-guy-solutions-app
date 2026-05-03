@@ -905,6 +905,11 @@ const app = {
             // Adaptive Sync: Activate data streams for this view
             this.updateViewSync(viewId);
             
+            // Critical Fix: Force an immediate deep refresh to prevent blank views
+            if (window.localDb && typeof window.localDb.syncAll === 'function') {
+                window.localDb.syncAll();
+            }
+            
             // Force a refresh immediately (in case data was already cached/synced)
             this.refreshActiveViews();
             
