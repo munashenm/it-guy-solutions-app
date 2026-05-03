@@ -112,14 +112,16 @@ try {
     app.use(errorHandler);
 
     // Passenger / Production Safe Listener
-    if (process.env.PASSENGER_APP_ENV) {
-        // Under Passenger, we don't always need to call listen(), 
-        // but if we do, it handles the port for us.
-        app.listen();
-        if (logger && logger.info) logger.info('Server running under Phusion Passenger');
+    const VERSION = "2.6-Harden"; 
+    
+    if (process.env.PASSENGER_APP_ENV || process.env.PASSENGER_ENV) {
+        console.log(`[BOOT] IT Guy Solutions ${VERSION} starting under Phusion Passenger...`);
+        // Under Passenger, we MUST NOT specify a port. Passenger handles the socket.
+        app.listen(); 
+        if (logger && logger.info) logger.info(`Server v${VERSION} running under Phusion Passenger`);
     } else {
         const server = app.listen(port, () => {
-            console.log(`Server running on port ${port} in ${process.env.NODE_ENV || 'production'} mode`);
+            console.log(`[BOOT] IT Guy Solutions ${VERSION} running on port ${port} (Local Mode)`);
         }).on('error', (err) => {
             if (err.code === 'EADDRINUSE') {
                 console.warn(`[PORT_BUSY] Port ${port} is already in use. Local development may require a different port.`);
@@ -133,7 +135,7 @@ try {
     module.exports = app;
 
 } catch (err) {
-    const msg = `[${new Date().toISOString()}] CRITICAL STARTUP ERROR: ${err.message}\n${err.stack}\n`;
+    const msg = `[${new Date().toISOString()}] CRITICAL STARTUP ERROR (v2.6): ${err.message}\n${err.stack}\n`;
     try {
         fs.appendFileSync(path.join(__dirname, 'emergency_error.txt'), msg);
     } catch(e) {}
