@@ -283,8 +283,8 @@ const app = {
             dot.style.background = isHealthy ? '#00b894' : '#ff7675';
             text.textContent = isHealthy ? 'System Online' : 'DB Sync Error';
             text.style.color = isHealthy ? '#00b894' : '#ff7675';
-            const engineInfo = status.dbType ? `${status.dbType.toUpperCase()} Engine` : 'Engine Unknown';
-            label.textContent = `${engineInfo} | v2.5`;
+            const engineInfo = status.dbType ? `${status.dbType.toUpperCase()} Engine` : 'MYSQL Engine';
+            label.textContent = `${engineInfo} | v2.7`;
             
             if (!isHealthy && status.dbError) {
                 console.error("Database Health Warning:", status.dbError);
