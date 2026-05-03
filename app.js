@@ -1,4 +1,4 @@
-// IT Guy Solutions - Stable Version (v3.1)
+// IT Guy Solutions - Hardened Version (v3.2)
 const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
@@ -21,7 +21,7 @@ app.get('/api/status', (req, res) => {
     res.json({ 
         status: "online", 
         dbStatus: (appDb && appDb.pool) ? "Connected" : "Initializing",
-        version: "3.1-Final",
+        version: "3.2-Hardened",
         timestamp: new Date().toISOString() 
     });
 });
@@ -29,10 +29,12 @@ app.get('/api/status', (req, res) => {
 try {
     appDb = require('./database');
     
-    // Immediate Init (Non-blocking)
-    if (appDb && appDb.init) {
-        appDb.init().catch(e => console.error("DB Init Error:", e));
-    }
+    // CRITICAL: 5-second delay is MANDATORY for Passenger stability on this server
+    setTimeout(() => {
+        if (appDb && appDb.init) {
+            appDb.init().catch(e => console.error("Database Init Failed:", e));
+        }
+    }, 5000);
 
     app.use('/api/auth', require('./routes/auth'));
     app.use('/api/users', require('./routes/users'));
@@ -43,13 +45,10 @@ try {
     console.error("Startup Error:", err);
 }
 
-// Global Error Handler (Returns JSON, not HTML)
+// Ensure error responses are ALWAYS JSON
 app.use((err, req, res, next) => {
     console.error(err.stack);
-    res.status(500).json({ 
-        error: 'Server Error', 
-        message: err.message 
-    });
+    res.status(500).json({ error: 'Server Error', message: err.message });
 });
 
 const port = process.env.PORT || 0; 
