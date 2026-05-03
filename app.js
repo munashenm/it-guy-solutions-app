@@ -1,13 +1,21 @@
-require('dotenv').config();
+// 1. ABSOLUTE TOP: Core dependencies & Emergency Logging
 const fs = require('fs');
 const path = require('path');
 
-// Emergency Logging for Startup Crashes
 process.on('uncaughtException', (err) => {
-    const msg = `[${new Date().toISOString()}] UNCAUGHT EXCEPTION: ${err.message}\n${err.stack}\n`;
-    fs.appendFileSync(path.join(__dirname, 'emergency_error.txt'), msg);
+    try {
+        const msg = `[${new Date().toISOString()}] UNCAUGHT EXCEPTION: ${err.message}\n${err.stack}\n`;
+        fs.appendFileSync(path.join(__dirname, 'emergency_error.txt'), msg);
+    } catch (e) {}
     process.exit(1);
 });
+
+// 2. Safe Environment Initialization
+try {
+    require('dotenv').config();
+} catch (e) {
+    console.warn("Resilience: .env loading skipped");
+}
 
 try {
     const express = require('express');
@@ -51,7 +59,7 @@ try {
     if (rateLimit) {
         const limiter = rateLimit({
             windowMs: 15 * 60 * 1000,
-            max: 500,
+            max: 1000, // Increased for sync intensity
             message: { error: "Too many requests from this IP, please try again after 15 minutes" }
         });
         app.use('/api', limiter);
@@ -64,12 +72,6 @@ try {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');
-        next();
-    });
-
-    // Request Logging
-    app.use('/api', (req, res, next) => {
-        if (logger && logger.info) logger.info(`${req.method} ${req.url}`, { ip: req.ip });
         next();
     });
 
@@ -105,13 +107,22 @@ try {
 
     app.use(errorHandler);
 
-    app.listen(port, () => {
-        console.log(`Server running on port ${port}`);
+    // Passenger / Production Safe Listener
+    const server = app.listen(port, () => {
+        console.log(`Server running on port ${port} in ${process.env.NODE_ENV || 'production'} mode`);
+    }).on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+            console.warn(`[PORT_BUSY] Port ${port} is already in use. Passenger may be managing this process.`);
+        } else {
+            throw err;
+        }
     });
 
 } catch (err) {
     const msg = `[${new Date().toISOString()}] CRITICAL STARTUP ERROR: ${err.message}\n${err.stack}\n`;
-    fs.appendFileSync(path.join(__dirname, 'emergency_error.txt'), msg);
-    // Create a fallback server to show the error if possible, or just exit
+    try {
+        fs.appendFileSync(path.join(__dirname, 'emergency_error.txt'), msg);
+    } catch(e) {}
+    console.error(msg);
     process.exit(1);
 }
