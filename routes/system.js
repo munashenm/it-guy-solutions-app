@@ -13,26 +13,7 @@ const uploadDir = path.resolve(__dirname, '../uploads');
 const upload = multer({ dest: uploadDir });
 const dbPath = path.resolve(__dirname, '../database.sqlite');
 
-router.get('/status', async (req, res) => {
-    let dbStatus = "Connected";
-    let dbError = null;
-    try {
-        await db.get("SELECT 1");
-    } catch(e) {
-        dbStatus = "Error";
-        dbError = e.message;
-    }
-
-    res.json({ 
-        status: "online", 
-        timestamp: new Date().toISOString(),
-        dbType: process.env.DB_TYPE || 'sqlite',
-        dbStatus: dbStatus,
-        dbError: dbError,
-        environment: process.env.NODE_ENV || 'production',
-        message: "IT Guy Backend is reachable and healthy."
-    });
-});
+// Status route removed to avoid conflict with main app status
 
 router.get('/proxy-image', async (req, res) => {
     const { url } = req.query;
