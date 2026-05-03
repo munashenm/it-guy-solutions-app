@@ -47,8 +47,20 @@ try {
     const port = process.env.PORT || 3000;
 
     // 1. Logging and Status (Highest Priority)
-    app.use('/api/status', (req, res) => {
-        res.json({ status: "online", timestamp: new Date().toISOString(), message: "Heartbeat check passed." });
+    app.use('/api/status', async (req, res) => {
+        let dbStatus = "Connected";
+        try {
+            await db.get("SELECT 1");
+        } catch(e) {
+            dbStatus = "Error";
+        }
+        res.json({ 
+            status: "online", 
+            dbStatus: dbStatus,
+            dbType: process.env.DB_TYPE || 'mysql',
+            timestamp: new Date().toISOString(), 
+            message: "Heartbeat check passed." 
+        });
     });
 
     if (logger && logger.info) logger.info('Boot: Initializing Middleware...');
