@@ -136,8 +136,13 @@ class LocalStorage {
 
     onSnapshot(callback) {
         this.listeners.push(callback);
+        
+        // Only start polling if there's at least one listener and the tab is visible
         this.startPolling();
+        
+        // Initial fetch
         this.fetch();
+        
         return () => {
             this.listeners = this.listeners.filter(l => l !== callback);
             if (this.listeners.length === 0) this.stopPolling();
@@ -157,8 +162,10 @@ class LocalStorage {
             }
             
             this.emit();
+            this._retryCount = 0; // Reset on success
         } catch (e) {
             console.error(`Fetch error for ${this.name}:`, e.message);
+            this._retryCount = (this._retryCount || 0) + 1;
             
             // Only notify if status just changed to error
             if (!this._hasSyncError) {
@@ -168,14 +175,12 @@ class LocalStorage {
                 // Throttle toast to once every 30 seconds globally
                 const now = Date.now();
                 if (!window._lastSyncToast || (now - window._lastSyncToast > 30000)) {
-                    if (window.app && window.app.showToast) {
-                        window.app.showToast(`Sync issue: Connection to server unstable.`, "warning");
+                    if (window.app && typeof window.app.showToast === 'function') {
+                        window.app.showToast(`Sync issue: Connection to server unstable. Retrying...`, "warning");
                     }
                     window._lastSyncToast = now;
                 }
             }
-            
-            // Automatic retry managed by the interval, no need for manual timeout here
         }
     }
 
@@ -242,9 +247,37 @@ class LocalStorage {
     }
 
     startPolling() {
-        if (!this.pollInterval) {
-            // Increased interval to 15s to reduce server load/rate-limiting
-            this.pollInterval = setInterval(() => this.fetch(), 15000);
+        if (this.pollInterval) return;
+
+        const poll = () => {
+            // Stop polling if the window is not visible to save server resources
+            if (document.visibilityState === 'hidden') {
+                console.log(`⏸️ Pausing sync for ${this.name} (Tab Hidden)`);
+                return;
+            }
+            this.fetch();
+        };
+
+        // Standard poll every 15s, but back-off if we are getting errors
+        const getInterval = () => {
+            const base = 15000;
+            const backoff = Math.min((this._retryCount || 0) * 5000, 45000); // Max 60s
+            return base + backoff;
+        };
+
+        this.pollInterval = setInterval(poll, 15000);
+        
+        // Listen for visibility changes to resume immediately when user returns
+        if (!window._visibilityInited) {
+            window._visibilityInited = true;
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    console.log("♻️ Resuming database sync...");
+                    Object.values(window.localDb._collections).forEach(c => {
+                        if (c.listeners.length > 0) c.fetch();
+                    });
+                }
+            });
         }
     }
 

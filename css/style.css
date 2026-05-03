@@ -1621,3 +1621,91 @@ textarea.form-control {
     width: 100% !important;
 }
 
+/* --- MOBILE BOTTOM NAV --- */
+.mobile-bottom-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 70px;
+    background: rgba(26, 29, 45, 0.95);
+    backdrop-filter: blur(10px);
+    display: none;
+    justify-content: space-around;
+    align-items: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 10000;
+    padding-bottom: env(safe-area-inset-bottom);
+}
+
+.mobile-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.7rem;
+    gap: 4px;
+    transition: 0.3s;
+}
+
+.mobile-nav-item .material-symbols-outlined {
+    font-size: 24px;
+}
+
+.mobile-nav-item.active {
+    color: var(--accent);
+}
+
+.mobile-nav-item.active .material-symbols-outlined {
+    font-variation-settings: 'FILL' 1;
+}
+
+/* Mobile Specific UX Enhancements */
+@media (max-width: 992px) {
+    .mobile-bottom-nav {
+        display: flex;
+    }
+
+    .main-content {
+        padding-bottom: 90px; /* Space for bottom nav */
+    }
+
+    /* Larger tap targets for mobile */
+    .btn-primary, .btn-secondary, .form-control {
+        min-height: 48px;
+        font-size: 1rem;
+    }
+
+    .sidebar {
+        display: none; /* Hide sidebar on mobile in favor of bottom nav and backdrop menu */
+    }
+    
+    .sidebar.active {
+        display: block;
+        z-index: 9999;
+    }
+
+    /* Repair Console Mobile Optimization */
+    .pos-wrapper {
+        grid-template-columns: 1fr !important;
+        height: auto !important;
+    }
+
+    #repair-timeline {
+        max-height: 400px;
+    }
+}
+
+/* Glassmorphism for mobile cards */
+@media (max-width: 600px) {
+    .glass-card {
+        padding: 16px;
+    }
+    
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+}

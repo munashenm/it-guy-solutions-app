@@ -660,6 +660,7 @@ const app = {
 
     cacheDOM() {
         this.navItems = document.querySelectorAll('.nav-item');
+        this.mobileNavItems = document.querySelectorAll('.mobile-nav-item');
         this.viewSections = document.querySelectorAll('.view-section');
         this.modalContainer = document.getElementById('modal-container');
         console.log(`DOM Cached: ${this.navItems.length} nav items, ${this.viewSections.length} sections.`);
@@ -686,6 +687,14 @@ const app = {
                 if (window.innerWidth <= 992) {
                     toggleSidebar(true);
                 }
+            });
+        });
+
+        this.mobileNavItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                // Remove active class from all mobile nav items
+                this.mobileNavItems.forEach(n => n.classList.remove('active'));
+                item.classList.add('active');
             });
         });
 
@@ -773,12 +782,60 @@ const app = {
         const hash = window.location.hash || '#dashboard';
         const navItem = Array.from(this.navItems).find(item => item.getAttribute('href') === hash);
         
+        // Update Mobile Nav Active State
+        this.mobileNavItems.forEach(item => {
+            if (item.getAttribute('href') === hash) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+
         if (navItem) {
             const targetView = navItem.getAttribute('data-target');
             this.navigate(targetView, navItem);
-        } else if (hash === '#profile') {
-            this.navigate('profile-view', document.getElementById('nav-profile'));
+        } else {
+            // Check mobile nav items if sidebar item not found
+            const mNavItem = Array.from(this.mobileNavItems).find(item => item.getAttribute('href') === hash);
+            if (mNavItem) {
+                this.navigate(mNavItem.getAttribute('data-target'), mNavItem);
+            } else if (hash === '#profile') {
+                this.navigate('profile-view', document.getElementById('nav-profile'));
+            }
         }
+    },
+
+    showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container') || this.createToastContainer();
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        const icons = {
+            success: 'check_circle',
+            warning: 'warning',
+            error: 'error',
+            info: 'info'
+        };
+
+        toast.innerHTML = `
+            <span class="material-symbols-outlined toast-icon">${icons[type] || 'info'}</span>
+            <div class="toast-body">${message}</div>
+        `;
+
+        container.appendChild(toast);
+
+        // Auto remove
+        setTimeout(() => {
+            toast.style.animation = 'toastSlideOut 0.3s forwards';
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    },
+
+    createToastContainer() {
+        const div = document.createElement('div');
+        div.id = 'toast-container';
+        document.body.appendChild(div);
+        return div;
     },
 
     async navigate(viewId, navItem) {
