@@ -6,3 +6,5 @@ database.sqlite.bak
 .env
 .env.local
 .env.*.local
+logs/
+*.log
