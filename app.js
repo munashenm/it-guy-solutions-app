@@ -1,4 +1,4 @@
-// IT Guy Solutions - Permanent Stability Version (v4.0)
+// IT Guy Solutions - Permanent Stability Version (v4.1)
 const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
@@ -11,45 +11,24 @@ function diagLog(msg) {
     console.log(entry);
 }
 
-// 1. Recovery Shield: Catch every possible error
 process.on('uncaughtException', (err) => {
-    diagLog(`!!! CRITICAL UNCAUGHT EXCEPTION: ${err.message}`);
-    try { fs.appendFileSync(path.join(__dirname, 'emergency_error.txt'), `[${new Date().toISOString()}] ${err.stack}\n`); } catch(e) {}
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    diagLog(`!!! UNHANDLED REJECTION: ${reason}`);
+    diagLog(`!!! CRITICAL: ${err.message}`);
+    try { fs.appendFileSync(path.join(__dirname, 'emergency_error.txt'), `${err.stack}\n`); } catch(e) {}
 });
 
 const app = express();
 
-// 2. Black Box Recorder: Log every incoming request
-app.use((req, res, next) => {
-    diagLog(`${req.method} ${req.url} - IP: ${req.ip}`);
-    next();
-});
-
+// 1. Core Middleware
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
-app.use(express.static(path.join(__dirname)));
 
+// 2. PRIMARY API ROUTES (Must be above static files)
 let appDb = null;
-app.get('/api/status', (req, res) => {
-    res.json({ 
-        status: "online", 
-        dbStatus: (appDb && appDb.pool) ? "Connected" : "Initializing",
-        version: "4.0-Permanent",
-        timestamp: new Date().toISOString() 
-    });
-});
-
-// 3. Robust Route Loading
 try {
     appDb = require('./database');
     
-    // Safety Delay for Passenger
+    // Defer DB Init to satisfy Passenger
     setTimeout(() => {
-        diagLog("Connecting to Database...");
         if (appDb && appDb.init) appDb.init().catch(e => diagLog("DB Init Error: " + e.message));
     }, 5000);
 
@@ -57,20 +36,32 @@ try {
     app.use('/api/users', require('./routes/users'));
     app.use('/api/collections', require('./routes/collections'));
     app.use('/api', require('./routes/system'));
-
+    diagLog("API Routes Registered Successfully.");
 } catch (err) {
-    diagLog("FATAL STARTUP ERROR: " + err.message);
+    diagLog("FATAL ROUTE ERROR: " + err.message);
 }
 
-// 4. Force JSON Error Responses (Stop HTML leaks)
+app.get('/api/status', (req, res) => {
+    res.json({ 
+        status: "online", 
+        dbStatus: (appDb && appDb.pool) ? "Connected" : "Initializing",
+        version: "4.1-Final",
+        timestamp: new Date().toISOString() 
+    });
+});
+
+// 3. STATIC FILES (Below API)
+app.use(express.static(path.join(__dirname)));
+
+// 4. Global Error Handler
 app.use((err, req, res, next) => {
-    diagLog(`Error on ${req.url}: ${err.message}`);
-    res.status(500).json({ error: 'Server Internal Error', message: err.message });
+    diagLog(`Error: ${err.message}`);
+    res.status(500).json({ error: 'Server Error', details: err.message });
 });
 
 const port = process.env.PORT || 0; 
 const server = app.listen(port, () => {
-    diagLog(`SYSTEM ONLINE - Listening on port ${server.address().port}`);
+    diagLog(`SYSTEM ONLINE on port ${server.address().port}`);
 });
 
 module.exports = app;
