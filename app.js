@@ -1,4 +1,4 @@
-// IT Guy Solutions - Extreme Compatibility Version (v2.7)
+// IT Guy Solutions - Extreme Compatibility Version (v2.8)
 const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
@@ -13,7 +13,6 @@ process.on('uncaughtException', (err) => {
 });
 
 const app = express();
-const port = process.env.PORT || 3000;
 
 // 2. Core Middleware (Minimal)
 app.use(bodyParser.json({ limit: '10mb' }));
@@ -24,7 +23,7 @@ app.use(express.static(path.join(__dirname)));
 app.get('/api/status', (req, res) => {
     res.json({ 
         status: "online", 
-        version: "2.7-Extreme",
+        version: "2.8-Zombie-Killer",
         timestamp: new Date().toISOString() 
     });
 });
@@ -41,9 +40,6 @@ try {
     app.use('/api/users', userRoutes);
     app.use('/api/collections', collectionRoutes);
     app.use('/api', systemRoutes);
-    
-    // Database Init Warning
-    if (!db || !db.pool) console.warn("[DB] Pool not initialized yet.");
 } catch (err) {
     console.error("Route Loading Error:", err);
 }
@@ -54,14 +50,13 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal Server Error', details: err.message });
 });
 
-// 6. Passenger vs Local Listener
-if (process.env.PASSENGER_APP_ENV || process.env.PASSENGER_ENV || !process.env.PORT) {
-    app.listen(); 
-    console.log("Running in Passenger Mode (v2.7)");
-} else {
-    app.listen(port, () => {
-        console.log(`Running in Local Mode on port ${port} (v2.7)`);
-    });
-}
+// 6. The "Zombie Process" Bypass
+// By using port 0, Node will find any available port.
+// Passenger will STILL intercept this call and route traffic perfectly.
+// This permanently prevents the "EADDRINUSE" crash.
+const port = process.env.PORT || 0; 
+const server = app.listen(port, () => {
+    console.log(`Server v2.8 running on port ${server.address().port}`);
+});
 
 module.exports = app;
