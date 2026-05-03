@@ -1,0 +1,28 @@
+[2026-05-03T00:26:46.858Z] UNCAUGHT EXCEPTION: Cannot find module 'helmet'
+Require stack:
+- C:\Users\Nimrod\Documents\Gravity Projects\it-guy-solutions-app\app.js
+Error: Cannot find module 'helmet'
+Require stack:
+- C:\Users\Nimrod\Documents\Gravity Projects\it-guy-solutions-app\app.js
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+    at Module._load (node:internal/modules/cjs/loader:1242:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.require (node:internal/modules/cjs/loader:1556:12)
+    at require (node:internal/modules/helpers:152:16)
+    at Object.<anonymous> (C:\Users\Nimrod\Documents\Gravity Projects\it-guy-solutions-app\app.js:16:16)
+    at Module._compile (node:internal/modules/cjs/loader:1812:14)
+    at Object..js (node:internal/modules/cjs/loader:1943:10)
+[2026-05-03T00:33:40.055Z] UNCAUGHT EXCEPTION: listen EADDRINUSE: address already in use :::3000
+Error: listen EADDRINUSE: address already in use :::3000
+    at Server.setupListenHandle [as _listen2] (node:net:1948:16)
+    at listenInCluster (node:net:2005:12)
+    at Server.listen (node:net:2110:7)
+    at app.listen (C:\Users\Nimrod\Documents\Gravity Projects\it-guy-solutions-app\node_modules\express\lib\application.js:635:24)
+    at Object.<anonymous> (C:\Users\Nimrod\Documents\Gravity Projects\it-guy-solutions-app\app.js:113:5)
+    at Module._compile (node:internal/modules/cjs/loader:1812:14)
+    at Object..js (node:internal/modules/cjs/loader:1943:10)
+    at Module.load (node:internal/modules/cjs/loader:1533:32)
+    at Module._load (node:internal/modules/cjs/loader:1335:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
