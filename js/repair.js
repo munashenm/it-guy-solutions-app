@@ -105,16 +105,39 @@ window.repair = {
                     </h2>
                     <div style="color: #a0a0a0; font-size: 0.9rem; margin-top: 4px;">${job.customer} | ${job.device}</div>
                 </div>
-                <div style="display: flex; gap: 12px; align-items: center;">
+                </div>
+                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
+                    <!-- Quick Status Buttons (Technician Friendly) -->
+                    <div class="quick-status-bar" style="display: flex; gap: 8px;">
+                        <button class="btn-icon-label ${job.status === 'In Diagnosis' ? 'active' : ''}" onclick="repair.changeStatus('In Diagnosis')" title="Diagnosis">
+                            <span class="material-symbols-outlined">search</span>
+                            <span>Diag</span>
+                        </button>
+                        <button class="btn-icon-label ${job.status === 'Waiting on Parts' ? 'active' : ''}" onclick="repair.changeStatus('Waiting on Parts')" title="Parts">
+                            <span class="material-symbols-outlined">shopping_cart</span>
+                            <span>Parts</span>
+                        </button>
+                        <button class="btn-icon-label ${job.status === 'In Repair' ? 'active' : ''}" onclick="repair.changeStatus('In Repair')" title="Repairing">
+                            <span class="material-symbols-outlined">build</span>
+                            <span>Fixing</span>
+                        </button>
+                        <button class="btn-icon-label ${job.status === 'Ready For Collection' ? 'active' : ''}" onclick="repair.changeStatus('Ready For Collection')" title="Ready">
+                            <span class="material-symbols-outlined">check_circle</span>
+                            <span>Ready</span>
+                        </button>
+                    </div>
+
+                    <div class="divider-v" style="width: 1px; height: 24px; background: rgba(255,255,255,0.1); margin: 0 8px;"></div>
+
                     ${(window.authSystem?.currentUser?.role === 'admin' || window.authSystem?.currentUser?.role === 'frontdesk') ? `
-                     <select id="repair-tech-dd" class="form-control" style="width: 150px; appearance: auto;" onchange="repair.changeTechnician()">
+                     <select id="repair-tech-dd" class="form-control" style="width: 130px; appearance: auto;" onchange="repair.changeTechnician()">
                          <option value="">Unassigned</option>
                          <option value="Admin User" ${job.technician==='Admin User'?'selected':''}>Admin</option>
                          <option value="Tech John" ${job.technician==='Tech John'?'selected':''}>John</option>
                          <option value="Tech Sarah" ${job.technician==='Tech Sarah'?'selected':''}>Sarah</option>
                      </select>
                      ` : ''}
-                     <select id="repair-status-dd" class="form-control" style="width: 200px; appearance: auto;" onchange="repair.changeStatus()">
+                     <select id="repair-status-dd" class="form-control hidden-mobile" style="width: 160px; appearance: auto;" onchange="repair.changeStatus()">
                          <option value="Booked" ${job.status==='Booked'?'selected':''}>Booked</option>
                          <option value="In Diagnosis" ${job.status==='In Diagnosis'?'selected':''}>In Diagnosis</option>
                          <option value="Waiting on Parts" ${job.status==='Waiting on Parts'?'selected':''}>Waiting on Parts</option>
@@ -240,9 +263,9 @@ window.repair = {
         }
     },
 
-    async changeStatus() {
+    async changeStatus(manualStatus = null) {
         const dd = document.getElementById('repair-status-dd');
-        const newStatus = dd.value;
+        const newStatus = manualStatus || (dd ? dd.value : null);
         if(!newStatus || !this.activeJobId) return;
 
         const job = window.app.state.jobs.find(j => j.id === this.activeJobId);

@@ -1709,3 +1709,59 @@ textarea.form-control {
         gap: 16px;
     }
 }
+
+/* Technician Quick Action Buttons */
+.quick-status-bar {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 4px;
+    border-radius: 30px;
+    border: 1px solid var(--border);
+    display: flex;
+}
+
+.btn-icon-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    padding: 6px 12px;
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    gap: 2px;
+}
+
+.btn-icon-label span:not(.material-symbols-outlined) {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.btn-icon-label .material-symbols-outlined {
+    font-size: 20px;
+}
+
+.btn-icon-label:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+}
+
+.btn-icon-label.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(108, 92, 231, 0.4);
+}
+
+@media (max-width: 600px) {
+    .quick-status-bar {
+        width: 100%;
+        justify-content: space-around;
+        order: 1; /* Move to top on mobile wrap */
+    }
+    
+    .hidden-mobile {
+        display: none !important;
+    }
+}
