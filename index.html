@@ -189,7 +189,13 @@
                     </button>
                     <div id="global-search-results" class="search-results-dropdown hidden"></div>
                 </div>
+
+                <div id="sync-indicator" class="sync-status" title="Connection Stable">
+                    <span class="material-symbols-outlined">sync</span>
+                    <span class="sync-text">Sync Active</span>
+                </div>
                 <div class="topbar-actions">
+                    <button class="btn-icon" onclick="app.refreshAllData()" title="Force Refresh All Data"><span class="material-symbols-outlined" id="global-refresh-icon">refresh</span></button>
                     <button class="btn-icon"><span class="material-symbols-outlined">notifications</span></button>
                     <button class="btn-icon" id="btn-topbar-settings"><span class="material-symbols-outlined">settings</span></button>
                     

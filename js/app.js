@@ -653,9 +653,32 @@ const app = {
             return data.newId;
         } catch (e) {
             console.error("Sequence Generation Error:", e);
-            // Fallback to random ID if server fails to prevent blocking the user
-            return prefix + "-" + Math.floor(1000 + Math.random() * 9000);
+            // High-entropy fallback: Use timestamp + random suffix to prevent collisions
+            const timestamp = Date.now().toString().slice(-4);
+            const random = Math.floor(100 + Math.random() * 899).toString();
+            const fallbackId = `${prefix}-${timestamp}${random}`;
+            console.warn(`Fallback ID generated: ${fallbackId}`);
+            return fallbackId;
         }
+    },
+
+    refreshAllData() {
+        const icon = document.getElementById('global-refresh-icon');
+        if (icon) icon.classList.add('rotating');
+        
+        console.log("♻️ Triggering Global Data Refresh...");
+        
+        if (window.localDb && window.localDb._collections) {
+            Object.values(window.localDb._collections).forEach(coll => {
+                if (coll.listeners.length > 0) coll.fetch();
+            });
+            this.showToast("Syncing all data with server...", "info");
+        }
+
+        setTimeout(() => {
+            if (icon) icon.classList.remove('rotating');
+            this.refreshActiveViews();
+        }, 1000);
     },
 
     cacheDOM() {

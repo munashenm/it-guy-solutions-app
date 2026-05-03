@@ -1709,6 +1709,46 @@ textarea.form-control {
         gap: 16px;
     }
 }
+/* Global Sync Status & Refresh */
+.sync-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(46, 204, 113, 0.1);
+    border: 1px solid rgba(46, 204, 113, 0.2);
+    border-radius: 20px;
+    color: #2ecc71;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 16px;
+    transition: all 0.3s ease;
+}
+
+.sync-status.offline {
+    background: rgba(231, 76, 60, 0.1);
+    border-color: rgba(231, 76, 60, 0.2);
+    color: #e74c3c;
+}
+
+.sync-status .material-symbols-outlined {
+    font-size: 16px;
+}
+
+.rotating {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@media (max-width: 992px) {
+    .sync-status {
+        display: none; /* Hide on mobile to save space */
+    }
+}
 
 /* Technician Quick Action Buttons */
 .quick-status-bar {
