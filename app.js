@@ -1,145 +1,67 @@
-// 1. ABSOLUTE TOP: Core dependencies & Emergency Logging
-const fs = require('fs');
+// IT Guy Solutions - Extreme Compatibility Version (v2.7)
+const express = require('express');
 const path = require('path');
+const bodyParser = require('body-parser');
+const fs = require('fs');
 
+// 1. Emergency Error Logging
 process.on('uncaughtException', (err) => {
-    try {
-        const msg = `[${new Date().toISOString()}] UNCAUGHT EXCEPTION: ${err.message}\n${err.stack}\n`;
-        fs.appendFileSync(path.join(__dirname, 'emergency_error.txt'), msg);
-    } catch (e) {}
+    const msg = `[${new Date().toISOString()}] CRITICAL: ${err.message}\n${err.stack}\n`;
+    try { fs.appendFileSync(path.join(__dirname, 'emergency_error.txt'), msg); } catch(e) {}
+    console.error(msg);
     process.exit(1);
 });
 
-// 2. Safe Environment Initialization
-try {
-    require('dotenv').config();
-} catch (e) {
-    console.warn("Resilience: .env loading skipped");
-}
+const app = express();
+const port = process.env.PORT || 3000;
 
-try {
-    const express = require('express');
-    const bodyParser = require('body-parser');
+// 2. Core Middleware (Minimal)
+app.use(bodyParser.json({ limit: '10mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.static(path.join(__dirname)));
 
-    // Resilience Layer: Load optional security modules safely
-    let helmet, cors, rateLimit;
-    try { helmet = require('helmet'); } catch(e) { console.warn("Resilience: helmet missing"); }
-    try { cors = require('cors'); } catch(e) { console.warn("Resilience: cors missing"); }
-    try { rateLimit = require('express-rate-limit'); } catch(e) { console.warn("Resilience: rateLimit missing"); }
-
-    const db = require('./database');
-    const logger = require('./utils/logger');
-    const errorHandler = require('./middleware/errorHandler');
-
-    // Global Unhandled Rejection Handler
-    process.on('unhandledRejection', (reason, promise) => {
-        if (logger && logger.error) logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
-        else console.error('Unhandled Rejection:', reason);
+// 3. Status Heartbeat
+app.get('/api/status', (req, res) => {
+    res.json({ 
+        status: "online", 
+        version: "2.7-Extreme",
+        timestamp: new Date().toISOString() 
     });
+});
 
-    // Route Imports
+// 4. Load Routes Safely
+try {
+    const db = require('./database');
     const authRoutes = require('./routes/auth');
     const userRoutes = require('./routes/users');
     const collectionRoutes = require('./routes/collections');
     const systemRoutes = require('./routes/system');
 
-    const app = express();
-    const port = process.env.PORT || 3000;
-
-    // 1. Logging and Status (Highest Priority)
-    app.use('/api/status', (req, res) => {
-        // Return simple online status. The Dashboard will do its own deep check.
-        res.json({ 
-            status: "online", 
-            dbStatus: (db && db.pool) ? "Connected" : "Initializing",
-            dbType: process.env.DB_TYPE || 'mysql',
-            timestamp: new Date().toISOString(), 
-            message: "Heartbeat check passed." 
-        });
-    });
-
-    if (logger && logger.info) logger.info('Boot: Initializing Middleware...');
-
-    // Security Middleware
-    if (helmet) {
-        app.use(helmet({ contentSecurityPolicy: false }));
-    }
-    if (cors) {
-        app.use(cors()); 
-    }
-    app.set('trust proxy', 1);
-
-    // Rate Limiting
-    if (rateLimit) {
-        const limiter = rateLimit({
-            windowMs: 15 * 60 * 1000,
-            max: 1000, 
-            message: { error: "Too many requests from this IP" }
-        });
-        app.use('/api', limiter);
-    }
-
-    // Optimized memory for shared hosting
-    app.use(bodyParser.json({ limit: '10mb' })); 
-
-    // 2. Database Initialization (Resilient Pattern)
-    if (logger && logger.info) logger.info('Boot: Connecting to Database...');
-    
-    // We don't await this so the server can start even if DB is slow
-    db.init().then(() => {
-        if (logger && logger.info) logger.info('Boot: Database Connection Established');
-    }).catch(err => {
-        if (logger && logger.error) logger.error('Boot: Critical Database Error', { error: err.message });
-        // Don't exit, allow /api/status to still report the error
-    });
-
-    // 3. API Routes
-    if (logger && logger.info) logger.info('Boot: Registering Routes...');
-    app.use('/api', authRoutes);
+    app.use('/api/auth', authRoutes);
     app.use('/api/users', userRoutes);
     app.use('/api/collections', collectionRoutes);
     app.use('/api', systemRoutes);
-
-    app.use(express.static(path.resolve(__dirname, '.')));
-
-    app.all('/api/*', (req, res) => {
-        res.status(404).json({ error: "Not Found" });
-    });
-
-    app.get('*', (req, res) => {
-        res.sendFile(path.resolve(__dirname, 'index.html'));
-    });
-
-    app.use(errorHandler);
-
-    // Passenger / Production Safe Listener
-    const VERSION = "2.6-Harden"; 
     
-    if (process.env.PASSENGER_APP_ENV || process.env.PASSENGER_ENV) {
-        console.log(`[BOOT] IT Guy Solutions ${VERSION} starting under Phusion Passenger...`);
-        // Under Passenger, we MUST NOT specify a port. Passenger handles the socket.
-        app.listen(); 
-        if (logger && logger.info) logger.info(`Server v${VERSION} running under Phusion Passenger`);
-    } else {
-        const server = app.listen(port, () => {
-            console.log(`[BOOT] IT Guy Solutions ${VERSION} running on port ${port} (Local Mode)`);
-        }).on('error', (err) => {
-            if (err.code === 'EADDRINUSE') {
-                console.warn(`[PORT_BUSY] Port ${port} is already in use. Local development may require a different port.`);
-            } else {
-                throw err;
-            }
-        });
-    }
-
-    // Export for Passenger if needed
-    module.exports = app;
-
+    // Database Init Warning
+    if (!db || !db.pool) console.warn("[DB] Pool not initialized yet.");
 } catch (err) {
-    const msg = `[${new Date().toISOString()}] CRITICAL STARTUP ERROR (v2.6): ${err.message}\n${err.stack}\n`;
-    try {
-        fs.appendFileSync(path.join(__dirname, 'emergency_error.txt'), msg);
-    } catch(e) {}
-    console.error(msg);
-    process.exit(1);
+    console.error("Route Loading Error:", err);
 }
+
+// 5. Global Error Handler
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ error: 'Internal Server Error', details: err.message });
+});
+
+// 6. Passenger vs Local Listener
+if (process.env.PASSENGER_APP_ENV || process.env.PASSENGER_ENV || !process.env.PORT) {
+    app.listen(); 
+    console.log("Running in Passenger Mode (v2.7)");
+} else {
+    app.listen(port, () => {
+        console.log(`Running in Local Mode on port ${port} (v2.7)`);
+    });
+}
+
+module.exports = app;
