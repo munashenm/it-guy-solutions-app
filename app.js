@@ -46,6 +46,13 @@ try {
     const app = express();
     const port = process.env.PORT || 3000;
 
+    // 1. Logging and Status (Highest Priority)
+    app.use('/api/status', (req, res) => {
+        res.json({ status: "online", timestamp: new Date().toISOString(), message: "Heartbeat check passed." });
+    });
+
+    if (logger && logger.info) logger.info('Boot: Initializing Middleware...');
+
     // Security Middleware
     if (helmet) {
         app.use(helmet({ contentSecurityPolicy: false }));
@@ -59,37 +66,24 @@ try {
     if (rateLimit) {
         const limiter = rateLimit({
             windowMs: 15 * 60 * 1000,
-            max: 1000, // Increased for sync intensity
-            message: { error: "Too many requests from this IP, please try again after 15 minutes" }
+            max: 1000, 
+            message: { error: "Too many requests from this IP" }
         });
         app.use('/api', limiter);
     }
 
     app.use(bodyParser.json({ limit: '50mb' }));
 
-    // Prevent API caching globally
-    app.use('/api', (req, res, next) => {
-        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-        res.setHeader('Pragma', 'no-cache');
-        res.setHeader('Expires', '0');
-        next();
-    });
-
     // Database Initialization
+    if (logger && logger.info) logger.info('Boot: Connecting to Database...');
     db.init().then(async () => {
-        if (logger && logger.info) logger.info('Database System Ready');
-        
-        if (process.env.DB_TYPE !== 'mysql') {
-            try {
-                const { startBackupService } = require('./services/backupService');
-                startBackupService();
-            } catch(e) {}
-        }
+        if (logger && logger.info) logger.info('Boot: Database Connection Established');
     }).catch(err => {
-        if (logger && logger.error) logger.error('Critical Database Error', { error: err.message });
+        if (logger && logger.error) logger.error('Boot: Critical Database Error', { error: err.message });
     });
 
     // API Routes
+    if (logger && logger.info) logger.info('Boot: Registering Routes...');
     app.use('/api', authRoutes);
     app.use('/api/users', userRoutes);
     app.use('/api/collections', collectionRoutes);
