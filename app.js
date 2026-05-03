@@ -1,16 +1,33 @@
-// IT Guy Solutions - Hardened Version (v3.2)
+// IT Guy Solutions - Permanent Stability Version (v4.0)
 const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 
+const logFile = path.join(__dirname, 'startup_log.txt');
+function diagLog(msg) {
+    const entry = `[${new Date().toISOString()}] ${msg}\n`;
+    try { fs.appendFileSync(logFile, entry); } catch(e) {}
+    console.log(entry);
+}
+
+// 1. Recovery Shield: Catch every possible error
 process.on('uncaughtException', (err) => {
-    const msg = `[${new Date().toISOString()}] CRITICAL: ${err.message}\n${err.stack}\n`;
-    try { fs.appendFileSync(path.join(__dirname, 'emergency_error.txt'), msg); } catch(e) {}
-    process.exit(1);
+    diagLog(`!!! CRITICAL UNCAUGHT EXCEPTION: ${err.message}`);
+    try { fs.appendFileSync(path.join(__dirname, 'emergency_error.txt'), `[${new Date().toISOString()}] ${err.stack}\n`); } catch(e) {}
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    diagLog(`!!! UNHANDLED REJECTION: ${reason}`);
 });
 
 const app = express();
+
+// 2. Black Box Recorder: Log every incoming request
+app.use((req, res, next) => {
+    diagLog(`${req.method} ${req.url} - IP: ${req.ip}`);
+    next();
+});
 
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
@@ -21,19 +38,19 @@ app.get('/api/status', (req, res) => {
     res.json({ 
         status: "online", 
         dbStatus: (appDb && appDb.pool) ? "Connected" : "Initializing",
-        version: "3.2-Hardened",
+        version: "4.0-Permanent",
         timestamp: new Date().toISOString() 
     });
 });
 
+// 3. Robust Route Loading
 try {
     appDb = require('./database');
     
-    // CRITICAL: 5-second delay is MANDATORY for Passenger stability on this server
+    // Safety Delay for Passenger
     setTimeout(() => {
-        if (appDb && appDb.init) {
-            appDb.init().catch(e => console.error("Database Init Failed:", e));
-        }
+        diagLog("Connecting to Database...");
+        if (appDb && appDb.init) appDb.init().catch(e => diagLog("DB Init Error: " + e.message));
     }, 5000);
 
     app.use('/api/auth', require('./routes/auth'));
@@ -42,16 +59,18 @@ try {
     app.use('/api', require('./routes/system'));
 
 } catch (err) {
-    console.error("Startup Error:", err);
+    diagLog("FATAL STARTUP ERROR: " + err.message);
 }
 
-// Ensure error responses are ALWAYS JSON
+// 4. Force JSON Error Responses (Stop HTML leaks)
 app.use((err, req, res, next) => {
-    console.error(err.stack);
-    res.status(500).json({ error: 'Server Error', message: err.message });
+    diagLog(`Error on ${req.url}: ${err.message}`);
+    res.status(500).json({ error: 'Server Internal Error', message: err.message });
 });
 
 const port = process.env.PORT || 0; 
-app.listen(port);
+const server = app.listen(port, () => {
+    diagLog(`SYSTEM ONLINE - Listening on port ${server.address().port}`);
+});
 
 module.exports = app;
