@@ -280,7 +280,12 @@
         }
 
         // --- Core Portal Sync ---
+        let isSyncing = false;
         async function syncDataAndRender() {
+            if (isSyncing) return;
+            if (!window.fbAuth.currentUser) return;
+            
+            isSyncing = true;
             try {
                 console.log("Portal: Syncing data collections...");
                 const companyDoc = await window.fbDb.collection('settings').doc('companyProfile').get();
@@ -307,33 +312,32 @@
                 console.log("Portal: Collections synced. Triggering render.");
                 if(window.client && window.authSystem && window.authSystem.currentUser) {
                     window.client.render();
-                } else {
-                    console.warn("Client or Auth not ready during sync cycle.");
                 }
             } catch(e) {
                 console.error("Data sync failed", e);
-                if(e.message.toLowerCase().includes('authorized') || e.message.toLowerCase().includes('session')) {
+                // Only logout if it's a definitive auth error to prevent refresh loops
+                if(e.message.toLowerCase().includes('401') || e.message.toLowerCase().includes('unauthorized') || e.message.toLowerCase().includes('invalid token')) {
                     if(window.authSystem) window.authSystem.logout();
-                } else {
-                    if(window.client && window.authSystem && window.authSystem.currentUser) window.client.render();
                 }
+            } finally {
+                isSyncing = false;
             }
         }
 
         // Initialize Portal
         document.addEventListener('DOMContentLoaded', () => {
-            window.addEventListener('firebase-ready', () => {
-                syncDataAndRender();
-            });
-
+            // Wait for auth to settle before first sync
             window.fbAuth.onAuthStateChanged((user) => {
+                const loginScreen = document.getElementById('login-screen');
+                const portalContent = document.getElementById('portal-content');
+
                 if (user && (user.role === 'client' || user.role === 'admin')) {
-                    document.getElementById('login-screen').classList.add('hidden');
-                    document.getElementById('portal-content').classList.remove('hidden');
+                    if (loginScreen) loginScreen.classList.add('hidden');
+                    if (portalContent) portalContent.classList.remove('hidden');
                     syncDataAndRender();
                 } else {
-                    document.getElementById('login-screen').classList.remove('hidden');
-                    document.getElementById('portal-content').classList.add('hidden');
+                    if (loginScreen) loginScreen.classList.remove('hidden');
+                    if (portalContent) portalContent.classList.add('hidden');
                 }
             });
         });
