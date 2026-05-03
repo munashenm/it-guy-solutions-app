@@ -112,15 +112,25 @@ try {
     app.use(errorHandler);
 
     // Passenger / Production Safe Listener
-    const server = app.listen(port, () => {
-        console.log(`Server running on port ${port} in ${process.env.NODE_ENV || 'production'} mode`);
-    }).on('error', (err) => {
-        if (err.code === 'EADDRINUSE') {
-            console.warn(`[PORT_BUSY] Port ${port} is already in use. Passenger may be managing this process.`);
-        } else {
-            throw err;
-        }
-    });
+    if (process.env.PASSENGER_APP_ENV) {
+        // Under Passenger, we don't always need to call listen(), 
+        // but if we do, it handles the port for us.
+        app.listen();
+        if (logger && logger.info) logger.info('Server running under Phusion Passenger');
+    } else {
+        const server = app.listen(port, () => {
+            console.log(`Server running on port ${port} in ${process.env.NODE_ENV || 'production'} mode`);
+        }).on('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+                console.warn(`[PORT_BUSY] Port ${port} is already in use. Local development may require a different port.`);
+            } else {
+                throw err;
+            }
+        });
+    }
+
+    // Export for Passenger if needed
+    module.exports = app;
 
 } catch (err) {
     const msg = `[${new Date().toISOString()}] CRITICAL STARTUP ERROR: ${err.message}\n${err.stack}\n`;
