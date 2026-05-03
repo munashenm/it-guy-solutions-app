@@ -20,21 +20,29 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname)));
 
 // 3. Status Heartbeat
+let appDb = null;
+
 app.get('/api/status', (req, res) => {
     res.json({ 
         status: "online", 
-        version: "2.8-Zombie-Killer",
+        dbStatus: (appDb && appDb.pool) ? "Connected" : "Initializing",
+        dbType: process.env.DB_TYPE || 'mysql',
+        version: "2.9-Stable",
         timestamp: new Date().toISOString() 
     });
 });
 
 // 4. Load Routes Safely
 try {
-    const db = require('./database');
+    appDb = require('./database');
     const authRoutes = require('./routes/auth');
     const userRoutes = require('./routes/users');
     const collectionRoutes = require('./routes/collections');
     const systemRoutes = require('./routes/system');
+
+    // Optional Security (Fail-safe)
+    try { const cors = require('cors'); app.use(cors()); } catch(e) {}
+    try { const helmet = require('helmet'); app.use(helmet()); } catch(e) {}
 
     app.use('/api/auth', authRoutes);
     app.use('/api/users', userRoutes);
