@@ -42,7 +42,7 @@ router.post('/login', async (req, res, next) => {
                 if (needsMigration) {
                     const hashedPassword = await bcrypt.hash(password, 12);
                     await db.run("UPDATE users SET sessionToken = ?, password = ? WHERE uid = ?", [token, hashedPassword, row.uid]);
-                    console.log(`Auth: Migrated user ${email} to Bcrypt.`);
+                    logger.info(`Auth: Migrated user ${email} to Bcrypt.`);
                 } else {
                     await db.run("UPDATE users SET sessionToken = ? WHERE uid = ?", [token, row.uid]);
                 }
@@ -50,28 +50,28 @@ router.post('/login', async (req, res, next) => {
                 const { password: _p, ...user } = row;
                 res.json({ user, token });
             } else {
-                console.warn(`Auth: Invalid password for ${email}`);
+                logger.warn(`Auth: Invalid password for ${email}`);
                 res.status(401).json({ error: "Invalid credentials" });
             }
         } else {
-            console.warn(`Auth: No user found for ${email}`);
+            logger.warn(`Auth: No user found for ${email}`);
             res.status(401).json({ error: "Invalid credentials" });
         }
     } catch(err) {
-        console.error(`Auth: Login error for ${email}`, err);
+        logger.error(`Auth: Login error for ${email}`, err);
         next(err);
     }
 });
 
 router.post('/register', async (req, res, next) => {
     const { email, password, firstName, lastName, phone } = req.body;
-    console.log(`Auth: Registration attempt for ${email}`);
+    logger.info(`Auth: Registration attempt for ${email}`);
     if(!email || !password) return res.status(400).json({ error: "Email and Password are required" });
     
     try {
         const existing = await db.get("SELECT * FROM users WHERE email = ?", [email]);
         if(existing) {
-            console.warn(`Auth: Registration failed - ${email} already exists.`);
+            logger.warn(`Auth: Registration failed - ${email} already exists.`);
             return res.status(400).json({ error: "An account with this email already exists." });
         }
 
@@ -79,7 +79,7 @@ router.post('/register', async (req, res, next) => {
         const hashedPassword = await bcrypt.hash(password, 12);
         const role = 'client'; 
         
-        console.log(`Auth: Creating user ${uid} / ${email}`);
+        logger.info(`Auth: Creating user ${uid} / ${email}`);
         await db.run("INSERT INTO users (uid, email, firstName, lastName, phone, role, password) VALUES (?, ?, ?, ?, ?, ?, ?)", 
             [uid, email, firstName||'', lastName||'', phone||'', role, hashedPassword]);
         
@@ -94,7 +94,7 @@ router.post('/register', async (req, res, next) => {
             await db.run(`INSERT OR REPLACE INTO collections (id, name, data, updatedAt) VALUES (?, 'users', ?, CURRENT_TIMESTAMP)`, [uid, jsonData]);
         }
 
-        console.log(`Auth: Registration successful for ${email}`);
+        logger.info(`Auth: Registration successful for ${email}`);
 
         // NEW: Generate token immediately so we don't need a separate login call
         const token = jwt.sign(
@@ -105,7 +105,7 @@ router.post('/register', async (req, res, next) => {
 
         res.json({ success: true, user: userData, token: token });
     } catch(err) {
-        console.error(`Auth: Registration error for ${email}`, err);
+        logger.error(`Registration error for ${email}: ${err.message}`);
         next(err);
     }
 });

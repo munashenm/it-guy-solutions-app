@@ -83,7 +83,13 @@ async function safeFetch(url, options = {}, retries = 3) {
         if (res.status === 204) return {};
 
         if (contentType && contentType.includes('application/json')) {
-            return await res.json();
+            try {
+                return await res.json();
+            } catch(parseErr) {
+                const raw = await res.text();
+                console.error("JSON Parse Error. Raw response:", raw);
+                throw new Error(`Invalid response from server: ${raw.substring(0, 100)}...`);
+            }
         }
         return await res.text();
     } catch (e) {
