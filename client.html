@@ -252,10 +252,9 @@
 
             try {
                 await window.fbAuth.createUserWithEmailAndPassword(email, pass, fname, lname, phone);
-                // Success - now log them in
-                await window.fbAuth.signInWithEmailAndPassword(email, pass);
+                // Success - the adapter now handles token storage and redirect via onAuthStateChanged
             } catch (e) {
-                err.innerText = "❌ Registration Failed: " + e.message;
+                err.innerText = "❌ Registration Failed: " + (e.message || "Something went wrong");
                 err.classList.remove('hidden');
                 btn.disabled = false;
                 btn.innerText = "Register Account";

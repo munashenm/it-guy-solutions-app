@@ -513,7 +513,12 @@ window.localAuth = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email, password, firstName, lastName, phone })
         });
-        if (data && data.user) return data.user;
+        if (data && data.user && data.token) {
+            sessionStorage.setItem('it-guy-token', data.token);
+            sessionStorage.setItem('it-guy-user', JSON.stringify(data.user));
+            triggerAuthChange(data.user);
+            return data.user;
+        }
         throw new Error(data?.error || "Registration failed");
     },
     sendPasswordResetEmail: async (email) => {

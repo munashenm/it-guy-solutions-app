@@ -10,18 +10,26 @@ const JWT_SECRET = process.env.JWT_SECRET || 'it-guy-secret-key-2024';
 
 router.post('/login', async (req, res, next) => {
     const { email, password } = req.body;
+    console.log(`Auth: Login attempt for ${email}`);
     try {
         const row = await db.get("SELECT * FROM users WHERE email = ? OR username = ?", [email, email]);
         
         if (row) {
+            console.log(`Auth: User found ${row.email}, role: ${row.role}`);
             let isValid = false;
             let needsMigration = false;
 
-            if (row.password && row.password.startsWith('$2a$')) {
+            // Debug: Check password format
+            const isHashed = row.password && (row.password.startsWith('$2a$') || row.password.startsWith('$2b$'));
+            console.log(`Auth: Password is hashed: ${isHashed}`);
+
+            if (isHashed) {
                 isValid = await bcrypt.compare(password, row.password);
+                console.log(`Auth: Bcrypt comparison result: ${isValid}`);
             } else {
                 isValid = (row.password === password);
                 if (isValid) needsMigration = true;
+                console.log(`Auth: Plaintext comparison result: ${isValid}`);
             }
 
             if (isValid) {
@@ -34,7 +42,7 @@ router.post('/login', async (req, res, next) => {
                 if (needsMigration) {
                     const hashedPassword = await bcrypt.hash(password, 12);
                     await db.run("UPDATE users SET sessionToken = ?, password = ? WHERE uid = ?", [token, hashedPassword, row.uid]);
-                    logger.info(`Migrated user ${email} to Bcrypt hashing.`);
+                    console.log(`Auth: Migrated user ${email} to Bcrypt.`);
                 } else {
                     await db.run("UPDATE users SET sessionToken = ? WHERE uid = ?", [token, row.uid]);
                 }
@@ -42,27 +50,36 @@ router.post('/login', async (req, res, next) => {
                 const { password: _p, ...user } = row;
                 res.json({ user, token });
             } else {
+                console.warn(`Auth: Invalid password for ${email}`);
                 res.status(401).json({ error: "Invalid credentials" });
             }
         } else {
+            console.warn(`Auth: No user found for ${email}`);
             res.status(401).json({ error: "Invalid credentials" });
         }
     } catch(err) {
+        console.error(`Auth: Login error for ${email}`, err);
         next(err);
     }
 });
 
 router.post('/register', async (req, res, next) => {
     const { email, password, firstName, lastName, phone } = req.body;
+    console.log(`Auth: Registration attempt for ${email}`);
     if(!email || !password) return res.status(400).json({ error: "Email and Password are required" });
     
     try {
         const existing = await db.get("SELECT * FROM users WHERE email = ?", [email]);
-        if(existing) return res.status(400).json({ error: "An account with this email already exists." });
+        if(existing) {
+            console.warn(`Auth: Registration failed - ${email} already exists.`);
+            return res.status(400).json({ error: "An account with this email already exists." });
+        }
 
         const uid = 'user-' + Math.random().toString(36).substring(2, 12);
         const hashedPassword = await bcrypt.hash(password, 12);
         const role = 'client'; 
+        
+        console.log(`Auth: Creating user ${uid} / ${email}`);
         await db.run("INSERT INTO users (uid, email, firstName, lastName, phone, role, password) VALUES (?, ?, ?, ?, ?, ?, ?)", 
             [uid, email, firstName||'', lastName||'', phone||'', role, hashedPassword]);
         
@@ -77,8 +94,18 @@ router.post('/register', async (req, res, next) => {
             await db.run(`INSERT OR REPLACE INTO collections (id, name, data, updatedAt) VALUES (?, 'users', ?, CURRENT_TIMESTAMP)`, [uid, jsonData]);
         }
 
-        res.json({ success: true, user: userData });
+        console.log(`Auth: Registration successful for ${email}`);
+
+        // NEW: Generate token immediately so we don't need a separate login call
+        const token = jwt.sign(
+            { uid: userData.uid, email: userData.email, role: userData.role },
+            JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+
+        res.json({ success: true, user: userData, token: token });
     } catch(err) {
+        console.error(`Auth: Registration error for ${email}`, err);
         next(err);
     }
 });
