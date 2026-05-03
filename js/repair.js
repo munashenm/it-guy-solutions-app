@@ -107,6 +107,9 @@ window.repair = {
                 </div>
                 </div>
                 <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap; justify-content: flex-end;">
+                    <button class="btn-primary" style="background: var(--accent); height: 40px; padding: 0 16px;" onclick="repair.quickPhoto('${job.id}')">
+                        <span class="material-symbols-outlined">photo_camera</span> <span>Photo</span>
+                    </button>
                     <!-- Quick Status Buttons (Technician Friendly) -->
                     <div class="quick-status-bar" style="display: flex; gap: 8px;">
                         <button class="btn-icon-label ${job.status === 'In Diagnosis' ? 'active' : ''}" onclick="repair.changeStatus('In Diagnosis')" title="Diagnosis">
@@ -558,6 +561,19 @@ window.repair = {
                 </div>
             </div>
         `);
+    },
+
+    quickPhoto(jobId) {
+        window.app.showToast("Camera access requested for " + jobId, "info");
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.capture = 'environment';
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if(file) window.app.showToast("Job photo captured locally. (Upload logic integration next)", "success");
+        };
+        input.click();
     }
 };
 

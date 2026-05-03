@@ -12,7 +12,9 @@ window.posSystem = {
             if (!this.container) return;
         }
         const html = `
-            <div class="pos-wrapper" style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; height: calc(100vh - 100px);">
+            <div class="pos-wrapper" style="display: flex; flex-direction: column; gap: 24px; height: auto; min-height: calc(100vh - 100px);">
+                
+                <div class="pos-layout-grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; flex: 1;">
                 
                 <!-- Left: Catalog -->
                 <div class="glass-card" style="display: flex; flex-direction: column; overflow: hidden; padding: 0;">

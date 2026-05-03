@@ -1805,3 +1805,14 @@ textarea.form-control {
         display: none !important;
     }
 }
+
+/* Sync Animations */
+#db-status-dot.syncing {
+    animation: pulse-green 1s infinite;
+}
+
+@keyframes pulse-green {
+    0% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0.4); }
+    70% { box-shadow: 0 0 0 10px rgba(46, 204, 113, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
+}
