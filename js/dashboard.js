@@ -14,7 +14,7 @@ window.dashboard = {
         const invoices = app.state.invoices || [];
         const fieldJobs = app.state.fieldJobs || [];
         
-        const openJobsCount = jobs.filter(j => j.status !== 'Collected').length;
+        const openJobsCount = jobs.filter(j => j.status && j.status !== 'Collected').length;
         const unpaidInvoicesCount = invoices.filter(i => i.status === 'Unpaid').length;
         const techsOnSite = fieldJobs.filter(j => j.status?.toLowerCase() === 'on-site').length;
         
@@ -57,7 +57,7 @@ window.dashboard = {
             const tech = j.technician || 'Unassigned';
             if(!techStats[tech]) techStats[tech] = { total: 0, completed: 0 };
             techStats[tech].total++;
-            if(['Completed', 'Collected', 'Ready For Collection'].includes(j.status)) techStats[tech].completed++;
+            if(['Completed', 'Collected', 'Ready For Collection'].includes(j.status || '')) techStats[tech].completed++;
         });
 
         const html = `
@@ -138,7 +138,7 @@ window.dashboard = {
                                         <td><strong>${job.id}</strong></td>
                                         <td>${job.customer}</td>
                                         <td>${job.device}</td>
-                                        <td><span class="badge ${job.status.toLowerCase().replace(/ /g, '-')}">${job.status}</span></td>
+                                        <td><span class="badge ${(job.status || 'Unknown').toLowerCase().replace(/ /g, '-')}">${job.status || 'N/A'}</span></td>
                                         <td>
                                             <button class="btn-icon" onclick="repair.openJob('${job.id}'); app.switchTab('repair-view');"><span class="material-symbols-outlined">arrow_forward</span></button>
                                         </td>

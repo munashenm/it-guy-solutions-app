@@ -180,7 +180,7 @@ window.repair = {
         const rows = items.map(i => `
             <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.05); padding: 8px 0; font-size: 0.9rem;">
                 <span style="color: #a0a0a0;">${i.qty}x ${i.desc}</span>
-                <span style="font-weight: bold;">${isTech ? '-' : 'R ' + (i.unit * i.qty).toFixed(2)}</span>
+                <span style="font-weight: bold;">${isTech ? '-' : 'R ' + ((parseFloat(i.unit) || 0) * (parseInt(i.qty) || 0)).toFixed(2)}</span>
             </div>
         `).join('');
 

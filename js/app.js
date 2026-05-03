@@ -235,34 +235,39 @@ const app = {
     },
 
     refreshActiveViews() {
-        const now = Date.now();
-        if (this._lastRefresh && now - this._lastRefresh < 500) return; // Debounce refreshes
-        this._lastRefresh = now;
-
-        console.log("Refreshing active views. Triggered for:", this.state.currentView);
+        if (!this.state.currentView) return;
         const activeView = this.state.currentView;
         
-        try {
-            if(window.dashboard && activeView === 'dashboard-view') dashboard.render();
-            if(window.repair && activeView === 'repair-view') repair.render();
-            if(window.field && activeView === 'field-view') field.render();
-            if(window.quotation && activeView === 'quotations-view') quotation.render();
-            if(window.invoice && activeView === 'invoices-view') invoice.render();
-            if(window.inventory && activeView === 'inventory-view') inventory.render();
-            if(window.mystock && activeView === 'mystock-view') mystock.render();
-            if(window.posSystem && activeView === 'pos-view') posSystem.render();
-            if(window.customers && activeView === 'customers-view') customers.render();
-            if(window.reports && activeView === 'reports-view') reports.render();
-            if(window.tickets && activeView === 'tickets-view') tickets.render();
-            if(window.purchases && activeView === 'purchases-view') purchases.render();
-            if(window.expenses && activeView === 'expenses-view') expenses.render();
-            if(window.wiki && activeView === 'wiki-view') wiki.render();
-            
-            // Post-render UX: Inject labels for mobile card-view
-            this.injectTableLabels();
-        } catch (e) {
-            console.error("Critical error during view refresh:", e);
+        const safeRender = (module, name) => {
+            if (module && typeof module.render === 'function') {
+                try {
+                    module.render();
+                } catch (err) {
+                    console.error(`Render error in ${name}:`, err);
+                }
+            }
+        };
+
+        switch (activeView) {
+            case 'dashboard-view': safeRender(window.dashboard, 'Dashboard'); break;
+            case 'repair-view': safeRender(window.repair, 'Repair'); break;
+            case 'field-view': safeRender(window.field, 'Field'); break;
+            case 'quotations-view': safeRender(window.quotation, 'Quotation'); break;
+            case 'invoices-view': safeRender(window.invoice, 'Invoice'); break;
+            case 'inventory-view': safeRender(window.inventory, 'Inventory'); break;
+            case 'purchases-view': safeRender(window.purchases, 'Purchases'); break;
+            case 'mystock-view': safeRender(window.mystock, 'MyStock'); break;
+            case 'pos-view': safeRender(window.pos, 'POS'); break;
+            case 'customers-view': safeRender(window.customers, 'Customers'); break;
+            case 'reports-view': safeRender(window.reports, 'Reports'); break;
+            case 'expenses-view': safeRender(window.expenses, 'Expenses'); break;
+            case 'wiki-view': safeRender(window.wiki, 'Wiki'); break;
+            case 'team-view': safeRender(window.admin, 'Admin'); break;
+            case 'tickets-view': safeRender(window.tickets, 'Tickets'); break;
         }
+
+        // Post-render UX: Inject labels for mobile card-view
+        this.injectTableLabels();
     },
 
     async checkSystemHealth() {
@@ -820,7 +825,9 @@ const app = {
             // Adaptive Sync: Activate data streams for this view
             this.updateViewSync(viewId);
             
+            // Force a refresh immediately (in case data was already cached/synced)
             this.refreshActiveViews();
+            
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         
@@ -2220,7 +2227,10 @@ const app = {
     },
 
     applyRolePermissions(user) {
-        if(!user) return;
+        if(!user || !user.role) {
+            console.error("Access Denied: Missing user role info");
+            return;
+        }
         console.log("Applying rules for role:", user.role);
         
         const role = user.role.toLowerCase();
