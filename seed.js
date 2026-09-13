@@ -75,6 +75,7 @@ db.serialize(() => {
         const data = {
             customerId: customer.id,
             customerName: customer.name,
+            customer: customer.name,
             device: random(devices),
             faultDescription: random(faults),
             status: random(statuses),

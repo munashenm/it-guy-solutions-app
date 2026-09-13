@@ -22,12 +22,17 @@ window.clientPortal = {
             return;
         }
 
-        const user = window.authSystem ? window.authSystem.currentUser : null;
+        const user = window.authSystem ? window.authSystem.currentUser : (window.fbAuth && window.fbAuth.currentUser) || null;
         if (!user) {
             console.warn("Portal: No authenticated user. Redirecting auth check...");
             container.innerHTML = `<div style="padding:60px; text-align:center; color:#555;"><span class="material-symbols-outlined rotating">sync</span><p>Waiting for session...</p></div>`;
             return;
         }
+
+        const nameEl = document.getElementById('client-name');
+        const emailEl = document.getElementById('client-email');
+        if (nameEl) nameEl.textContent = user.firstName || (user.email || '').split('@')[0] || 'Customer';
+        if (emailEl) emailEl.textContent = user.email || '';
 
         const curEmail = (user.email || '').toLowerCase();
         const displayName = user.firstName || curEmail.split('@')[0] || "Customer";

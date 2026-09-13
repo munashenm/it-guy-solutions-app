@@ -43,6 +43,7 @@ app.get('/api/status', (req, res) => {
     res.json({ 
         status: "online", 
         dbStatus: dbReady ? "Connected" : "Initializing",
+        dbType: process.env.DB_TYPE || 'sqlite',
         version: "4.4",
         timestamp: new Date().toISOString() 
     });

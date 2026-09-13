@@ -223,11 +223,11 @@
             }
         };
     </script>
-    <script src="js/local-db.js?v=2.8"></script>
-    <script src="js/firebase-init.js?v=2.8"></script>
-    <script src="js/auth.js?v=2.8"></script>
-    <script src="js/portal.js?v=2.8"></script>
-    <script src="js/pdf.js?v=2.8"></script>
+    <script src="js/local-db.js?v=2.9"></script>
+    <script src="js/firebase-init.js?v=2.9"></script>
+    <script src="js/auth.js?v=2.9"></script>
+    <script src="js/portal.js?v=2.9"></script>
+    <script src="js/pdf.js?v=2.9"></script>
     
     <script>
         function toggleAuthView(view) {
@@ -315,7 +315,7 @@
                 window.app.state.invoices = iSnap.docs.map(d => d.data());
                 
                 console.log("Portal: Collections synced. Triggering render.");
-                if(window.client && window.authSystem && window.authSystem.currentUser) {
+                if(window.client && typeof window.client.render === 'function') {
                     window.client.render();
                 }
             } catch(e) {
@@ -339,6 +339,10 @@
                 if (user && (user.role === 'client' || user.role === 'admin')) {
                     if (loginScreen) loginScreen.classList.add('hidden');
                     if (portalContent) portalContent.classList.remove('hidden');
+                    const nameEl = document.getElementById('client-name');
+                    const emailEl = document.getElementById('client-email');
+                    if (nameEl) nameEl.textContent = user.firstName || (user.email || '').split('@')[0] || 'Customer';
+                    if (emailEl) emailEl.textContent = user.email || '';
                     syncDataAndRender();
                 } else {
                     if (loginScreen) loginScreen.classList.remove('hidden');

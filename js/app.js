@@ -283,8 +283,8 @@ const app = {
             dot.style.background = isHealthy ? '#00b894' : '#ff7675';
             text.textContent = isHealthy ? 'System Online' : 'DB Sync Error';
             text.style.color = isHealthy ? '#00b894' : '#ff7675';
-            const engineInfo = status.dbType ? `${status.dbType.toUpperCase()} Engine` : 'MYSQL Engine';
-            label.textContent = `${engineInfo} | v2.7`;
+            const engineInfo = status.dbType ? `${status.dbType.toUpperCase()} Engine` : 'Local Engine';
+            if (label) label.textContent = `${engineInfo} | v4.4`;
             
             if (!isHealthy && status.dbError) {
                 console.error("Database Health Warning:", status.dbError);
@@ -2356,8 +2356,8 @@ const app = {
                 }
             } else {
                 // Admin
-                if(target === 'client-view' || target === 'field-view' || target === 'mystock-view') {
-                    item.classList.add('hidden'); // Admin only manages global inventory/jobs
+                if(target === 'client-view' || target === 'mystock-view') {
+                    item.classList.add('hidden');
                 }
                 // Important: team-view and company-view are visible to admins
             }

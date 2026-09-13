@@ -46,16 +46,16 @@ window.authSystem = {
         window.fbAuth.onAuthStateChanged(async (user) => {
             if (user) {
                 // In local mode, user object from localStorage already contains the role
-                this.setAndBootUser(user.uid, user.email, user.role);
+                this.setAndBootUser(user.uid, user.email, user.role, user);
             } else {
                 this.handleLogoutUI();
             }
         });
     },
 
-    setAndBootUser(uid, email, role) {
+    setAndBootUser(uid, email, role, extra = {}) {
         console.log(`Setting up session for ${email} (${role})`);
-        this.currentUser = { uid, email, role };
+        this.currentUser = { ...extra, uid, email, role };
         
         const loginScreen = document.getElementById('login-screen');
         const appContainer = document.querySelector('.app-container');
@@ -68,7 +68,13 @@ window.authSystem = {
                 window.app.initialized = true;
                 window.app.init();
             }
-            window.app.applyRolePermissions(this.currentUser);
+            if (typeof window.app.applyRolePermissions === 'function') {
+                window.app.applyRolePermissions(this.currentUser);
+            }
+        }
+
+        if (window.clientPortal && typeof window.clientPortal.render === 'function' && !appContainer) {
+            window.clientPortal.render();
         }
 
         // Update UI

@@ -139,8 +139,8 @@ window.dashboard = {
                                 ${jobs.sort((a,b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 5).map(job => `
                                     <tr>
                                         <td><strong>${job.id}</strong></td>
-                                        <td>${job.customer}</td>
-                                        <td>${job.device}</td>
+                                        <td>${job.customerName || job.customer || job.client || '—'}</td>
+                                        <td>${job.device || job.description || '—'}</td>
                                         <td><span class="badge ${(job.status || 'Unknown').toLowerCase().replace(/ /g, '-')}">${job.status || 'N/A'}</span></td>
                                         <td>
                                             <button class="btn-icon" onclick="repair.openJob('${job.id}'); app.switchTab('repair-view');"><span class="material-symbols-outlined">arrow_forward</span></button>
