@@ -16,9 +16,10 @@ Your production server must have a MySQL database named `itguy_prod` (or similar
 **Manual Setup Steps:**
 1. Log in to your hosting control panel (e.g., cPanel/phpMyAdmin).
 2. Create a new database: `itguy_prod`.
-3. Create a new user: `itguy_admin` with password `a5ed594eb62a4b4a`.
+3. Create a new MySQL user and set a strong password (do not reuse sample credentials).
 4. Grant the user **ALL PRIVILEGES** to the database.
-5. In phpMyAdmin, select the database and **Import** the following script from the ZIP's `backend/` folder:
+5. Put the database name, user, and password in `.env` on the server (`DB_NAME`, `DB_USER`, `DB_PASSWORD`).
+6. In phpMyAdmin, select the database and **Import** the following script:
    - `mysql-setup.sql`
 
 ## 3. Uploading Files

@@ -8,3 +8,5 @@ database.sqlite.bak
 .env.*.local
 logs/
 *.log
+startup_log.txt
+emergency_error.txt

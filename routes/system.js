@@ -15,6 +15,51 @@ const dbPath = path.resolve(__dirname, '../database.sqlite');
 
 // Status route removed to avoid conflict with main app status
 
+function publicJobView(id, data, type) {
+    return {
+        id,
+        type,
+        status: data.status || 'Scheduled',
+        device: data.device || data.description || 'Device',
+        technician: data.technician || 'Awaiting Assignment',
+        date: data.date || data.dateBooked || data.createdAt || null,
+        updatedAt: data.updatedAt || data.date || data.createdAt || null
+    };
+}
+
+function parseCollectionRow(row) {
+    if (!row || !row.data) return null;
+    try {
+        return typeof row.data === 'string' ? JSON.parse(row.data) : row.data;
+    } catch (e) {
+        return null;
+    }
+}
+
+// Public job status lookup for track.html (no login, sanitized fields only)
+router.get('/track/:id', async (req, res, next) => {
+    try {
+        const id = String(req.params.id || '').trim();
+        if (!id) return res.status(400).json({ error: 'Job ID is required' });
+
+        const workshop = await db.get("SELECT id, data FROM collections WHERE name = 'jobs' AND id = ?", [id]);
+        const workshopData = parseCollectionRow(workshop);
+        if (workshopData) {
+            return res.json(publicJobView(workshop.id, workshopData, 'Workshop Repair'));
+        }
+
+        const field = await db.get("SELECT id, data FROM collections WHERE name = 'fieldJobs' AND id = ?", [id]);
+        const fieldData = parseCollectionRow(field);
+        if (fieldData) {
+            return res.json(publicJobView(field.id, fieldData, 'Field Service'));
+        }
+
+        return res.status(404).json({ error: 'Reference not found' });
+    } catch (err) {
+        next(err);
+    }
+});
+
 router.get('/proxy-image', async (req, res) => {
     const { url } = req.query;
     if (!url) return res.status(400).send("URL is required");

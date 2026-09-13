@@ -27,12 +27,9 @@ let appDb = null;
 try {
     appDb = require('./database');
     
-    // Defer DB Init to satisfy Passenger
-    setTimeout(() => {
-        if (appDb && appDb.init) appDb.init().catch(e => diagLog("DB Init Error: " + e.message));
-    }, 5000);
-
-    app.use('/api/auth', require('./routes/auth'));
+    const authRoutes = require('./routes/auth');
+    app.use('/api', authRoutes);
+    app.use('/api/auth', authRoutes);
     app.use('/api/users', require('./routes/users'));
     app.use('/api/collections', require('./routes/collections'));
     app.use('/api', require('./routes/system'));
@@ -42,10 +39,11 @@ try {
 }
 
 app.get('/api/status', (req, res) => {
+    const dbReady = !!(appDb && (appDb.pool || appDb.sqlite));
     res.json({ 
         status: "online", 
-        dbStatus: (appDb && appDb.pool) ? "Connected" : "Initializing",
-        version: "4.1-Final",
+        dbStatus: dbReady ? "Connected" : "Initializing",
+        version: "4.4",
         timestamp: new Date().toISOString() 
     });
 });
@@ -59,9 +57,22 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Server Error', details: err.message });
 });
 
-const port = process.env.PORT || 0; 
-const server = app.listen(port, () => {
-    diagLog(`SYSTEM ONLINE on port ${server.address().port}`);
-});
+const port = process.env.PORT || 3000;
+function startListening() {
+    const server = app.listen(port, () => {
+        diagLog(`SYSTEM ONLINE on port ${server.address().port}`);
+    });
+}
+
+if (appDb && appDb.init) {
+    appDb.init()
+        .then(startListening)
+        .catch((e) => {
+            diagLog("DB Init Error: " + e.message);
+            startListening();
+        });
+} else {
+    startListening();
+}
 
 module.exports = app;

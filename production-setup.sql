@@ -5,7 +5,7 @@
 CREATE DATABASE IF NOT EXISTS itguy_prod;
 
 -- 2. Create the User with the generated password
-CREATE USER IF NOT EXISTS 'itguy_admin'@'localhost' IDENTIFIED BY 'a5ed594eb62a4b4a';
+CREATE USER IF NOT EXISTS 'itguy_admin'@'localhost' IDENTIFIED BY 'CHANGE_ME_STRONG_PASSWORD';
 
 -- 3. Grant Permissions
 GRANT ALL PRIVILEGES ON itguy_prod.* TO 'itguy_admin'@'localhost';

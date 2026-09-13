@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
     phone VARCHAR(255),
     role VARCHAR(255),
     password VARCHAR(255),
+    sessionToken VARCHAR(512),
     createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

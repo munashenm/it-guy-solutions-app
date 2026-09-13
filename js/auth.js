@@ -98,26 +98,31 @@ window.authSystem = {
         errorEl.classList.add('hidden');
         errorEl.innerText = '';
 
+        const btn = e.target.querySelector('button[type="submit"]');
+        const originalLabel = btn ? btn.innerHTML : 'Log In';
         try {
-            const btn = e.target.querySelector('button[type="submit"]');
-            btn.innerHTML = "Authenticating...";
-            btn.disabled = true;
+            if (btn) {
+                btn.innerHTML = "Authenticating...";
+                btn.disabled = true;
+            }
 
             await window.fbAuth.signInWithEmailAndPassword(email, pass);
             if(window.app) window.app.logActivity('Staff Login', `User ${email} authenticated successfully.`);
         } catch (error) {
             console.error("Login Error:", error);
-            const btn = e.target.querySelector('button[type="submit"]');
-            btn.innerHTML = "Log In";
-            btn.disabled = false;
 
-            if (error.message.includes('fetch') || error.message.includes('NetworkError')) {
+            if (error.message.includes('fetch') || error.message.includes('NetworkError') || error.message.includes('Failed to fetch')) {
                 errorEl.innerText = "❌ Connection Error: Unable to reach the server. Please check your internet or try again later.";
             } else {
                 errorEl.innerText = "❌ " + (error.message || "Invalid Email or Password");
             }
 
             errorEl.classList.remove('hidden');
+        } finally {
+            if (btn && !this.currentUser) {
+                btn.innerHTML = originalLabel;
+                btn.disabled = false;
+            }
         }
     },
 

@@ -43,7 +43,8 @@ router.post('/password', async (req, res, next) => {
         if(!row) return res.status(404).json({ error: "User not found" });
 
         let isMatch = false;
-        if (row.password.startsWith('$2a$')) {
+        const isHashed = row.password && (row.password.startsWith('$2a$') || row.password.startsWith('$2b$'));
+        if (isHashed) {
             isMatch = await bcrypt.compare(oldPassword, row.password);
         } else {
             isMatch = (row.password === oldPassword);
