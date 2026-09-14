@@ -35,7 +35,7 @@ window.quotation = {
                                 <tr>
                                     <td><strong>${quo.id}</strong></td>
                                     <td>${quo.date}</td>
-                                    <td>${quo.customer}</td>
+                                    <td>${quo.customer || quo.client || quo.customerName || '—'}</td>
                                     <td style="font-weight:600">${quo.amount || 'R 0.00'}</td>
                                     <td><span class="badge ${quo.status ? quo.status.toLowerCase() : 'pending'}">${quo.status || 'Pending'}</span></td>
                                     <td>
