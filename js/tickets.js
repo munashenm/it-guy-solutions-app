@@ -75,7 +75,7 @@ window.tickets = {
                             <tr>
                                 <th>Ticket ID</th>
                                 <th>Priority</th>
-                                <th>Client / Contact</th>
+                                <th>Customer</th>
                                 <th>Subject</th>
                                 <th>Assigned To</th>
                                 <th>Time Tracked</th>
