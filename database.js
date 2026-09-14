@@ -235,8 +235,18 @@ class Database {
         }
     }
 
+    async _ensureReady() {
+        if (this.ready) return;
+        if (this._initPromise) {
+            await this._initPromise;
+            return;
+        }
+        await this.init();
+    }
+
     // Generic Run (Insert/Update/Delete)
     async run(sql, params = []) {
+        await this._ensureReady();
         // SQLite 'INSERT OR REPLACE' isn't standard in MySQL
         // We handle the bridge in server.js but here we execute
         if (this.type === 'mysql') {
@@ -254,6 +264,7 @@ class Database {
 
     // Generic Get (Single Row)
     async get(sql, params = []) {
+        await this._ensureReady();
         if (this.type === 'mysql') {
             const [rows] = await this.pool.execute(sql, params);
             return rows[0] || null;
@@ -269,6 +280,7 @@ class Database {
 
     // Generic All (Multiple Rows)
     async all(sql, params = []) {
+        await this._ensureReady();
         if (this.type === 'mysql') {
             const [rows] = await this.pool.execute(sql, params);
             return rows;

@@ -168,10 +168,32 @@ class LocalStorage {
     }
 
     async fetch() {
+        this._fetchGen = (this._fetchGen || 0) + 1;
+        const gen = this._fetchGen;
         try {
             const raw = await safeFetch(`${API_BASE}/collections/${this.name}`);
-            const data = Array.isArray(raw) ? raw : [];
-            this.data = data;
+            if (gen !== this._fetchGen) return;
+
+            let list = null;
+            if (Array.isArray(raw)) list = raw;
+            else if (raw && Array.isArray(raw.data)) list = raw.data;
+            else if (raw && Array.isArray(raw.items)) list = raw.items;
+
+            if (!list) {
+                console.warn(`Sync ignored non-list payload for ${this.name}`);
+                if ((this.data || []).length > 0) return;
+                this.data = [];
+            } else if (list.length === 0 && (this.data || []).length > 0) {
+                this._emptyStreak = (this._emptyStreak || 0) + 1;
+                if (this._emptyStreak < 2) {
+                    console.warn(`Sync kept last-good data for ${this.name} (empty payload)`);
+                    return;
+                }
+                this.data = list;
+            } else {
+                this._emptyStreak = 0;
+                this.data = list;
+            }
             
             // Clear global sync error if this was a recovery
             if (this._hasSyncError) {

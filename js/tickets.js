@@ -12,10 +12,8 @@ window.tickets = {
     },
 
     render() {
-        if (!this.container) {
-            this.container = document.getElementById('tickets-content');
-            if (!this.container) return;
-        }
+        this.container = document.getElementById('tickets-content');
+        if (!this.container) return;
 
         const stats = this.getStats();
         
@@ -105,7 +103,7 @@ window.tickets = {
         
         let billableMs = 0;
         tks.forEach(t => {
-            if(t.status !== 'Closed' && t.timeLogs) {
+            if(t.status !== 'Closed' && Array.isArray(t.timeLogs)) {
                 t.timeLogs.forEach(log => {
                     if(!log.billed) billableMs += (log.duration || 0);
                 });

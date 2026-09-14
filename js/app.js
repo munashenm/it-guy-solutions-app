@@ -40,13 +40,18 @@ const app = {
             { name: 'field', ref: window.field },
             { name: 'quotation', ref: window.quotation },
             { name: 'invoice', ref: window.invoice },
+            { name: 'tickets', ref: window.tickets },
             { name: 'client', ref: window.client },
             { name: 'inventory', ref: window.inventory },
             { name: 'mystock', ref: window.mystock },
+            { name: 'purchases', ref: window.purchases },
+            { name: 'expenses', ref: window.expenses },
+            { name: 'wiki', ref: window.wiki },
             { name: 'posSystem', ref: window.posSystem },
             { name: 'reports', ref: window.reports },
             { name: 'customers', ref: window.customers },
-            { name: 'adminPanel', ref: window.adminPanel }
+            { name: 'adminPanel', ref: window.adminPanel },
+            { name: 'companySettings', ref: window.companySettings }
         ];
 
         modules.forEach(m => {
@@ -246,8 +251,40 @@ const app = {
     },
 
     refreshActiveViews() {
+        clearTimeout(this._refreshTimer);
+        this._refreshTimer = setTimeout(() => {
+            this._refreshTimer = null;
+            this.paintActiveView();
+        }, 50);
+    },
+
+    ensureViewVisible(viewId) {
+        if (!viewId) return;
+        if (!this.viewSections || !this.viewSections.length) {
+            this.viewSections = document.querySelectorAll('.view-section');
+        }
+        const target = document.getElementById(viewId);
+        if (!target) return;
+
+        this.viewSections.forEach(section => {
+            section.style.removeProperty('display');
+            section.style.removeProperty('opacity');
+            section.style.removeProperty('transform');
+            section.style.removeProperty('visibility');
+            if (section === target) {
+                section.classList.remove('hidden');
+                section.classList.add('active');
+            } else {
+                section.classList.remove('active');
+                section.classList.add('hidden');
+            }
+        });
+    },
+
+    paintActiveView() {
         if (!this.state.currentView) return;
         const activeView = this.state.currentView;
+        this.ensureViewVisible(activeView);
         
         const safeRender = (module, name) => {
             if (module && typeof module.render === 'function') {
@@ -268,17 +305,19 @@ const app = {
             case 'inventory-view': safeRender(window.inventory, 'Inventory'); break;
             case 'purchases-view': safeRender(window.purchases, 'Purchases'); break;
             case 'mystock-view': safeRender(window.mystock, 'MyStock'); break;
-            case 'pos-view': safeRender(window.pos, 'POS'); break;
+            case 'pos-view': safeRender(window.posSystem, 'POS'); break;
             case 'customers-view': safeRender(window.customers, 'Customers'); break;
             case 'reports-view': safeRender(window.reports, 'Reports'); break;
             case 'expenses-view': safeRender(window.expenses, 'Expenses'); break;
             case 'wiki-view': safeRender(window.wiki, 'Wiki'); break;
-            case 'team-view': safeRender(window.admin, 'Admin'); break;
+            case 'team-view': safeRender(window.adminPanel, 'Admin'); break;
             case 'tickets-view': safeRender(window.tickets, 'Tickets'); break;
+            case 'company-view': safeRender(window.companySettings, 'Settings'); break;
         }
 
         // Post-render UX: Inject labels for mobile card-view
         this.injectTableLabels();
+        this.ensureViewVisible(activeView);
     },
 
     async checkSystemHealth() {
@@ -295,7 +334,7 @@ const app = {
             text.textContent = isHealthy ? 'System Online' : 'DB Sync Error';
             text.style.color = isHealthy ? '#00b894' : '#ff7675';
             const engineInfo = status.dbType ? `${status.dbType.toUpperCase()} Engine` : 'Local Engine';
-            if (label) label.textContent = `${engineInfo} | v4.5`;
+            if (label) label.textContent = `${engineInfo} | v4.6`;
             
             if (!isHealthy && status.dbError) {
                 console.error("Database Health Warning:", status.dbError);
@@ -873,61 +912,27 @@ const app = {
     },
 
     async navigate(viewId, navItem) {
-        if(this.isNavigating) return;
-        this.isNavigating = true;
-        
-        console.log(`Navigating to ${viewId}`);
-        
-        // 1. Update Nav Active State
+        if (!viewId) return;
+        this._navSeq = (this._navSeq || 0) + 1;
+
         this.navItems.forEach(nav => nav.classList.remove('active'));
-        if(navItem) {
+        if (navItem) {
             navItem.classList.add('active');
         } else {
             const fallbackNav = Array.from(this.navItems).find(nav => nav.getAttribute('data-target') === viewId);
-            if(fallbackNav) fallbackNav.classList.add('active');
+            if (fallbackNav) fallbackNav.classList.add('active');
         }
-
-        // 2. Animate Out
-        const currentActive = document.querySelector('.view-section.active');
-        if(currentActive && currentActive.id !== viewId) {
-            currentActive.style.opacity = '0';
-            currentActive.style.transform = 'translate3d(0, -10px, 0)';
-            await new Promise(r => setTimeout(r, 200));
-        }
-
-        // 3. Update View Active State
-        this.viewSections.forEach(section => {
-            section.classList.remove('active', 'entry-anim');
-            section.classList.add('hidden');
-            section.style.display = 'none';
-        });
 
         const target = document.getElementById(viewId);
-        if(target) {
-            target.classList.remove('hidden');
-            target.style.display = 'block';
-            
-            // Force reflow for animation
-            void target.offsetWidth;
-            
-            target.classList.add('active');
-            this.state.currentView = viewId;
-            
-            // Adaptive Sync: Activate data streams for this view
-            this.updateViewSync(viewId);
-            
-            // Critical Fix: Force an immediate deep refresh to prevent blank views
-            if (window.localDb && typeof window.localDb.syncAll === 'function') {
-                window.localDb.syncAll();
-            }
-            
-            // Force a refresh immediately (in case data was already cached/synced)
-            this.refreshActiveViews();
-            
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+        if (!target) {
+            console.error('Missing view section:', viewId);
+            return;
         }
-        
-        this.isNavigating = false;
+
+        this.state.currentView = viewId;
+        this.ensureViewVisible(viewId);
+        this.updateViewSync(viewId);
+        this.paintActiveView();
     },
 
     switchTab(viewId) {

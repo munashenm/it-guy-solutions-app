@@ -341,18 +341,18 @@ body {
     box-shadow: 0 0 20px rgba(var(--accent-rgb), 0.1);
 }
 
-/* View Sections Entry Animation */
+/* View Sections — never animate opacity; leftover inline opacity:0 used to hide pages after navigation */
 .view-section {
     display: none;
-    opacity: 0;
-    transform: translate3d(0, 15px, 0);
-    transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    opacity: 1;
+    visibility: visible;
 }
 
 .view-section.active {
-    display: block;
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    animation: none;
 }
 
 .search-bar .material-symbols-outlined {
@@ -642,18 +642,12 @@ body {
     background: rgba(255, 255, 255, 0.2);
 }
 
-/* Views */
-.view-section {
-    display: none;
-    animation: fadeIn 0.4s ease forwards;
+.hidden {
+    display: none !important;
 }
 
 .view-section.active {
-    display: block;
-}
-
-.hidden {
-    display: none !important;
+    display: block !important;
 }
 
 @keyframes fadeIn {
@@ -1250,16 +1244,6 @@ body.page-public {
 @keyframes rotate {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
-}
-
-/* View Transition Fade */
-.view-section {
-    animation: fade-in 0.4s ease-out;
-}
-
-@keyframes fade-in {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
 }
 
 /* Status Pulse for On-Site jobs */

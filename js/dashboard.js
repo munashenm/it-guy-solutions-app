@@ -5,14 +5,13 @@ window.dashboard = {
     },
     
     render() {
-        if (!this.container) {
-            this.container = document.getElementById('dashboard-content');
-            if (!this.container) return;
-        }
+        this.container = document.getElementById('dashboard-content');
+        if (!this.container) return;
 
-        const jobs = app.state.jobs || [];
-        const invoices = app.state.invoices || [];
-        const fieldJobs = app.state.fieldJobs || [];
+        const state = (window.app && window.app.state) || {};
+        const jobs = state.jobs || [];
+        const invoices = state.invoices || [];
+        const fieldJobs = state.fieldJobs || [];
         
         const openJobsCount = jobs.filter(j => j.status && j.status !== 'Collected').length;
         const unpaidInvoicesCount = invoices.filter(i => i.status === 'Unpaid').length;
@@ -41,14 +40,14 @@ window.dashboard = {
             .filter(i => i.status === 'Paid' && new Date(i.createdAt || i.date) >= startOfMonth)
             .reduce((sum, i) => sum + (parseFloat(i.total || i.amount) || 0), 0);
         
-        const monthlyExpenses = (app.state.expenses || [])
+        const monthlyExpenses = (state.expenses || [])
             .filter(e => new Date(e.date) >= startOfMonth)
             .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
         
         const monthlyProfit = monthlyRevenue - monthlyExpenses;
 
         // 2. Stock Health
-        const lowStockItems = (app.state.inventory || []).filter(i => (i.qty || 0) < 5);
+        const lowStockItems = (state.inventory || []).filter(i => (i.qty || 0) < 5);
         
         // 3. Tech Performance (Completion Rate)
         const techStats = {};
@@ -180,7 +179,7 @@ window.dashboard = {
                     <h2 style="display: flex; align-items: center; gap: 8px;"><span class="material-symbols-outlined" style="color: #ffca28;">star</span> Recent Customer Feedback</h2>
                 </div>
                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px;">
-                    ${[...jobs, ...(app.state.fieldJobs || [])].filter(j => j.rating).sort((a,b) => b.id.localeCompare(a.id)).slice(0,6).map(j => `
+                    ${[...jobs, ...fieldJobs].filter(j => j.rating).sort((a,b) => b.id.localeCompare(a.id)).slice(0,6).map(j => `
                         <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 20px; border-radius: 12px;">
                             <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
                                 <strong style="color: #fff;">${j.customer}</strong>

@@ -5,13 +5,11 @@ window.quotation = {
     },
     
     render() {
-        if (!this.container) {
-            this.container = document.getElementById('quotations-content');
-            if (!this.container) return;
-        }
+        this.container = document.getElementById('quotations-content');
+        if (!this.container) return;
 
         // App.state.quotations must exist
-        const quotations = app.state.quotations || [];
+        const quotations = (window.app && window.app.state && window.app.state.quotations) || [];
         
         const html = `
             <div class="section-header">

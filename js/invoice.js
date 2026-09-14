@@ -5,9 +5,10 @@ window.invoice = {
     },
     
     render() {
+        this.container = document.getElementById('invoices-content');
         if (!this.container) return;
 
-        const invoices = app.state.invoices || [];
+        const invoices = (window.app && window.app.state && window.app.state.invoices) || [];
         const user = window.authSystem?.currentUser;
         const isFrontDesk = user && user.role === 'frontdesk';
         
