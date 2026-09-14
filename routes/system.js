@@ -203,7 +203,10 @@ router.post('/notify', requireAuth, async (req, res, next) => {
         
         const rows = await db.all("SELECT data FROM collections WHERE name = ? AND id = ?", ['settings', 'systemSettings']);
         if (!rows || rows.length === 0) throw new Error("System settings not found. Cannot send notifications.");
-        const sysSettings = JSON.parse(rows[0].data);
+        let sysSettings = {};
+        try { sysSettings = JSON.parse(rows[0].data); } catch (e) {
+            throw new Error("System settings are invalid. Cannot send notifications.");
+        }
 
         if (actionType === 'Email') {
             if(!sysSettings.smtpHost) throw new Error("SMTP is not configured in settings.");

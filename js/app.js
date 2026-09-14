@@ -26,7 +26,9 @@ const app = {
         
         // System Health Check
         this.checkSystemHealth();
-        setInterval(() => this.checkSystemHealth(), 60000); 
+        if (!this._healthTimer) {
+            this._healthTimer = setInterval(() => this.checkSystemHealth(), 60000);
+        } 
         
         // Handle initial route
         this.handleRouting();
@@ -113,8 +115,7 @@ const app = {
 
     updateViewSync(viewId) {
         if (!viewId) return;
-        const required = this.viewCollections[viewId] || [];
-        // Add users by default for role checks
+        const required = [...(this.viewCollections[viewId] || [])];
         if (!required.includes('users')) required.push('users');
         
         this.requestSync(required);
@@ -171,13 +172,19 @@ const app = {
 
     migrateInventorySchema() {
         if (!this.state.inventory) return;
+        if (!this._migratedInventory) this._migratedInventory = new Set();
         this.state.inventory.forEach(item => {
-            if(item.stock !== undefined && item.qty === undefined) {
-                console.log(`Migrating schema for ${item.id}...`);
+            if (!item || !item.id) return;
+            if (this._migratedInventory.has(item.id)) return;
+            if (item.stock !== undefined && item.qty === undefined) {
+                this._migratedInventory.add(item.id);
                 window.fbDb.collection('inventory').doc(item.id).update({
                     qty: parseInt(item.stock) || 0,
                     cost: item.buyPrice || item.cost || '0.00',
                     sell: item.sellPrice || item.sell || '0.00'
+                }).catch((e) => {
+                    this._migratedInventory.delete(item.id);
+                    console.warn('Inventory migrate skipped', item.id, e.message);
                 });
             }
         });
@@ -185,6 +192,7 @@ const app = {
 
     applyBranding(data) {
         if(!data) return;
+        try {
 
         // 1. Update Theme Colors (Accent)
         if(data.themeColor) {
@@ -226,6 +234,9 @@ const app = {
         const sidebarContainer = document.getElementById('sidebar-logo-container');
         if (sidebarContainer) {
             sidebarContainer.innerHTML = `<img src="${logoUrl}" alt="Logo" style="max-height: 40px; max-width: 100%; object-fit: contain;">`;
+        }
+        } catch (e) {
+            console.warn('Branding apply skipped:', e.message);
         }
     },
 
@@ -284,7 +295,7 @@ const app = {
             text.textContent = isHealthy ? 'System Online' : 'DB Sync Error';
             text.style.color = isHealthy ? '#00b894' : '#ff7675';
             const engineInfo = status.dbType ? `${status.dbType.toUpperCase()} Engine` : 'Local Engine';
-            if (label) label.textContent = `${engineInfo} | v4.4`;
+            if (label) label.textContent = `${engineInfo} | v4.5`;
             
             if (!isHealthy && status.dbError) {
                 console.error("Database Health Warning:", status.dbError);

@@ -20,9 +20,24 @@ class Database {
     constructor() {
         this.type = process.env.DB_TYPE || 'sqlite';
         this.connection = null;
+        this.ready = false;
+        this._initPromise = null;
     }
 
     async init() {
+        if (this.ready) return;
+        if (this._initPromise) return this._initPromise;
+        this._initPromise = this._connectAndPrepare();
+        try {
+            await this._initPromise;
+            this.ready = true;
+        } catch (err) {
+            this._initPromise = null;
+            throw err;
+        }
+    }
+
+    async _connectAndPrepare() {
         if (this.type === 'mysql') {
             console.log("DB: Initializing MySQL Connection Pool...");
             this.pool = mysql.createPool({
@@ -75,9 +90,10 @@ class Database {
                     }
                 });
             });
+            await this.run('PRAGMA busy_timeout = 5000');
+            try { await this.run('PRAGMA journal_mode = WAL'); } catch (e) {}
             await this.ensureSchema();
         }
-
     }
 
     async ensureSchema() {
@@ -116,8 +132,7 @@ class Database {
                 id VARCHAR(255) PRIMARY KEY,
                 name VARCHAR(255),
                 data LONGTEXT,
-                updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
-                INDEX idx_collections_name (name)
+                updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
             )` :
             `CREATE TABLE IF NOT EXISTS collections (
                 id TEXT PRIMARY KEY,
@@ -141,11 +156,45 @@ class Database {
             } catch (e) { /* column already exists */ }
         }
 
-        if (!isMySQL) {
-            try { await this.run('CREATE INDEX IF NOT EXISTS idx_collections_name ON collections (name)'); } catch (e) {}
-        }
+        try {
+            if (isMySQL) {
+                await this.run('CREATE INDEX idx_collections_name ON collections (name)');
+            } else {
+                await this.run('CREATE INDEX IF NOT EXISTS idx_collections_name ON collections (name)');
+            }
+        } catch (e) { /* index already exists */ }
 
         await this.seedDefaultAdmin();
+        await this.seedDefaultSettings();
+    }
+
+    async seedDefaultSettings() {
+        const defaults = [
+            ['companyProfile', { companyName: 'IT Guy Solutions', website: 'https://itguysa.co.za' }],
+            ['systemSettings', { enablePOS: true }],
+            ['documentSettings', {}]
+        ];
+        for (const [id, data] of defaults) {
+            try {
+                const row = await this.get("SELECT id FROM collections WHERE name = 'settings' AND id = ?", [id]);
+                if (row) continue;
+                const jsonData = JSON.stringify(data);
+                if (this.type === 'mysql') {
+                    await this.run(
+                        `INSERT INTO collections (id, name, data, updatedAt) VALUES (?, 'settings', ?, CURRENT_TIMESTAMP)
+                         ON DUPLICATE KEY UPDATE updatedAt = updatedAt`,
+                        [id, jsonData]
+                    );
+                } else {
+                    await this.run(
+                        `INSERT OR IGNORE INTO collections (id, name, data, updatedAt) VALUES (?, 'settings', ?, CURRENT_TIMESTAMP)`,
+                        [id, jsonData]
+                    );
+                }
+            } catch (e) {
+                console.warn('DB: settings seed skipped', id, e.message);
+            }
+        }
     }
 
     async seedDefaultAdmin() {
@@ -306,6 +355,8 @@ class Database {
     }
 
     async close() {
+        this.ready = false;
+        this._initPromise = null;
         if (this.type === 'mysql') {
             await this.pool.end();
         } else if (this.sqlite) {

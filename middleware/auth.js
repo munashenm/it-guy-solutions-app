@@ -2,6 +2,11 @@ const db = require('../database');
 const jwt = require('jsonwebtoken');
 
 const requireAuth = async (req, res, next) => {
+    const dbReady = db && ((db.type === 'mysql' && db.pool) || (db.type !== 'mysql' && db.sqlite));
+    if (!dbReady) {
+        return res.status(503).json({ error: "Database is still initializing. Please retry." });
+    }
+
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: "Unauthorized. Please log in." });

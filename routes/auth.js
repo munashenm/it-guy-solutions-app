@@ -139,7 +139,8 @@ router.post('/forgot-password', async (req, res, next) => {
 
         const rows = await db.all("SELECT data FROM collections WHERE name = ? AND id = ?", ['settings', 'systemSettings']);
         if (rows && rows.length > 0) {
-            const sys = JSON.parse(rows[0].data);
+            let sys = {};
+            try { sys = JSON.parse(rows[0].data); } catch (e) { sys = {}; }
             if(sys.smtpHost) {
                 const transporter = nodemailer.createTransport({
                     host: String(sys.smtpHost).trim(),

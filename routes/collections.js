@@ -102,7 +102,7 @@ router.get('/:name/:id', async (req, res, next) => {
         const data = safeJsonParse(row.data, {}, `Collection: ${req.params.name}, ID: ${req.params.id}`);
         
         // Security check for clients
-        if (req.user.role === 'client') {
+        if (req.user && req.user.role === 'client') {
             const itemEmail = (data.email || data.customerEmail || data.clientEmail || '').toLowerCase();
             if (itemEmail !== req.user.email.toLowerCase()) {
                 return res.status(403).json({ error: "Forbidden: You do not have permission to view this document." });
@@ -125,7 +125,7 @@ router.post('/:name/:id', async (req, res, next) => {
         }
 
         // For other collections (jobs, quotes), clients can only create/update their OWN
-        if (req.user.role === 'client') {
+        if (req.user && req.user.role === 'client') {
             const itemEmail = (req.body.email || req.body.customerEmail || req.body.clientEmail || '').toLowerCase();
             if (itemEmail !== req.user.email.toLowerCase()) {
                 return res.status(403).json({ error: "Forbidden: You can only save documents associated with your email." });
@@ -151,7 +151,7 @@ router.patch('/:name/:id', async (req, res, next) => {
         const currentData = row ? safeJsonParse(row.data, {}, `Patch Read: ${name}/${id}`) : {};
         
         // Security check for existing document ownership
-        if (req.user.role === 'client' && row) {
+        if (req.user && req.user.role === 'client' && row) {
             const itemEmail = (currentData.email || currentData.customerEmail || currentData.clientEmail || '').toLowerCase();
             if (itemEmail !== req.user.email.toLowerCase()) {
                 return res.status(403).json({ error: "Forbidden: You do not own this document." });
