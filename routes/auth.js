@@ -14,7 +14,8 @@ router.post('/login', async (req, res, next) => {
     console.log(`[${logId}] Auth: Login attempt for ${email}`);
     
     try {
-        if (!db || (!db.pool && db.type === 'mysql')) {
+        const dbReady = db && ((db.type === 'mysql' && db.pool) || (db.type !== 'mysql' && db.sqlite));
+        if (!dbReady) {
             console.error(`[${logId}] Auth Error: Database not connected yet.`);
             return res.status(503).json({ error: "Database is still initializing. Please wait 5 seconds and try again." });
         }
@@ -57,7 +58,7 @@ router.post('/login', async (req, res, next) => {
                     await db.run("UPDATE users SET sessionToken = ? WHERE uid = ?", [token, row.uid]);
                 }
 
-                const { password: _p, ...user } = row;
+                const { password: _p, sessionToken: _s, ...user } = row;
                 console.log(`[${logId}] Auth: Login successful.`);
                 res.json({ user, token });
             } else {
@@ -77,7 +78,12 @@ router.post('/login', async (req, res, next) => {
 router.post('/register', async (req, res, next) => {
     const { email, password, firstName, lastName, phone } = req.body;
     logger.info(`Auth: Registration attempt for ${email}`);
-    if(!email || !password) return res.status(400).json({ error: "Email and Password are required" });
+        if(!email || !password) return res.status(400).json({ error: "Email and Password are required" });
+
+        const dbReady = db && ((db.type === 'mysql' && db.pool) || (db.type !== 'mysql' && db.sqlite));
+        if (!dbReady) {
+            return res.status(503).json({ error: "Database is still initializing. Please wait 5 seconds and try again." });
+        }
     
     try {
         const existing = await db.get("SELECT * FROM users WHERE email = ?", [email]);
@@ -133,7 +139,8 @@ router.post('/forgot-password', async (req, res, next) => {
 
         const rows = await db.all("SELECT data FROM collections WHERE name = ? AND id = ?", ['settings', 'systemSettings']);
         if (rows && rows.length > 0) {
-            const sys = JSON.parse(rows[0].data);
+            let sys = {};
+            try { sys = JSON.parse(rows[0].data); } catch (e) { sys = {}; }
             if(sys.smtpHost) {
                 const transporter = nodemailer.createTransport({
                     host: String(sys.smtpHost).trim(),

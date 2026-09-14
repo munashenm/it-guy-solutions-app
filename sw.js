@@ -1,62 +1,38 @@
-const CACHE_NAME = 'itguy-app-2.5.2';
-const urlsToCache = [
-  '/',
-  '/index.html',
-  '/css/style.css',
-  '/js/app.js',
-  '/js/local-db.js',
-  '/js/auth.js',
-  '/js/dashboard.js',
-  '/js/repair.js',
-  '/manifest.json'
-];
+const CACHE_NAME = 'itguy-app-4.5';
 
-self.addEventListener('install', event => {
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(['/'])));
+});
+
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => {
-        return cache.addAll(urlsToCache);
-      })
+    caches.keys().then((names) => Promise.all(
+      names.filter((name) => name !== CACHE_NAME).map((name) => caches.delete(name))
+    )).then(() => self.clients.claim())
   );
 });
 
-self.addEventListener('fetch', event => {
-  // If request is an API call to our backend, use Network First, fallback to nothing
-    if (event.request.url.includes('/api/')) {
-        event.respondWith(
-            fetch(event.request).catch(() => new Response(
-                JSON.stringify({ error: "Service temporarily unavailable. Please check your connection or try again later." }), 
-                { status: 503, headers: { 'Content-Type': 'application/json' } }
-            ))
-        );
-        return;
-    }
+self.addEventListener('fetch', (event) => {
+  const url = event.request.url;
+  if (event.request.method !== 'GET') return;
 
-  
-  // For static assets, Cache First, fallback to Network
-  event.respondWith(
-    caches.match(event.request)
-      .then(response => {
-        if (response) {
-          return response;
-        }
-        return fetch(event.request);
-      })
-  );
-});
-
-// Clean up old caches
-self.addEventListener('activate', event => {
-    const cacheAllowlist = [CACHE_NAME];
-    event.waitUntil(
-        caches.keys().then(cacheNames => {
-            return Promise.all(
-                cacheNames.map(cacheName => {
-                    if (cacheAllowlist.indexOf(cacheName) === -1) {
-                        return caches.delete(cacheName);
-                    }
-                })
-            );
-        })
+  if (url.includes('/api/')) {
+    event.respondWith(
+      fetch(event.request).catch(() => new Response(
+        JSON.stringify({ error: 'Service temporarily unavailable. Please check your connection or try again later.' }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } }
+      ))
     );
+    return;
+  }
+
+  // Network-first for HTML/JS/CSS so deploys are not stuck on old cached files.
+  event.respondWith(
+    fetch(event.request).then((response) => {
+      const copy = response.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
+      return response;
+    }).catch(() => caches.match(event.request).then((cached) => cached || caches.match('/')))
+  );
 });

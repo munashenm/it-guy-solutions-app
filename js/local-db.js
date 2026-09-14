@@ -39,68 +39,80 @@ window.addEventListener('scroll', resetIdleTimer);
 /**
  * Robust fetch helper that checks content-type and provides detailed errors
  */
+let logoutInFlight = false;
+function shouldSkipAuthLogout(url) {
+    return /\/(login|register|forgot-password|status|track\/|companyProfile)/i.test(url || '');
+}
+
 async function safeFetch(url, options = {}, retries = 3) {
-    if (!options.headers) options.headers = {};
-    if (!options.headers['Authorization']) {
+    const headers = Object.assign({}, options.headers || {});
+    if (!headers.Authorization) {
         const token = sessionStorage.getItem('it-guy-token');
-        if (token) options.headers['Authorization'] = `Bearer ${token}`;
+        if (token) headers.Authorization = `Bearer ${token}`;
     }
+    const request = Object.assign({}, options, { headers });
 
     try {
-        const res = await fetch(url, options);
-        const contentType = res.headers.get('content-type');
-        
+        const res = await fetch(url, request);
+        const contentType = res.headers.get('content-type') || '';
+        const isJson = contentType.includes('application/json');
+
+        if (res.status === 503 && retries > 0) {
+            await new Promise((r) => setTimeout(r, 1000 * (4 - retries)));
+            return safeFetch(url, options, retries - 1);
+        }
+
         if (!res.ok) {
-            // Handle session expiry specifically
-            if (res.status === 401) {
-                // DO NOT trigger logout/reload if we are already trying to login!
-                if (!url.endsWith('/login') && !url.includes('/settings/companyProfile')) {
-                    console.warn("Session expired or unauthorized. Redirecting to login...");
-                    if (window.authSystem && typeof window.authSystem.logout === 'function') {
-                        window.authSystem.logout();
-                    }
-                }
-                
-                if (contentType && contentType.includes('application/json')) {
+            let errMessage = `HTTP ${res.status}`;
+            if (isJson) {
+                try {
                     const errData = await res.json();
-                    throw new Error(errData.error || errData.message || "Unauthorized");
-                }
-                throw new Error("Unauthorized access. Please log in.");
+                    errMessage = errData.error || errData.message || errMessage;
+                } catch (e) {}
+            } else {
+                try {
+                    const text = await res.text();
+                    if (text && !text.trim().startsWith('<')) errMessage = text.substring(0, 80);
+                    else errMessage = 'Server error: The requested resource could not be processed.';
+                } catch (e) {}
             }
 
-            if (contentType && contentType.includes('application/json')) {
-                const errData = await res.json();
-                throw new Error(errData.error || errData.message || `HTTP ${res.status}`);
-            } else {
-                const text = await res.text();
-                if (text.trim().startsWith('<')) {
-                    throw new Error(`Server error: The requested resource could not be processed.`);
+            if (res.status === 401 && !shouldSkipAuthLogout(url) && !logoutInFlight) {
+                logoutInFlight = true;
+                console.warn('Session expired or unauthorized. Redirecting to login...');
+                if (window.authSystem && typeof window.authSystem.logout === 'function') {
+                    window.authSystem.logout();
                 }
-                throw new Error(text.substring(0, 50) || `HTTP ${res.status}`);
             }
+
+            throw new Error(errMessage);
         }
 
         if (res.status === 204) return {};
 
-        if (contentType && contentType.includes('application/json')) {
+        if (isJson) {
             try {
                 return await res.json();
-            } catch(parseErr) {
-                const raw = await res.text();
-                console.error("JSON Parse Error. Raw response:", raw);
-                throw new Error(`Invalid response from server: ${raw.substring(0, 100)}...`);
+            } catch (parseErr) {
+                throw new Error('Invalid JSON response from server.');
             }
         }
         return await res.text();
     } catch (e) {
-        if (retries > 0 && (e.message.includes('fetch') || e.name === 'TypeError')) {
+        const retryable = retries > 0 && (
+            e.name === 'TypeError' ||
+            /fetch|network|failed|503|initializing/i.test(e.message || '')
+        );
+        if (retryable && !/invalid credentials|unauthorized|forbidden/i.test(e.message || '')) {
             console.warn(`Fetch failed, retrying... (${retries} left). URL: ${url}`);
-            await new Promise(r => setTimeout(r, 1000 * (4 - retries))); // Exponential-ish backoff
+            await new Promise((r) => setTimeout(r, 1000 * (4 - retries)));
             return safeFetch(url, options, retries - 1);
         }
         throw e;
     }
 }
+
+window.safeFetch = safeFetch;
 
 
 class LocalStorage {

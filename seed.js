@@ -75,6 +75,7 @@ db.serialize(() => {
         const data = {
             customerId: customer.id,
             customerName: customer.name,
+            customer: customer.name,
             device: random(devices),
             faultDescription: random(faults),
             status: random(statuses),
@@ -85,7 +86,7 @@ db.serialize(() => {
             devicePasscode: '1234',
             notes: i % 3 === 0 ? 'Customer says it happened after a power surge.' : ''
         };
-        db.run("INSERT OR REPLACE INTO collections (id, name, data, updatedAt) VALUES (?, 'repairs', ?, CURRENT_TIMESTAMP)", [id, JSON.stringify(data)]);
+        db.run("INSERT OR REPLACE INTO collections (id, name, data, updatedAt) VALUES (?, 'jobs', ?, CURRENT_TIMESTAMP)", [id, JSON.stringify(data)]);
     }
     console.log(`- Seeded 12 repair jobs`);
 

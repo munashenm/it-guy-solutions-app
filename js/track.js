@@ -43,26 +43,9 @@ window.trackPortal = {
         `;
 
         try {
-            let foundJob = null;
-            let jobType = '';
-
-            // 1. Check workshop jobs
-            const wDoc = await window.fbDb.collection('jobs').doc(jobId).get();
-            if(wDoc.exists) {
-                foundJob = wDoc.data();
-                jobType = 'Workshop Repair';
-            } else {
-                // 2. Check field jobs
-                const fDoc = await window.fbDb.collection('fieldJobs').doc(jobId).get();
-                if(fDoc.exists) {
-                    foundJob = fDoc.data();
-                    jobType = 'Field Service';
-                }
-            }
-
-            if(foundJob) {
-                this.renderResult(foundJob, jobType);
-            } else {
+            const apiBase = window.API_BASE || '/api';
+            const res = await fetch(`${apiBase}/track/${encodeURIComponent(jobId)}`);
+            if (res.status === 404) {
                 resEl.innerHTML = `
                     <div class="status-update" style="background: rgba(255, 118, 117, 0.1); color: #ff7675; padding: 20px; border-radius: 8px; border: 1px solid rgba(255, 118, 117, 0.2); text-align: center; margin-top: 20px;">
                         <span class="material-symbols-outlined" style="font-size: 2.5rem; margin-bottom: 8px;">sentiment_very_dissatisfied</span><br>
@@ -70,6 +53,11 @@ window.trackPortal = {
                         <p style="font-size: 0.9rem; margin-top: 8px; opacity: 0.8;">We couldn't find a job matching <strong>${jobId}</strong>. Please check your reference number or contact support.</p>
                     </div>
                 `;
+            } else if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            } else {
+                const foundJob = await res.json();
+                this.renderResult(foundJob, foundJob.type || 'Service');
             }
         } catch (err) {
             console.error("Lookup Error:", err);
@@ -123,11 +111,20 @@ window.trackPortal = {
                 </div>
 
                 <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: #666; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 16px;">
-                    <span>Last Update: ${job.updatedAt ? new Date(job.updatedAt.seconds * 1000).toLocaleDateString() : (job.date || 'N/A')}</span>
+                    <span>Last Update: ${this.formatDate(job.updatedAt || job.date)}</span>
                     <button class="btn-icon" onclick="window.print()" title="Print Summary"><span class="material-symbols-outlined">print</span></button>
                 </div>
             </div>
         `;
+    },
+
+    formatDate(value) {
+        if (!value) return 'N/A';
+        if (typeof value === 'object' && value.seconds) {
+            return new Date(value.seconds * 1000).toLocaleString();
+        }
+        const parsed = new Date(value);
+        return isNaN(parsed.getTime()) ? String(value) : parsed.toLocaleString();
     },
 
     async fetchSettings() {

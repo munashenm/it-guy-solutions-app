@@ -1,6 +1,7 @@
 const mysql = require('mysql2/promise');
 const path = require('path');
 const fs = require('fs');
+const bcrypt = require('bcryptjs');
 
 // Hardened .env loading
 const envPath = path.resolve(__dirname, '.env');
@@ -19,9 +20,24 @@ class Database {
     constructor() {
         this.type = process.env.DB_TYPE || 'sqlite';
         this.connection = null;
+        this.ready = false;
+        this._initPromise = null;
     }
 
     async init() {
+        if (this.ready) return;
+        if (this._initPromise) return this._initPromise;
+        this._initPromise = this._connectAndPrepare();
+        try {
+            await this._initPromise;
+            this.ready = true;
+        } catch (err) {
+            this._initPromise = null;
+            throw err;
+        }
+    }
+
+    async _connectAndPrepare() {
         if (this.type === 'mysql') {
             console.log("DB: Initializing MySQL Connection Pool...");
             this.pool = mysql.createPool({
@@ -53,6 +69,7 @@ class Database {
             } catch (err) {
                 console.error("DB: MySQL Connection Warning during init:", err.message);
             }
+            await this.ensureSchema();
         } else {
             console.log("DB: Initializing Stable SQLite Mode...");
             let sqlite3;
@@ -62,12 +79,160 @@ class Database {
                 throw new Error("SQLite library (sqlite3) is missing. If you are using MySQL, set DB_TYPE=mysql in your .env file.");
             }
             const dbPath = path.resolve(__dirname, 'database.sqlite');
-            this.sqlite = new sqlite3.Database(dbPath, (err) => {
-                if (err) console.error("DB: SQLite Connection Error:", err.message);
-                else console.log(`DB: SQLite Connection Successful at ${dbPath}`);
+            await new Promise((resolve, reject) => {
+                this.sqlite = new sqlite3.Database(dbPath, (err) => {
+                    if (err) {
+                        console.error("DB: SQLite Connection Error:", err.message);
+                        reject(err);
+                    } else {
+                        console.log(`DB: SQLite Connection Successful at ${dbPath}`);
+                        resolve();
+                    }
+                });
             });
+            await this.run('PRAGMA busy_timeout = 5000');
+            try { await this.run('PRAGMA journal_mode = WAL'); } catch (e) {}
+            await this.ensureSchema();
+        }
+    }
+
+    async ensureSchema() {
+        const isMySQL = this.type === 'mysql';
+        const userSchema = isMySQL ?
+            `CREATE TABLE IF NOT EXISTS users (
+                uid VARCHAR(255) PRIMARY KEY,
+                email VARCHAR(255),
+                username VARCHAR(255),
+                firstName VARCHAR(255),
+                lastName VARCHAR(255),
+                employeeId VARCHAR(255),
+                phone VARCHAR(255),
+                role VARCHAR(255),
+                password VARCHAR(255),
+                sessionToken VARCHAR(512),
+                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+            )` :
+            `CREATE TABLE IF NOT EXISTS users (
+                uid TEXT PRIMARY KEY,
+                email TEXT,
+                username TEXT,
+                firstName TEXT,
+                lastName TEXT,
+                employeeId TEXT,
+                phone TEXT,
+                role TEXT,
+                password TEXT,
+                sessionToken TEXT,
+                createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`;
+        await this.run(userSchema);
+
+        const collSchema = isMySQL ?
+            `CREATE TABLE IF NOT EXISTS collections (
+                id VARCHAR(255) PRIMARY KEY,
+                name VARCHAR(255),
+                data LONGTEXT,
+                updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+            )` :
+            `CREATE TABLE IF NOT EXISTS collections (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                data TEXT,
+                updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`;
+        await this.run(collSchema);
+
+        const extraCols = [
+            ['username', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
+            ['firstName', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
+            ['lastName', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
+            ['employeeId', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
+            ['phone', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
+            ['sessionToken', isMySQL ? 'VARCHAR(512)' : 'TEXT']
+        ];
+        for (const [col, type] of extraCols) {
+            try {
+                await this.run(`ALTER TABLE users ADD COLUMN ${col} ${type}`);
+            } catch (e) { /* column already exists */ }
         }
 
+        try {
+            if (isMySQL) {
+                await this.run('CREATE INDEX idx_collections_name ON collections (name)');
+            } else {
+                await this.run('CREATE INDEX IF NOT EXISTS idx_collections_name ON collections (name)');
+            }
+        } catch (e) { /* index already exists */ }
+
+        await this.seedDefaultAdmin();
+        await this.seedDefaultSettings();
+    }
+
+    async seedDefaultSettings() {
+        const defaults = [
+            ['companyProfile', { companyName: 'IT Guy Solutions', website: 'https://itguysa.co.za' }],
+            ['systemSettings', { enablePOS: true }],
+            ['documentSettings', {}]
+        ];
+        for (const [id, data] of defaults) {
+            try {
+                const row = await this.get("SELECT id FROM collections WHERE name = 'settings' AND id = ?", [id]);
+                if (row) continue;
+                const jsonData = JSON.stringify(data);
+                if (this.type === 'mysql') {
+                    await this.run(
+                        `INSERT INTO collections (id, name, data, updatedAt) VALUES (?, 'settings', ?, CURRENT_TIMESTAMP)
+                         ON DUPLICATE KEY UPDATE updatedAt = updatedAt`,
+                        [id, jsonData]
+                    );
+                } else {
+                    await this.run(
+                        `INSERT OR IGNORE INTO collections (id, name, data, updatedAt) VALUES (?, 'settings', ?, CURRENT_TIMESTAMP)`,
+                        [id, jsonData]
+                    );
+                }
+            } catch (e) {
+                console.warn('DB: settings seed skipped', id, e.message);
+            }
+        }
+    }
+
+    async seedDefaultAdmin() {
+        try {
+            const existing = await this.get("SELECT uid FROM users LIMIT 1");
+            if (existing) return;
+
+            console.log("DB: Seeding default admin user (admin / admin123)...");
+            const hashedPassword = await bcrypt.hash('admin123', 12);
+            const admin = {
+                uid: 'admin-123',
+                email: 'admin@itguy.co.za',
+                username: 'admin',
+                firstName: 'System',
+                lastName: 'Admin',
+                employeeId: 'EMP-001',
+                role: 'admin'
+            };
+            await this.run(
+                "INSERT INTO users (uid, email, username, firstName, lastName, employeeId, role, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                [admin.uid, admin.email, admin.username, admin.firstName, admin.lastName, admin.employeeId, admin.role, hashedPassword]
+            );
+            const jsonData = JSON.stringify(admin);
+            if (this.type === 'mysql') {
+                await this.run(
+                    `INSERT INTO collections (id, name, data, updatedAt) VALUES (?, 'users', ?, CURRENT_TIMESTAMP)
+                     ON DUPLICATE KEY UPDATE data = VALUES(data), updatedAt = CURRENT_TIMESTAMP`,
+                    [admin.uid, jsonData]
+                );
+            } else {
+                await this.run(
+                    `INSERT OR REPLACE INTO collections (id, name, data, updatedAt) VALUES (?, 'users', ?, CURRENT_TIMESTAMP)`,
+                    [admin.uid, jsonData]
+                );
+            }
+        } catch (err) {
+            console.error("DB: Admin seed skipped:", err.message);
+        }
     }
 
     // Generic Run (Insert/Update/Delete)
@@ -190,6 +355,8 @@ class Database {
     }
 
     async close() {
+        this.ready = false;
+        this._initPromise = null;
         if (this.type === 'mysql') {
             await this.pool.end();
         } else if (this.sqlite) {

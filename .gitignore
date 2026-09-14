@@ -2,9 +2,13 @@ node_modules/
 uploads/*
 !uploads/.gitkeep
 database.sqlite
+database.sqlite-wal
+database.sqlite-shm
 database.sqlite.bak
 .env
 .env.local
 .env.*.local
 logs/
 *.log
+startup_log.txt
+emergency_error.txt

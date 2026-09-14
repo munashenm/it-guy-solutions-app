@@ -8,9 +8,12 @@
     --accent: #6366f1; /* More vibrant Indigo */
     --accent-hover: #4f46e5;
     --accent-rgb: 99, 102, 241;
+    --primary: var(--accent);
+    --primary-rgb: var(--accent-rgb);
     --success: #10b981;
     --warning: #f59e0b;
     --danger: #ef4444;
+    --danger-rgb: 239, 68, 68;
     --border: rgba(255, 255, 255, 0.05);
     
     /* Advanced Glassmorphism */
@@ -22,6 +25,7 @@
     --shadow-md: 0 10px 15px -3px rgba(0,0,0,0.2), 0 4px 6px -4px rgba(0,0,0,0.2);
     --shadow-lg: 0 20px 25px -5px rgba(0,0,0,0.3), 0 8px 10px -6px rgba(0,0,0,0.3);
     --shadow-accent: 0 10px 20px -5px rgba(99, 102, 241, 0.4);
+    --shadow-glass: 0 20px 40px rgba(0, 0, 0, 0.35);
     
     --sidebar-width: 280px;
     --topbar-height: 80px;
@@ -32,6 +36,7 @@
     
     --transition-smooth: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     --transition-fast: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition: var(--transition-fast);
 }
 
 * {
@@ -93,7 +98,8 @@ body {
     letter-spacing: 0.5px;
 }
 
-.sidebar-header h2 .highlight {
+.sidebar-header h2 .highlight,
+.highlight {
     color: var(--accent);
     font-weight: 700;
 }
@@ -841,6 +847,18 @@ tr:hover {
     font-weight: 700;
 }
 
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
 .form-control {
     width: 100%;
     background: rgba(255, 255, 255, 0.03);
@@ -933,6 +951,36 @@ textarea.form-control {
     background: var(--accent);
     color: white;
     box-shadow: 0 2px 10px rgba(108, 92, 231, 0.3);
+}
+
+.login-alt-links {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--glass-border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: center;
+}
+
+.login-alt-links a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.88rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: var(--transition-fast);
+}
+
+.login-alt-links a:hover {
+    color: var(--accent);
+}
+
+body.page-public {
+    overflow: auto;
+    height: auto;
+    min-height: 100vh;
 }
 
 /* Settings Sub-Tabs */
@@ -1028,97 +1076,97 @@ textarea.form-control {
     box-shadow: var(--shadow-md);
 }
 
- / *   - - -   R E S P O N S I V E   D E S I G N   - - -   * / 
- @ m e d i a   ( m a x - w i d t h :   9 9 2 p x )   { 
-         . s i d e b a r   { 
-                 p o s i t i o n :   f i x e d ; 
-                 l e f t :   - 3 0 0 p x ; 
-                 t o p :   0 ; 
-                 h e i g h t :   1 0 0 v h ; 
-                 t r a n s i t i o n :   l e f t   0 . 3 s   c u b i c - b e z i e r ( 0 . 2 5 ,   0 . 8 ,   0 . 2 5 ,   1 ) ; 
-                 b o x - s h a d o w :   1 0 p x   0   3 0 p x   r g b a ( 0 , 0 , 0 , 0 . 5 ) ; 
-         } 
-         . s i d e b a r . o p e n   { 
-                 l e f t :   0 ; 
-         } 
-         . m o b i l e - m e n u - b t n   { 
-                 d i s p l a y :   f l e x   ! i m p o r t a n t ; 
-                 m a r g i n - r i g h t :   1 2 p x ; 
-         } 
-         . t o p b a r   { 
-                 p a d d i n g :   0   1 6 p x ; 
-         } 
-         . d a s h b o a r d - g r i d ,   . s t a t s - g r i d   { 
-                 g r i d - t e m p l a t e - c o l u m n s :   1 f r ; 
-         } 
-         . t o p b a r - u s e r   . u s e r - i n f o   { 
-                 d i s p l a y :   n o n e ; 
-         } 
-         . s e a r c h - b a r   { 
-                 w i d t h :   1 5 0 p x ; 
-         } 
-         . s e a r c h - b a r : f o c u s - w i t h i n   { 
-                 w i d t h :   2 5 0 p x ; 
-         } 
-         . f o r m - r o w   { 
-                 f l e x - d i r e c t i o n :   c o l u m n ; 
-                 g a p :   0 ; 
-         } 
-         . l o g i n - w r a p p e r   { 
-                 p a d d i n g :   2 0 p x ; 
-         } 
- } 
- 
- @ m e d i a   ( m a x - w i d t h :   6 0 0 p x )   { 
-         . c o n t e n t - w r a p p e r   { 
-                 p a d d i n g :   1 6 p x ; 
-         } 
-         . s t a t s - g r i d ,   . d a s h b o a r d - g r i d   { 
-                 g r i d - t e m p l a t e - c o l u m n s :   1 f r ; 
-         } 
-         . g l a s s - c a r d   { 
-                 p a d d i n g :   1 6 p x ; 
-         } 
-         . s t a t - c a r d   { 
-                 f l e x - d i r e c t i o n :   r o w ; 
-                 a l i g n - i t e m s :   c e n t e r ; 
-                 t e x t - a l i g n :   l e f t ; 
-         } 
-         . s e a r c h - b a r   { 
-                 w i d t h :   1 2 0 p x ; 
-         } 
-         . s e a r c h - b a r : f o c u s - w i t h i n   { 
-                 p o s i t i o n :   a b s o l u t e ; 
-                 w i d t h :   c a l c ( 1 0 0 v w   -   8 0 p x ) ;   / *   F i l l   m o s t   o f   b a r   * / 
-                 l e f t :   5 0 p x ; 
-                 b a c k g r o u n d :   v a r ( - - b g - p r i m a r y ) ; 
-                 z - i n d e x :   1 0 0 0 ; 
-         } 
-         . m o d a l - c o n t e n t   { 
-                 p a d d i n g :   2 0 p x ; 
-                 w i d t h :   9 5 % ; 
-         } 
-         . s e c t i o n - h e a d e r   { 
-                 f l e x - d i r e c t i o n :   c o l u m n ; 
-                 a l i g n - i t e m s :   f l e x - s t a r t ; 
-                 g a p :   1 6 p x ; 
-         } 
-         . s e c t i o n - h e a d e r   >   d i v : l a s t - c h i l d   { 
-                 w i d t h :   1 0 0 % ; 
-         } 
-         . s e c t i o n - h e a d e r   b u t t o n   { 
-                 w i d t h :   1 0 0 % ; 
-                 j u s t i f y - c o n t e n t :   c e n t e r ; 
-         } 
-         . t a b l e - c o n t a i n e r   { 
-                 f o n t - s i z e :   0 . 8 5 r e m ; 
-         } 
-         t h ,   t d   { 
-                 p a d d i n g :   1 0 p x   8 p x ; 
-         } 
- } 
-  
- /* Appended Mobile Responsiveness Overrides */
+/* --- RESPONSIVE DESIGN --- */
+@media (max-width: 992px) {
+    .sidebar {
+        position: fixed;
+        left: -300px;
+        top: 0;
+        height: 100vh;
+        transition: left 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+        box-shadow: 10px 0 30px rgba(0,0,0,0.5);
+    }
+    .sidebar.open {
+        left: 0;
+    }
+    .mobile-menu-btn {
+        display: flex !important;
+        margin-right: 12px;
+    }
+    .topbar {
+        padding: 0 16px;
+    }
+    .dashboard-grid, .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    .topbar-user .user-info {
+        display: none;
+    }
+    .search-bar {
+        width: 150px;
+    }
+    .search-bar:focus-within {
+        width: 250px;
+    }
+    .form-row {
+        flex-direction: column;
+        gap: 0;
+    }
+    .login-wrapper {
+        padding: 20px;
+    }
+}
+
+@media (max-width: 600px) {
+    .content-wrapper {
+        padding: 16px;
+    }
+    .stats-grid, .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+    .glass-card {
+        padding: 16px;
+    }
+    .stat-card {
+        flex-direction: row;
+        align-items: center;
+        text-align: left;
+    }
+    .search-bar {
+        width: 120px;
+    }
+    .search-bar:focus-within {
+        position: absolute;
+        width: calc(100vw - 80px); /* Fill most of bar */
+        left: 50px;
+        background: var(--bg-primary);
+        z-index: 1000;
+    }
+    .modal-content {
+        padding: 20px;
+        width: 95%;
+    }
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 16px;
+    }
+    .section-header > div:last-child {
+        width: 100%;
+    }
+    .section-header button {
+        width: 100%;
+        justify-content: center;
+    }
+    .table-container {
+        font-size: 0.85rem;
+    }
+    th, td {
+        padding: 10px 8px;
+    }
+}
+
+/* Appended Mobile Responsiveness Overrides */
 .settings-tabs, .glass-tabs {
     flex-wrap: nowrap;
     overflow-x: auto;
