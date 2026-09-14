@@ -237,6 +237,9 @@ class Database {
 
     async _ensureReady() {
         if (this.ready) return;
+        // Connection already exists while init() is still creating schema — do not
+        // await _initPromise here or run/get/all deadlock against init.
+        if (this.sqlite || this.pool) return;
         if (this._initPromise) {
             await this._initPromise;
             return;
