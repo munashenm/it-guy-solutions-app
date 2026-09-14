@@ -60,7 +60,9 @@ window.field = {
         html += jobs.map(job => this.renderFieldCard(job)).join('');
 
         html += `</div>`;
-        this.container.innerHTML = html;
+        (window.app && window.app.writeViewHtml)
+            ? window.app.writeViewHtml(this.container, html)
+            : (this.container.innerHTML = html);
     },
 
     renderFieldCard(job) {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'itguy-app-4.6';
+const CACHE_NAME = 'itguy-app-4.7';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

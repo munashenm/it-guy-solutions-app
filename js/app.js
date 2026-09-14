@@ -107,7 +107,9 @@ const app = {
         console.log("Starting Core Sync...");
         this.unsubscribes = this.unsubscribes || [];
         this._activeCollections = new Set();
-        this._syncRawData = {}; 
+        this._syncRawData = {};
+        this._collFp = this._collFp || {};
+        this._docFp = this._docFp || {}; 
 
         // Always sync core settings for branding and logic
         this.requestSync(['settings', 'companyProfile', 'systemSettings']);
@@ -143,7 +145,12 @@ const app = {
             const stateKey = this.getCollectionStateKey(coll);
             const unsub = window.fbDb.collection(coll).onSnapshot(snap => {
                 if(!this._syncRawData[stateKey]) this._syncRawData[stateKey] = {};
-                this._syncRawData[stateKey][coll] = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const rows = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const fp = this._fingerprint(rows);
+                if (this._collFp[coll] === fp) return;
+                this._collFp[coll] = fp;
+
+                this._syncRawData[stateKey][coll] = rows;
                 this.state[stateKey] = Object.values(this._syncRawData[stateKey]).flat();
                 
                 if(stateKey === 'inventory') this.migrateInventorySchema();
@@ -162,6 +169,10 @@ const app = {
         const unsub = window.fbDb.collection(coll).doc(docId).onSnapshot(doc => {
             if(doc.exists) {
                 const data = doc.data();
+                const fp = this._fingerprint(data);
+                if (this._docFp[docId] === fp) return;
+                this._docFp[docId] = fp;
+
                 if (docId === 'companyProfile') {
                     this.state.companyProfile = data;
                     this.state.settings = { ...(this.state.settings || {}), ...data };
@@ -198,6 +209,12 @@ const app = {
     applyBranding(data) {
         if(!data) return;
         try {
+        const brandFp = this._fingerprint({
+            themeColor: data.themeColor || '',
+            logoUrl: data.logoUrl || data.brandLogo || ''
+        });
+        if (this._brandFp === brandFp) return;
+        this._brandFp = brandFp;
 
         // 1. Update Theme Colors (Accent)
         if(data.themeColor) {
@@ -250,12 +267,38 @@ const app = {
         return result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '108, 92, 231';
     },
 
-    refreshActiveViews() {
+    writeViewHtml(el, html) {
+        if (!el) return;
+        if (el._itguyHtml === html) return;
+        el._itguyHtml = html;
+        el.innerHTML = html;
+    },
+
+    _fingerprint(value) {
+        try {
+            return JSON.stringify(value);
+        } catch (e) {
+            return '';
+        }
+    },
+
+    viewDataFingerprint(viewId) {
+        const colls = this.viewCollections[viewId] || [];
+        const keys = [...new Set(colls.map(c => this.getCollectionStateKey(c)))];
+        const slice = {};
+        keys.forEach(k => { slice[k] = this.state[k]; });
+        return this._fingerprint(slice);
+    },
+
+    refreshActiveViews(force = false) {
+        this._refreshForce = this._refreshForce || !!force;
         clearTimeout(this._refreshTimer);
         this._refreshTimer = setTimeout(() => {
             this._refreshTimer = null;
-            this.paintActiveView();
-        }, 50);
+            const forced = this._refreshForce;
+            this._refreshForce = false;
+            this.paintActiveView(forced);
+        }, 80);
     },
 
     ensureViewVisible(viewId) {
@@ -281,10 +324,13 @@ const app = {
         });
     },
 
-    paintActiveView() {
+    paintActiveView(force = false) {
         if (!this.state.currentView) return;
         const activeView = this.state.currentView;
-        this.ensureViewVisible(activeView);
+        const fp = this.viewDataFingerprint(activeView);
+        if (!force && this._paintedView === activeView && this._paintedFp === fp) return;
+        this._paintedView = activeView;
+        this._paintedFp = fp;
         
         const safeRender = (module, name) => {
             if (module && typeof module.render === 'function') {
@@ -317,7 +363,6 @@ const app = {
 
         // Post-render UX: Inject labels for mobile card-view
         this.injectTableLabels();
-        this.ensureViewVisible(activeView);
     },
 
     async checkSystemHealth() {
@@ -334,7 +379,7 @@ const app = {
             text.textContent = isHealthy ? 'System Online' : 'DB Sync Error';
             text.style.color = isHealthy ? '#00b894' : '#ff7675';
             const engineInfo = status.dbType ? `${status.dbType.toUpperCase()} Engine` : 'Local Engine';
-            if (label) label.textContent = `${engineInfo} | v4.6`;
+            if (label) label.textContent = `${engineInfo} | v4.7`;
             
             if (!isHealthy && status.dbError) {
                 console.error("Database Health Warning:", status.dbError);
@@ -932,7 +977,7 @@ const app = {
         this.state.currentView = viewId;
         this.ensureViewVisible(viewId);
         this.updateViewSync(viewId);
-        this.paintActiveView();
+        this.paintActiveView(true);
     },
 
     switchTab(viewId) {

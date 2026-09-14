@@ -154,13 +154,14 @@ class LocalStorage {
 
     onSnapshot(callback) {
         this.listeners.push(callback);
-        
-        // Only start polling if there's at least one listener and the tab is visible
+
+        if (this._emitted) {
+            try { callback(this._snapshot()); } catch (e) { console.error(e); }
+        }
+
         this.startPolling();
-        
-        // Initial fetch
         this.fetch();
-        
+
         return () => {
             this.listeners = this.listeners.filter(l => l !== callback);
             if (this.listeners.length === 0) this.stopPolling();
@@ -194,15 +195,20 @@ class LocalStorage {
                 this._emptyStreak = 0;
                 this.data = list;
             }
-            
+
+            const fp = this._fingerprint(this.data);
+            const unchanged = this._emitted && fp === this._fp;
+            this._fp = fp;
+
             // Clear global sync error if this was a recovery
             if (this._hasSyncError) {
                 this._hasSyncError = false;
                 this.updateGlobalSyncStatus();
             }
-            
+
+            this._retryCount = 0;
+            if (unchanged) return;
             this.emit();
-            this._retryCount = 0; // Reset on success
         } catch (e) {
             console.error(`Fetch error for ${this.name}:`, e.message);
             this._retryCount = (this._retryCount || 0) + 1;
@@ -262,13 +268,20 @@ class LocalStorage {
         };
     }
 
-    emit() {
+    _fingerprint(list) {
+        try {
+            return JSON.stringify(list || []);
+        } catch (e) {
+            return String((list || []).length);
+        }
+    }
+
+    _snapshot() {
         const snapDocs = (this.data || []).map(d => ({
             id: d.id,
             data: () => d
         }));
 
-        // Merge pending items that aren't in the main list yet
         for (const id in this._pending) {
             const found = snapDocs.find(d => d.id === id);
             if (!found) {
@@ -277,17 +290,22 @@ class LocalStorage {
                     data: () => this._pending[id]
                 });
             } else {
-                // Item has successfully synced to server list, remove from pending
                 delete this._pending[id];
             }
         }
 
-        const snap = { docs: snapDocs };
+        return { docs: snapDocs };
+    }
+
+    emit() {
+        this._emitted = true;
+        const snap = this._snapshot();
         this.listeners.forEach(l => l(snap));
     }
 
     startPolling() {
-        if (this.pollInterval) return;
+        if (this._polling) return;
+        this._polling = true;
 
         const poll = () => {
             // Stop polling if the window is not visible to save server resources
@@ -329,6 +347,7 @@ class LocalStorage {
     }
 
     stopPolling() {
+        this._polling = false;
         if (this.pollTimeout) {
             clearTimeout(this.pollTimeout);
             this.pollTimeout = null;

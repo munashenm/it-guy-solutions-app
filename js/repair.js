@@ -48,7 +48,9 @@ window.repair = {
             </div>
         `;
         
-        this.container.innerHTML = html;
+        (window.app && window.app.writeViewHtml)
+            ? window.app.writeViewHtml(this.container, html)
+            : (this.container.innerHTML = html);
         this.scrollToBottom();
     },
 
