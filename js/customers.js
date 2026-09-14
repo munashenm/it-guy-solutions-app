@@ -12,8 +12,8 @@ window.customers = {
         let html = `
             <div class="section-header">
                 <div>
-                    <h1>Customer Directory (CRM)</h1>
-                    <p style="color: #a0a0a0; margin-top: 4px;">Manage client data and view historical transactions.</p>
+                    <h1>Customers</h1>
+                    <p style="color: #a0a0a0; margin-top: 4px;">Names, phone numbers, and job history in one place.</p>
                 </div>
                 <div style="display: flex; gap: 12px;">
                     <button class="btn-primary" onclick="customers.showAddCustomerModal()"><span class="material-symbols-outlined">person_add</span> Add Customer</button>
@@ -25,7 +25,7 @@ window.customers = {
                     <table id="customers-table">
                         <thead>
                             <tr>
-                                <th>Client Name</th>
+                                <th>Customer</th>
                                 <th>Phone Number</th>
                                 <th>Email Address</th>
                                 <th>Address</th>
@@ -43,7 +43,7 @@ window.customers = {
 
     renderCustomerRows() {
         if(!window.app || !window.app.state.customers || window.app.state.customers.length === 0) {
-            return `<tr><td colspan="5" style="text-align: center; color: #a0a0a0;">No customers registered yet.</td></tr>`;
+            return `<tr><td colspan="5" style="text-align: center; color: #a0a0a0; padding: 32px;">No customers yet. Add one so jobs and invoices can pick them from the list.</td></tr>`;
         }
         
         return window.app.state.customers.map(c => `

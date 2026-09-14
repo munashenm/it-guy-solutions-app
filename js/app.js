@@ -112,7 +112,7 @@ const app = {
         this._docFp = this._docFp || {}; 
 
         // Always sync core settings for branding and logic
-        this.requestSync(['settings', 'companyProfile', 'systemSettings']);
+        this.requestSync(['settings', 'companyProfile', 'systemSettings', 'users', 'customers', 'tickets']);
         
         // Initial sync for current view
         const hash = window.location.hash || '#dashboard';
@@ -274,6 +274,97 @@ const app = {
         el.innerHTML = html;
     },
 
+    escapeHtml(str) {
+        return String(str == null ? '' : str).replace(/[&<>"']/g, ch => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[ch]));
+    },
+
+    partyName(doc, fallback = '—') {
+        if (!doc) return fallback;
+        return doc.customer || doc.client || doc.customerName || doc.company || doc.name || fallback;
+    },
+
+    personName(user) {
+        if (!user) return 'Staff';
+        const full = [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
+        return full || user.username || (user.email || '').split('@')[0] || 'Staff';
+    },
+
+    displayRole(role) {
+        const map = {
+            admin: 'Admin',
+            technician: 'Technician',
+            frontdesk: 'Front Desk',
+            employee: 'Staff',
+            client: 'Customer'
+        };
+        const key = (role || '').toLowerCase();
+        return map[key] || (role ? role.charAt(0).toUpperCase() + role.slice(1) : '');
+    },
+
+    parseMoney(val) {
+        if (typeof val === 'number') return val;
+        const n = parseFloat(String(val || '').replace(/[^\d.-]/g, ''));
+        return Number.isNaN(n) ? 0 : n;
+    },
+
+    formatMoney(val) {
+        return 'R ' + this.parseMoney(val).toLocaleString('en-ZA', {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+    },
+
+    staffSelectOptions(selected = '') {
+        const names = new Set();
+        (this.state.users || []).forEach(u => {
+            if ((u.role || '').toLowerCase() === 'client') return;
+            const name = this.personName(u);
+            if (name) names.add(name);
+        });
+        if (selected) names.add(selected);
+        let html = `<option value="">Unassigned</option>`;
+        [...names].sort((a, b) => a.localeCompare(b)).forEach(name => {
+            const sel = selected === name ? 'selected' : '';
+            html += `<option value="${this.escapeHtml(name)}" ${sel}>${this.escapeHtml(name)}</option>`;
+        });
+        return html;
+    },
+
+    toggleNotifications(event) {
+        if (event) event.stopPropagation();
+        const panel = document.getElementById('notifications-panel');
+        if (!panel) return;
+        const opening = panel.classList.contains('hidden');
+        document.getElementById('global-search-results')?.classList.add('hidden');
+        panel.classList.toggle('hidden', !opening);
+        if (opening) this.renderNotifications();
+    },
+
+    renderNotifications() {
+        const panel = document.getElementById('notifications-panel');
+        if (!panel) return;
+        const logs = [...(this.state.activityLog || [])].sort((a, b) => {
+            const ta = new Date(a.timestamp?.seconds ? a.timestamp.seconds * 1000 : a.timestamp || 0).getTime();
+            const tb = new Date(b.timestamp?.seconds ? b.timestamp.seconds * 1000 : b.timestamp || 0).getTime();
+            return tb - ta;
+        }).slice(0, 8);
+
+        if (!logs.length) {
+            panel.innerHTML = `<div class="notif-empty">You're all caught up. New jobs, quotes, and tickets will show here.</div>`;
+            return;
+        }
+
+        panel.innerHTML = logs.map(log => `
+            <div class="notif-item">
+                <strong>${this.escapeHtml(log.event || 'Update')}</strong>
+                <span>${this.escapeHtml(log.details || '')}</span>
+                <em>${this.escapeHtml(log.user || '')}</em>
+            </div>
+        `).join('');
+    },
+
     _fingerprint(value) {
         try {
             return JSON.stringify(value);
@@ -379,7 +470,7 @@ const app = {
             text.textContent = isHealthy ? 'System Online' : 'DB Sync Error';
             text.style.color = isHealthy ? '#00b894' : '#ff7675';
             const engineInfo = status.dbType ? `${status.dbType.toUpperCase()} Engine` : 'Local Engine';
-            if (label) label.textContent = `${engineInfo} | v4.7`;
+            if (label) label.textContent = `${engineInfo} | v4.8`;
             
             if (!isHealthy && status.dbError) {
                 console.error("Database Health Warning:", status.dbError);
@@ -483,34 +574,48 @@ const app = {
             jobs: [],
             invoices: [],
             quotations: [],
-            inventory: []
+            inventory: [],
+            customers: [],
+            tickets: []
         };
 
         // 1. Search Jobs (Workshop & Field)
         const allJobs = [...(this.state.jobs || []), ...(this.state.fieldJobs || [])];
         results.jobs = allJobs.filter(j => 
             (j.id || '').toLowerCase().includes(q) || 
-            (j.customer || j.customerName || '').toLowerCase().includes(q)
-        ).slice(0, 10);
+            this.partyName(j, '').toLowerCase().includes(q)
+        ).slice(0, 8);
 
         // 2. Search Invoices
         results.invoices = (this.state.invoices || []).filter(inv => 
             (inv.id || '').toLowerCase().includes(q) || 
-            (inv.customer || '').toLowerCase().includes(q)
-        ).slice(0, 10);
+            this.partyName(inv, '').toLowerCase().includes(q)
+        ).slice(0, 8);
 
         // 3. Search Quotations
         results.quotations = (this.state.quotations || []).filter(quo => 
             (quo.id || '').toLowerCase().includes(q) || 
-            (quo.customer || '').toLowerCase().includes(q)
-        ).slice(0, 10);
+            this.partyName(quo, '').toLowerCase().includes(q)
+        ).slice(0, 8);
 
         // 4. Search Inventory
         results.inventory = (this.state.inventory || []).filter(item => 
             (item.sku || '').toLowerCase().includes(q) || 
             (item.name || '').toLowerCase().includes(q) ||
             (item.serial || '').toLowerCase().includes(q)
-        ).slice(0, 10);
+        ).slice(0, 8);
+
+        results.customers = (this.state.customers || []).filter(c =>
+            (c.name || '').toLowerCase().includes(q) ||
+            (c.email || '').toLowerCase().includes(q) ||
+            (c.phone || '').toLowerCase().includes(q)
+        ).slice(0, 6);
+
+        results.tickets = (this.state.tickets || []).filter(t =>
+            (t.id || '').toLowerCase().includes(q) ||
+            this.partyName(t, '').toLowerCase().includes(q) ||
+            (t.subject || '').toLowerCase().includes(q)
+        ).slice(0, 6);
 
         this.renderGlobalSearchResults(results);
     },
@@ -519,10 +624,10 @@ const app = {
         const resultsEl = document.getElementById('global-search-results');
         if(!resultsEl) return;
 
-        const hasResults = results.jobs.length > 0 || results.invoices.length > 0 || results.quotations.length > 0 || results.inventory.length > 0;
+        const hasResults = results.jobs.length > 0 || results.invoices.length > 0 || results.quotations.length > 0 || results.inventory.length > 0 || results.customers.length > 0 || results.tickets.length > 0;
         
         if(!hasResults) {
-            resultsEl.innerHTML = `<div class="search-no-results">No documents found matching your search.</div>`;
+            resultsEl.innerHTML = `<div class="search-no-results">No customers, jobs, quotes, or invoices match that search.</div>`;
             resultsEl.classList.remove('hidden');
             return;
         }
@@ -536,7 +641,7 @@ const app = {
                     <div class="search-item-icon"><span class="material-symbols-outlined">description</span></div>
                     <div class="search-item-info">
                         <div class="search-item-title">${j.id}</div>
-                        <div class="search-item-subtitle">${j.customer || j.customerName || 'Walk-in'} - ${j.device || 'Repair'}</div>
+                        <div class="search-item-subtitle">${this.partyName(j, 'Walk-in')} - ${j.device || 'Repair'}</div>
                     </div>
                 </div>
             `).join('');
@@ -549,7 +654,7 @@ const app = {
                     <div class="search-item-icon" style="color: #fdcb6e;"><span class="material-symbols-outlined">request_quote</span></div>
                     <div class="search-item-info">
                         <div class="search-item-title">${q.id}</div>
-                        <div class="search-item-subtitle">${q.customer || 'Unnamed Client'} - R ${q.amount || '0.00'}</div>
+                        <div class="search-item-subtitle">${this.partyName(q, 'No customer')} · ${this.formatMoney(q.amount)}</div>
                     </div>
                 </div>
             `).join('');
@@ -562,7 +667,7 @@ const app = {
                     <div class="search-item-icon" style="color: #00b894;"><span class="material-symbols-outlined">receipt_long</span></div>
                     <div class="search-item-info">
                         <div class="search-item-title">${inv.id}</div>
-                        <div class="search-item-subtitle">${inv.customer || 'Unnamed Client'} - R ${inv.amount || '0.00'}</div>
+                        <div class="search-item-subtitle">${this.partyName(inv, 'No customer')} · ${this.formatMoney(inv.amount)}</div>
                     </div>
                 </div>
             `).join('');
@@ -581,11 +686,37 @@ const app = {
             `).join('');
         }
 
+        if(results.customers.length > 0) {
+            html += `<div class="search-header"><span class="material-symbols-outlined" style="font-size: 1rem;">contacts</span> Customers</div>`;
+            html += results.customers.map(c => `
+                <div class="search-item" onclick="app.closeModal(); window.location.hash='#customers';">
+                    <div class="search-item-icon"><span class="material-symbols-outlined">person</span></div>
+                    <div class="search-item-info">
+                        <div class="search-item-title">${this.escapeHtml(c.name || 'Customer')}</div>
+                        <div class="search-item-subtitle">${this.escapeHtml(c.phone || c.email || '')}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        if(results.tickets.length > 0) {
+            html += `<div class="search-header"><span class="material-symbols-outlined" style="font-size: 1rem;">confirmation_number</span> Tickets</div>`;
+            html += results.tickets.map(t => `
+                <div class="search-item" onclick="window.location.hash='#tickets';">
+                    <div class="search-item-icon"><span class="material-symbols-outlined">confirmation_number</span></div>
+                    <div class="search-item-info">
+                        <div class="search-item-title">${this.escapeHtml(t.id || '')} · ${this.escapeHtml(t.subject || 'Ticket')}</div>
+                        <div class="search-item-subtitle">${this.escapeHtml(this.partyName(t, ''))}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
         resultsEl.innerHTML = html;
         resultsEl.classList.remove('hidden');
         
         // Cache items for keyboard nav
-        this._searchItems = results.jobs.concat(results.quotations, results.invoices, results.inventory);
+        this._searchItems = results.jobs.concat(results.quotations, results.invoices, results.inventory, results.customers, results.tickets);
         this._searchIndex = -1;
     },
 
@@ -617,11 +748,11 @@ const app = {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 32px; background: rgba(255,255,255,0.03); padding: 20px; border-radius: 12px; border: 1px solid var(--border);">
                 <div>
                     <label style="font-size: 0.75rem; text-transform: uppercase; color: #747d8c; margin-bottom: 4px; display: block;">Customer</label>
-                    <div style="font-weight: 600;">${doc.customer || doc.customerName || 'N/A'}</div>
+                    <div style="font-weight: 600;">${this.partyName(doc, 'N/A')}</div>
                 </div>
                 <div>
                     <label style="font-size: 0.75rem; text-transform: uppercase; color: #747d8c; margin-bottom: 4px; display: block;">Status / Total</label>
-                    <div style="font-weight: 600;">${doc.status || 'Pending'} / R ${doc.amount || '0.00'}</div>
+                    <div style="font-weight: 600;">${doc.status || 'Pending'} / ${this.formatMoney(doc.amount)}</div>
                 </div>
                 <div style="grid-column: span 2;">
                     <label style="font-size: 0.75rem; text-transform: uppercase; color: #747d8c; margin-bottom: 4px; display: block;">Associated Info</label>
@@ -634,7 +765,7 @@ const app = {
             actionsHTML = `
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
                     <button class="btn-primary" onclick="app.executeDocumentAction('Print', 'Invoice', '${doc.id}')"><span class="material-symbols-outlined">download</span> Download (Reprint)</button>
-                    <button class="btn-primary" onclick="app.showSendModal('${doc.id}', 'Invoice')" style="background: var(--accent);"><span class="material-symbols-outlined">send</span> Resend to Client</button>
+                    <button class="btn-primary" onclick="app.showSendModal('${doc.id}', 'Invoice')" style="background: var(--accent);"><span class="material-symbols-outlined">send</span> Send to customer</button>
                     <button class="btn-secondary" onclick="app.markInvoiceAsPaid('${doc.id}')" style="grid-column: span 2; justify-content: center; border-color: var(--success); color: var(--success);"><span class="material-symbols-outlined">payments</span> Mark as Paid</button>
                 </div>
             `;
@@ -844,6 +975,11 @@ const app = {
             if (dropdown && searchWrap && !searchWrap.contains(e.target)) {
                 dropdown.classList.add('hidden');
             }
+            const notifWrap = document.getElementById('notifications-wrap');
+            const notifPanel = document.getElementById('notifications-panel');
+            if (notifPanel && notifWrap && !notifWrap.contains(e.target)) {
+                notifPanel.classList.add('hidden');
+            }
         });
 
         // Close modal on outside click
@@ -1025,7 +1161,7 @@ const app = {
             doc = this.state._lastCreatedDoc;
         }
 
-        const clientName = doc ? (doc.customer || doc.customerName || 'N/A') : 'N/A';
+        const clientName = doc ? this.partyName(doc, 'N/A') : 'N/A';
         const amount = doc ? (doc.amount || '') : '';
         const email = doc ? (doc.email || '') : '';
         const phone = doc ? (doc.phone || '') : '';
@@ -1037,9 +1173,9 @@ const app = {
         if(!confirm(`Mark invoice ${id} as fully paid?`)) return;
         try {
             await window.fbDb.collection('invoices').doc(id).update({ status: 'Paid', updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-            alert("Invoice marked as Paid!");
+            this.showToast('Invoice ' + id + ' marked as paid.', 'success');
             this.closeModal();
-            this.refreshActiveViews();
+            this.refreshActiveViews(true);
         } catch(e) {
             console.error(e);
             alert("Error updating invoice: " + e.message);
@@ -1193,8 +1329,7 @@ const app = {
                 }, 800);
             }
             
-            // Simulating auto-email notification toast
-            alert('Job ' + newId + ' created successfully in Live DB! PDF generated and sent to customer via ' + (email ? 'Email' : 'WhatsApp') + '.');
+            this.showToast('Job ' + newId + ' saved. Choose how to share the job card.', 'success');
         } catch(err) {
             console.error(err);
             alert("Database error: Could not save job.");
@@ -1213,7 +1348,7 @@ const app = {
                 <div class="modal-body">
                     <form id="schedule-callout-form" onsubmit="app.handleScheduledCallout(event)">
                         <div class="form-group">
-                            <label>Client Details (Name or Company)</label>
+                            <label>Customer</label>
                             <div style="display: flex; gap: 8px;">
                                 <input type="text" id="callout-client" list="crm-customers-list" class="form-control" placeholder="Select existing or type Walk-in" required oninput="app.fillCustomerDetails(this.value, 'callout')">
                                 <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal('callout')" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>
@@ -1355,7 +1490,7 @@ const app = {
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Company / Client Name (Optional)</label>
+                                <label>Customer name</label>
                                 <div style="display: flex; gap: 8px;">
                                     <input type="text" id="inv-client" list="crm-customers-list" class="form-control" placeholder="e.g. Acme Corp or Walk-in" oninput="app.fillCustomerDetails(this.value, 'inv')">
                                     <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal('invoice')" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>
@@ -1597,7 +1732,7 @@ const app = {
     showScheduleCalloutModal() {
         const dateStr = new Date().toISOString().split('T')[0];
         const customers = this.state.customers || [];
-        const techs = ['Unassigned', 'Admin User', 'Tech John', 'Tech Sarah']; // Could be dynamic
+        const techsHtml = this.staffSelectOptions();
         
         const modalHTML = `
             <div class="modal-content" style="max-width: 500px;">
@@ -1631,7 +1766,7 @@ const app = {
                         <div class="form-group">
                             <label>Assign Technician</label>
                             <select id="call-tech" class="form-control" style="appearance: auto;">
-                                ${techs.map(t => `<option value="${t}">${t}</option>`).join('')}
+                                ${techsHtml}
                             </select>
                         </div>
                         <div class="form-group">
@@ -2053,7 +2188,7 @@ const app = {
 
                         <div class="form-row">
                             <div class="form-group">
-                                <label>Company / Client Name</label>
+                                <label>Customer name</label>
                                 <div style="display: flex; gap: 8px;">
                                     <input type="text" id="quo-client" list="crm-customers-list" class="form-control" placeholder="e.g. Acme Corp or John Doe" value="${data.customer || ''}" required oninput="app.fillCustomerDetails(this.value, 'quo')">
                                     <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal('quotation')" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>

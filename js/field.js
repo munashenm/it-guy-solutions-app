@@ -75,7 +75,7 @@ window.field = {
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
                     <div>
                         <div style="color: #a0a0a0; font-size: 0.8rem; margin-bottom: 4px;">${job.id}</div>
-                        <h3 style="margin: 0; color: #ffffff;">${job.customer}</h3>
+                        <h3 style="margin: 0; color: #ffffff;">${window.app.partyName(job, 'Customer')}</h3>
                     </div>
                     <span class="badge ${statusBadge}">${job.status}</span>
                 </div>

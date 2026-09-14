@@ -400,6 +400,55 @@ body {
     display: none;
 }
 
+.notifications-panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    width: 340px;
+    max-height: 380px;
+    overflow-y: auto;
+    background: rgba(26, 29, 45, 0.96);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-glass);
+    z-index: 1000;
+    padding: 8px 0;
+}
+
+.notifications-panel.hidden {
+    display: none;
+}
+
+.notif-empty {
+    padding: 24px 16px;
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+.notif-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.notif-item strong {
+    font-size: 0.85rem;
+}
+
+.notif-item span {
+    color: var(--text-secondary);
+    font-size: 0.8rem;
+}
+
+.notif-item em {
+    color: #64748b;
+    font-size: 0.7rem;
+    font-style: normal;
+}
+
 .search-header {
     padding: 12px 16px;
     background: rgba(255, 255, 255, 0.03);

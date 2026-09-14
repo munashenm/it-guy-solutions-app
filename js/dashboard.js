@@ -24,13 +24,13 @@ window.dashboard = {
         
         const weeklyRevenue = invoices
             .filter(i => i.status === 'Paid' && new Date(i.createdAt) >= startOfWeek)
-            .reduce((sum, i) => sum + (parseFloat(i.total || i.amount) || 0), 0);
+            .reduce((sum, i) => sum + window.app.parseMoney(i.total || i.amount), 0);
             
-        // Urgent Jobs (Started > 48h ago)
+        const inProgress = ['Booked', 'In Diagnosis', 'Waiting on Parts', 'In Repair', 'Started'];
         const fortyEightHoursAgo = Date.now() - (48 * 60 * 60 * 1000);
         const urgentJobs = jobs.filter(j => 
-            j.status === 'Started' && 
-            new Date(j.createdAt).getTime() < fortyEightHoursAgo
+            inProgress.includes(j.status) && 
+            new Date(j.createdAt || j.date).getTime() < fortyEightHoursAgo
         ).length;
 
         // --- NEW METRICS ---
@@ -38,11 +38,11 @@ window.dashboard = {
         const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
         const monthlyRevenue = invoices
             .filter(i => i.status === 'Paid' && new Date(i.createdAt || i.date) >= startOfMonth)
-            .reduce((sum, i) => sum + (parseFloat(i.total || i.amount) || 0), 0);
+            .reduce((sum, i) => sum + window.app.parseMoney(i.total || i.amount), 0);
         
         const monthlyExpenses = (state.expenses || [])
             .filter(e => new Date(e.date) >= startOfMonth)
-            .reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
+            .reduce((sum, e) => sum + window.app.parseMoney(e.amount), 0);
         
         const monthlyProfit = monthlyRevenue - monthlyExpenses;
 
@@ -77,8 +77,8 @@ window.dashboard = {
                     </div>
                     <div class="stat-content">
                         <h3>Operating Profit</h3>
-                        <div class="value" style="color: ${monthlyProfit >= 0 ? '#00b894' : 'var(--danger)'}">R ${monthlyProfit.toLocaleString()}</div>
-                        <p style="font-size: 0.75rem; color: #a0a0a0; margin-top: 4px;">Rev: R ${monthlyRevenue.toLocaleString()} | Exp: R ${monthlyExpenses.toLocaleString()}</p>
+                        <div class="value" style="color: ${monthlyProfit >= 0 ? '#00b894' : 'var(--danger)'}">${window.app.formatMoney(monthlyProfit)}</div>
+                        <p style="font-size: 0.75rem; color: #a0a0a0; margin-top: 4px;">In: ${window.app.formatMoney(monthlyRevenue)} · Out: ${window.app.formatMoney(monthlyExpenses)}</p>
                     </div>
                 </div>
                 
@@ -109,9 +109,9 @@ window.dashboard = {
                         <span class="material-symbols-outlined">priority_high</span>
                     </div>
                     <div class="stat-content">
-                        <h3>Urgent SLA</h3>
+                        <h3>Waiting over 2 days</h3>
                         <div class="value">${urgentJobs}</div>
-                        <p style="font-size: 0.75rem; color: #a0a0a0; margin-top: 4px;">Repairs exceeding 48h idle</p>
+                        <p style="font-size: 0.75rem; color: #a0a0a0; margin-top: 4px;">Workshop jobs still in progress</p>
                     </div>
                 </div>
             </div>
@@ -121,7 +121,7 @@ window.dashboard = {
                 <div class="glass-card" style="padding: 0;">
                     <div class="header-flex" style="padding: 24px 24px 12px;">
                         <h2>Recent Activity</h2>
-                        <button class="btn-secondary" onclick="app.switchTab('repair-view')">View All repairs</button>
+                        <button class="btn-secondary" onclick="app.switchTab('repair-view')">Open workshop</button>
                     </div>
                     <div class="table-container">
                         <table>
@@ -135,17 +135,17 @@ window.dashboard = {
                                 </tr>
                             </thead>
                             <tbody>
-                                ${jobs.sort((a,b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 5).map(job => `
+                                ${jobs.length ? jobs.sort((a,b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)).slice(0, 5).map(job => `
                                     <tr>
                                         <td><strong>${job.id}</strong></td>
-                                        <td>${job.customerName || job.customer || job.client || '—'}</td>
+                                        <td>${window.app.partyName(job)}</td>
                                         <td>${job.device || job.description || '—'}</td>
                                         <td><span class="badge ${(job.status || 'Unknown').toLowerCase().replace(/ /g, '-')}">${job.status || 'N/A'}</span></td>
                                         <td>
                                             <button class="btn-icon" onclick="repair.openJob('${job.id}'); app.switchTab('repair-view');"><span class="material-symbols-outlined">arrow_forward</span></button>
                                         </td>
                                     </tr>
-                                `).join('')}
+                                `).join('') : `<tr><td colspan="5" style="text-align:center; padding: 32px; color:#a0a0a0;">No workshop jobs yet. Use New Job to book a walk-in repair.</td></tr>`}
                             </tbody>
                         </table>
                     </div>

@@ -135,11 +135,8 @@ window.repair = {
                     <div class="divider-v" style="width: 1px; height: 24px; background: rgba(255,255,255,0.1); margin: 0 8px;"></div>
 
                     ${(window.authSystem?.currentUser?.role === 'admin' || window.authSystem?.currentUser?.role === 'frontdesk') ? `
-                     <select id="repair-tech-dd" class="form-control" style="width: 130px; appearance: auto;" onchange="repair.changeTechnician()">
-                         <option value="">Unassigned</option>
-                         <option value="Admin User" ${job.technician==='Admin User'?'selected':''}>Admin</option>
-                         <option value="Tech John" ${job.technician==='Tech John'?'selected':''}>John</option>
-                         <option value="Tech Sarah" ${job.technician==='Tech Sarah'?'selected':''}>Sarah</option>
+                     <select id="repair-tech-dd" class="form-control" style="width: 160px; appearance: auto;" onchange="repair.changeTechnician()">
+                         ${window.app.staffSelectOptions(job.technician || '')}
                      </select>
                      ` : ''}
                      <select id="repair-status-dd" class="form-control hidden-mobile" style="width: 160px; appearance: auto;" onchange="repair.changeStatus()">
@@ -165,7 +162,7 @@ window.repair = {
                 <div style="display: flex; gap: 12px;">
                     <button class="btn-secondary" onclick="repair.showAddPartModal()" style="white-space: nowrap;"><span class="material-symbols-outlined">memory</span> Attach Part/Labour</button>
                     <div style="flex: 1; display: flex; background: rgba(255,255,255,0.05); border: 1px solid #e0e0e0; border-radius: 6px; overflow: hidden;">
-                         <input type="text" id="repair-note-input" placeholder="Type a troubleshooting note (visibile to client)..." style="flex: 1; background: transparent; border: none; color: #fff; padding: 12px; outline: none;" onkeypress="if(event.key === 'Enter') repair.addNote()">
+                         <input type="text" id="repair-note-input" placeholder="Add a note the customer can see..." style="flex: 1; background: transparent; border: none; color: #fff; padding: 12px; outline: none;" onkeypress="if(event.key === 'Enter') repair.addNote()">
                          <button style="background: var(--accent); border: none; color: #fff; padding: 0 16px; cursor: pointer; transition: 0.2s;" onclick="repair.addNote()">
                              <span class="material-symbols-outlined">send</span>
                          </button>

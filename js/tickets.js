@@ -21,7 +21,7 @@ window.tickets = {
             <div class="section-header">
                 <div>
                     <h1>Service Desk & Tickets</h1>
-                    <p style="color: #a0a0a0; margin-top: 4px;">Manage support requests, track billable time, and onsite consulting.</p>
+                    <p style="color: #a0a0a0; margin-top: 4px;">Log customer issues, assign a technician, and track time to bill.</p>
                 </div>
                 <div style="display: flex; gap: 12px;">
                     ${window.authSystem?.currentUser?.role !== 'technician' ? `<button class="btn-primary" onclick="tickets.showNewTicketModal()"><span class="material-symbols-outlined">add_circle</span> New Ticket</button>` : ''}
@@ -48,7 +48,7 @@ window.tickets = {
                     <div class="stat-icon" style="background: rgba(0, 184, 148, 0.1); color: var(--success);"><span class="material-symbols-outlined">check_circle</span></div>
                     <div class="stat-info">
                         <div class="stat-value">${stats.closed}</div>
-                        <div class="stat-label">Resolved (This Month)</div>
+                        <div class="stat-label">Resolved</div>
                     </div>
                 </div>
                 <div class="glass-card stat-card">
@@ -121,7 +121,7 @@ window.tickets = {
         const tks = window.app.state.tickets || [];
         const currentUser = window.authSystem?.currentUser;
         const filtered = tks.filter(t => {
-            const matchesSearch = `${t.id} ${t.customer} ${t.subject}`.toLowerCase().includes(filter.toLowerCase());
+            const matchesSearch = `${t.id} ${window.app.partyName(t, '')} ${t.subject}`.toLowerCase().includes(filter.toLowerCase());
             
             if (currentUser && currentUser.role === 'technician') {
                 const uName = currentUser.email.split('@')[0].toLowerCase();
@@ -132,7 +132,7 @@ window.tickets = {
         });
 
         if(filtered.length === 0) {
-            return `<tr><td colspan="7" style="text-align: center; color: #a0a0a0; padding: 40px;">No support tickets found.</td></tr>`;
+            return `<tr><td colspan="8" style="text-align: center; color: #a0a0a0; padding: 40px;">No support tickets yet. Use New Ticket to log a customer issue.</td></tr>`;
         }
 
         return filtered.sort((a, b) => new Date(b.createdAt?.seconds * 1000 || 0) - new Date(a.createdAt?.seconds * 1000 || 0)).map(t => {
@@ -144,7 +144,7 @@ window.tickets = {
                     <td><strong>${t.id}</strong></td>
                     <td><span class="badge ${priorityClass}">${t.priority || 'Medium'}</span></td>
                     <td>
-                        <div>${t.customer}</div>
+                        <div>${window.app.partyName(t, '—')}</div>
                         <div style="font-size: 0.8rem; color: #a0a0a0;">${t.phone || t.email || ''}</div>
                     </td>
                     <td>${t.subject}</td>
@@ -335,8 +335,8 @@ window.tickets = {
                         <!-- Right: Sidebar Info -->
                         <div>
                             <div class="glass-card" style="padding: 16px; margin-bottom: 16px;">
-                                <h3 style="margin-top: 0; font-size: 0.9rem; color: #a0a0a0;">CLIENT INFO</h3>
-                                <div style="font-weight: bold; font-size: 1.1rem; margin-bottom: 4px;">${ticket.customer}</div>
+                                <h3 style="margin-top: 0; font-size: 0.9rem; color: #a0a0a0;">CUSTOMER</h3>
+                                <div style="font-weight: bold; font-size: 1.1rem; margin-bottom: 4px;">${window.app.partyName(ticket, '—')}</div>
                                 <div style="color: #a0a0a0; font-size: 0.9rem; margin-bottom: 16px;">${ticket.phone}</div>
                                 
                                 <h3 style="font-size: 0.9rem; color: #a0a0a0;">TOTAL LABOR</h3>
@@ -349,10 +349,7 @@ window.tickets = {
                                 <div class="form-group" style="margin-bottom: 0;">
                                     <label style="font-size: 0.75rem;">Assign Technician</label>
                                     <select class="form-control" style="appearance: auto;" onchange="tickets.assignTech('${ticket.id}', this.value)">
-                                        <option value="">Unassigned</option>
-                                        <option value="Admin" ${ticket.assignedTo === 'Admin' ? 'selected' : ''}>Admin</option>
-                                        <option value="John" ${ticket.assignedTo === 'John' ? 'selected' : ''}>John</option>
-                                        <option value="Sarah" ${ticket.assignedTo === 'Sarah' ? 'selected' : ''}>Sarah</option>
+                                        ${window.app.staffSelectOptions(ticket.assignedTo || '')}
                                     </select>
                                 </div>
                                 ` : ''}
@@ -490,7 +487,7 @@ window.tickets = {
     },
 
     async closeTicket(id) {
-        if(!confirm("Resolve this ticket and notify the client?")) return;
+        if(!confirm("Mark this ticket as resolved?")) return;
         
         try {
             await window.fbDb.collection('tickets').doc(id).update({ 
@@ -509,13 +506,14 @@ window.tickets = {
     },
 
     sendNotifications(id, action, client, phone, subject) {
-        console.log(`[Notification Engine] Action: ${action} for Ticket ${id}`);
-        const msg = action === 'Created' ? 
-            `Hi ${client}, Support Ticket ${id} has been opened: "${subject}". A technician will review it shortly. - IT Guy Solutions` :
-            `Hi ${client}, Support Ticket ${id} ("${subject}") has been resolved. We are closing this ticket. Thank you! - IT Guy Solutions`;
-        
-        // Simulated WhatsApp/Email
-        alert(`AUTOMATED NOTIFICATIONS (Yes & Yes):\n\n1. WhatsApp Sent to ${phone}:\n"${msg}"\n\n2. Email Sent to Client: [Official Ticket Header] ${action} Notice.`);
+        const who = client || 'the customer';
+        const msg = action === 'Created'
+            ? `Ticket ${id} opened for ${who}.`
+            : `Ticket ${id} marked as resolved.`;
+        if (window.app && typeof window.app.showToast === 'function') {
+            window.app.showToast(msg, 'success');
+        }
+        console.log(`[Ticket] ${action} ${id} ${subject || ''} ${phone || ''}`);
     },
 
     async toggleStatus(id) {

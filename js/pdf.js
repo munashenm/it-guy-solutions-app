@@ -13,8 +13,8 @@ window.pdfGenerator = {
             address: "102 President Street, Louis Trichardt, Limpopo, South Africa",
             phone: "087 550 1813",
             whatsapp: "065 866 3103",
-            email: "support@techguy.pl",
-            website: "www.techguy.pl",
+            email: "info@itguysa.co.za",
+            website: "www.itguysa.co.za",
             logoUrl: ""
         };
     },

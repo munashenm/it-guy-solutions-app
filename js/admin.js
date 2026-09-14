@@ -256,7 +256,7 @@ window.adminPanel = {
                         </div>
                         <div class="form-group">
                             <label>Email Address</label>
-                            <input type="email" id="new-staff-email" class="form-control" placeholder="e.g. tech@techguy.pl" required>
+                            <input type="email" id="new-staff-email" class="form-control" placeholder="e.g. tech@itguysa.co.za" required>
                         </div>
                         <div class="form-row">
                             <div class="form-group">

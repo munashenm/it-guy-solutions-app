@@ -60,11 +60,11 @@ window.companySettings = {
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Email Address</label>
-                                <input type="email" id="cs-email" class="form-control" placeholder="support@techguy.pl">
+                                <input type="email" id="cs-email" class="form-control" placeholder="support@itguysa.co.za">
                             </div>
                             <div class="form-group">
                                 <label>Website</label>
-                                <input type="text" id="cs-website" class="form-control" placeholder="www.techguy.pl">
+                                <input type="text" id="cs-website" class="form-control" placeholder="www.itguysa.co.za">
                             </div>
                         </div>
                         <div class="form-row">
@@ -164,7 +164,7 @@ window.companySettings = {
                         <div class="form-row">
                             <div class="form-group">
                                 <label>SMTP Host</label>
-                                <input type="text" id="cs-smtp-host" class="form-control" placeholder="mail.techguy.pl">
+                                <input type="text" id="cs-smtp-host" class="form-control" placeholder="mail.itguysa.co.za">
                             </div>
                             <div class="form-group">
                                 <label>SMTP Port</label>
@@ -174,7 +174,7 @@ window.companySettings = {
                         <div class="form-row">
                             <div class="form-group">
                                 <label>SMTP Username (Email)</label>
-                                <input type="email" id="cs-smtp-user" class="form-control" placeholder="billing@techguy.pl">
+                                <input type="email" id="cs-smtp-user" class="form-control" placeholder="billing@itguysa.co.za">
                             </div>
                             <div class="form-group">
                                 <label>SMTP Password</label>
@@ -188,7 +188,7 @@ window.companySettings = {
                             </div>
                             <div class="form-group">
                                 <label>Reply-To Email Address</label>
-                                <input type="email" id="cs-email-reply" class="form-control" placeholder="support@techguy.pl">
+                                <input type="email" id="cs-email-reply" class="form-control" placeholder="support@itguysa.co.za">
                             </div>
                         </div>
 

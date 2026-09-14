@@ -82,9 +82,16 @@ window.authSystem = {
         const profileRole = document.getElementById('topbar-user-role');
         const profileAvatar = document.getElementById('topbar-user-avatar');
 
-        if(profileName) profileName.textContent = email.split('@')[0];
-        if(profileRole) profileRole.textContent = role.charAt(0).toUpperCase() + role.slice(1);
-        if(profileAvatar) profileAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(email)}&background=6c5ce7&color=fff&rounded=true`;
+        if(profileName) profileName.textContent = extra.firstName
+            ? [extra.firstName, extra.lastName].filter(Boolean).join(' ')
+            : extra.username || email.split('@')[0];
+        if(profileRole) profileRole.textContent = window.app && window.app.displayRole
+            ? window.app.displayRole(role)
+            : (role.charAt(0).toUpperCase() + role.slice(1));
+        if(profileAvatar) {
+            const label = profileName ? profileName.textContent : email;
+            profileAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(label)}&background=6c5ce7&color=fff&rounded=true`;
+        }
     },
 
     handleLogoutUI() {

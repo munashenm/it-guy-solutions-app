@@ -1,4 +1,4 @@
-// IT Guy Solutions - Stability Version (v4.7)
+// IT Guy Solutions - Stability Version (v4.8)
 const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
@@ -48,7 +48,7 @@ app.get('/api/status', (req, res) => {
         status: 'online',
         dbStatus: dbReady ? 'Connected' : 'Initializing',
         dbType: (appDb && appDb.type) || process.env.DB_TYPE || 'sqlite',
-        version: '4.7',
+        version: '4.8',
         timestamp: new Date().toISOString()
     });
 });
