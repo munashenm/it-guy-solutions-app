@@ -2,6 +2,8 @@ node_modules/
 uploads/*
 !uploads/.gitkeep
 database.sqlite
+database.sqlite-wal
+database.sqlite-shm
 database.sqlite.bak
 .env
 .env.local
