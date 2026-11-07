@@ -234,14 +234,18 @@ window.purchases = {
         
         rows.forEach(row => {
             const cost = parseFloat(row.querySelector('.po-cost').value) || 0;
-            const qty = parseInt(row.querySelector('.po-qty').value) || 0;
-            const total = cost * qty;
-            subtotal += total;
+            const qty = parseFloat(row.querySelector('.po-qty').value) || 0;
+            const total = window.ItguyFixes ? window.ItguyFixes.lineTotal(cost, qty) : cost * qty;
+            subtotal = window.ItguyFixes ? window.ItguyFixes.grandTotal(subtotal, total) : (subtotal + total);
             row.querySelector('.po-row-total').textContent = 'R ' + total.toFixed(2);
         });
 
-        const vat = subtotal * 0.15;
-        const total = subtotal + vat;
+        const settings = (window.app && window.app.state && window.app.state.settings) || {};
+        const vatOn = settings.vatRegistered === true;
+        const vat = window.ItguyFixes
+            ? window.ItguyFixes.vatAmount(subtotal, settings.vatRate, vatOn)
+            : (vatOn ? subtotal * ((parseFloat(settings.vatRate) || 15) / 100) : 0);
+        const total = window.ItguyFixes ? window.ItguyFixes.grandTotal(subtotal, vat) : (subtotal + vat);
 
         document.getElementById('po-subtotal').value = 'R ' + subtotal.toFixed(2);
         document.getElementById('po-vat-amount').value = 'R ' + vat.toFixed(2);
@@ -267,7 +271,7 @@ window.purchases = {
                 desc: invItem.name,
                 sku: invItem.sku,
                 cost: row.querySelector('.po-cost').value,
-                qty: parseInt(row.querySelector('.po-qty').value)
+                qty: parseFloat(row.querySelector('.po-qty').value) || 0
             });
         });
 
@@ -281,7 +285,7 @@ window.purchases = {
             await window.fbDb.collection('purchaseOrders').doc(id).set(payload);
             
             // Simulation
-            alert(`Purchase Order ${id} saved and emailed to ${supplier}!`);
+            alert(`Purchase Order ${id} saved. It was not emailed. Send it yourself if the supplier needs a copy.`);
             window.app.closeModal();
         } catch(err) {
             console.error(err);

@@ -304,6 +304,7 @@ const app = {
     },
 
     parseMoney(val) {
+        if (window.ItguyFixes && window.ItguyFixes.parseMoney) return window.ItguyFixes.parseMoney(val);
         if (typeof val === 'number') return val;
         const n = parseFloat(String(val || '').replace(/[^\d.-]/g, ''));
         return Number.isNaN(n) ? 0 : n;

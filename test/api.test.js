@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
+const net = require('net');
 const os = require('os');
 const path = require('path');
 
@@ -235,4 +236,216 @@ test('email notify fails closed when SMTP is not configured and the image proxy 
     assert.equal(proxy.status, 400);
     const fileProxy = await fetch(base + '/proxy-image?url=' + encodeURIComponent('file:///etc/passwd'));
     assert.equal(fileProxy.status, 400);
+    const decimalIp = await fetch(base + '/proxy-image?url=' + encodeURIComponent('http://2130706433/secret'));
+    assert.equal(decimalIp.status, 400);
+    const nip = await fetch(base + '/proxy-image?url=' + encodeURIComponent('http://127.0.0.1.nip.io/secret'));
+    assert.equal(nip.status, 400);
+});
+
+test('POS stock, purchases, expenses, backup safeguards, and permissions', async () => {
+    const admin = await login('admin', 'admin123');
+    const desk = await login('desk', 'Welcome123!');
+    const client = await login('customer@example.com', 'Welcome123!');
+
+    const seeded = await fetch(base + '/collections/inventory/sku-cable', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({ id: 'sku-cable', name: 'Cable', sku: 'CBL', qty: 5, sell: 'R 10.00', cost: 'R 4.00' })
+    });
+    assert.equal(seeded.status, 200);
+
+    const sale = await fetch(base + '/transaction/batch', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({
+            updates: [
+                { coll: 'inventory', id: 'sku-cable', method: 'update', data: { qty: { _type: 'increment', value: -2 } } },
+                { coll: 'sales', id: 'REC-1', method: 'set', data: { id: 'REC-1', customer: 'Walk-in', total: 20, method: 'Cash', items: [{ name: 'Cable', qty: 2 }], date: new Date().toISOString(), status: 'Completed' } }
+            ]
+        })
+    });
+    assert.equal(sale.status, 200, await sale.clone().text());
+    let stock = await (await fetch(base + '/collections/inventory/sku-cable', { headers: auth(admin.token) })).json();
+    assert.equal(stock.qty, 3);
+    const savedSale = await (await fetch(base + '/collections/sales/REC-1', { headers: auth(admin.token) })).json();
+    assert.equal(savedSale.total, 20);
+
+    const over = await fetch(base + '/transaction/batch', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({ updates: [{ coll: 'inventory', id: 'sku-cable', method: 'update', data: { qty: { _type: 'increment', value: -10 } } }] })
+    });
+    assert.equal(over.status, 409);
+    stock = await (await fetch(base + '/collections/inventory/sku-cable', { headers: auth(admin.token) })).json();
+    assert.equal(stock.qty, 3);
+
+    const deskSale = await fetch(base + '/transaction/batch', {
+        method: 'POST',
+        headers: auth(desk.token),
+        body: JSON.stringify({ updates: [{ coll: 'inventory', id: 'sku-cable', method: 'update', data: { qty: { _type: 'increment', value: -1 } } }] })
+    });
+    assert.equal(deskSale.status, 200, await deskSale.clone().text());
+    stock = await (await fetch(base + '/collections/inventory/sku-cable', { headers: auth(admin.token) })).json();
+    assert.equal(stock.qty, 2);
+
+    const received = await fetch(base + '/transaction/batch', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({ updates: [{ coll: 'inventory', id: 'sku-cable', method: 'update', data: { qty: { _type: 'increment', value: 4 } } }] })
+    });
+    assert.equal(received.status, 200);
+    stock = await (await fetch(base + '/collections/inventory/sku-cable', { headers: auth(admin.token) })).json();
+    assert.equal(stock.qty, 6);
+
+    const clientStock = await fetch(base + '/transaction/batch', {
+        method: 'POST',
+        headers: auth(client.token),
+        body: JSON.stringify({ updates: [{ coll: 'inventory', id: 'sku-cable', method: 'update', data: { qty: { _type: 'increment', value: -1 } } }] })
+    });
+    assert.equal(clientStock.status, 403);
+
+    const expense = await fetch(base + '/collections/expenses/EXP-1', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({ id: 'EXP-1', description: 'Rent', category: 'Premises', amount: '1 234,56', date: new Date().toISOString().slice(0, 10) })
+    });
+    assert.equal(expense.status, 200);
+    const storedExpense = await (await fetch(base + '/collections/expenses/EXP-1', { headers: auth(admin.token) })).json();
+    assert.equal(storedExpense.amount, '1 234,56');
+    assert.equal(fixes.reconcileBooks({
+        invoices: [],
+        sales: [savedSale],
+        expenses: [storedExpense]
+    }).netProfit, -1214.56);
+
+    const clientBackup = await fetch(base + '/backup', { headers: auth(client.token) });
+    assert.equal(clientBackup.status, 403);
+    const backup = await fetch(base + '/backup', { headers: auth(admin.token) });
+    assert.equal(backup.status, 200);
+    const backupBytes = Buffer.from(await backup.arrayBuffer());
+    assert.equal(backupBytes.subarray(0, 15).toString(), 'SQLite format 3');
+
+    const badRestore = new FormData();
+    badRestore.append('database', new Blob([Buffer.from('not a database')]), 'bad.txt');
+    const restored = await fetch(base + '/restore', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + admin.token },
+        body: badRestore
+    });
+    assert.equal(restored.status, 400);
+    const stillThere = await login('admin', 'admin123');
+    assert.equal(stillThere.user.role, 'admin');
+
+    const clientNotify = await fetch(base + '/notify', {
+        method: 'POST',
+        headers: auth(client.token),
+        body: JSON.stringify({ actionType: 'Email', docType: 'Job Report', docId: 'FLD-1001', contactInfo: 'a@b.co' })
+    });
+    assert.equal(clientNotify.status, 403);
+});
+
+function startFakeSmtp() {
+    const messages = [];
+    const server = net.createServer((socket) => {
+        socket.write('220 fake.local ESMTP\r\n');
+        let mode = 'cmd';
+        let body = '';
+        socket.on('data', (chunk) => {
+            const text = chunk.toString();
+            if (mode === 'data') {
+                body += text;
+                if (body.includes('\r\n.\r\n')) {
+                    messages.push(body);
+                    body = '';
+                    mode = 'cmd';
+                    socket.write('250 queued\r\n');
+                }
+                return;
+            }
+            text.split(/\r\n/).forEach((line) => {
+                if (!line) return;
+                if (/^DATA$/i.test(line)) {
+                    mode = 'data';
+                    socket.write('354 send\r\n');
+                } else if (/^QUIT/i.test(line)) {
+                    socket.end('221 bye\r\n');
+                } else {
+                    socket.write('250 ok\r\n');
+                }
+            });
+        });
+    });
+    return new Promise((resolve) => {
+        server.listen(0, '127.0.0.1', () => resolve({ server, port: server.address().port, messages }));
+    });
+}
+
+test('report email is captured by a local SMTP sink and failure stays an error', async () => {
+    const admin = await login('admin', 'admin123');
+    const smtp = await startFakeSmtp();
+    try {
+        const saved = await fetch(base + '/collections/settings/systemSettings', {
+            method: 'PATCH',
+            headers: auth(admin.token),
+            body: JSON.stringify({
+                smtpHost: '127.0.0.1',
+                smtpPort: String(smtp.port),
+                smtpUser: 'qa-mailer',
+                smtpPass: 'qa-secret',
+                emailName: 'QA Bench'
+            })
+        });
+        assert.equal(saved.status, 200, await saved.clone().text());
+
+        const sent = await fetch(base + '/notify', {
+            method: 'POST',
+            headers: auth(admin.token),
+            body: JSON.stringify({
+                actionType: 'Email',
+                docType: 'Job Report',
+                docId: 'FLD-1001',
+                contactInfo: 'north@example.com',
+                subject: 'Job report FLD-1001',
+                customMessage: 'Synthetic report body'
+            })
+        });
+        const sentBody = await sent.json();
+        assert.equal(sent.status, 200, JSON.stringify(sentBody));
+        assert.equal(smtp.messages.length, 1);
+        assert.match(smtp.messages[0], /north@example.com/);
+        assert.match(smtp.messages[0], /Synthetic report body/);
+        assert.doesNotMatch(smtp.messages[0], /qa-secret/);
+
+        const missing = await fetch(base + '/notify', {
+            method: 'POST',
+            headers: auth(admin.token),
+            body: JSON.stringify({ actionType: 'Email', docType: 'Job Report', docId: 'FLD-1001', contactInfo: '' })
+        });
+        assert.equal(missing.status, 400);
+        assert.equal(smtp.messages.length, 1);
+
+        const broken = await fetch(base + '/collections/settings/systemSettings', {
+            method: 'PATCH',
+            headers: auth(admin.token),
+            body: JSON.stringify({ smtpHost: '127.0.0.1', smtpPort: '1', smtpUser: 'qa-mailer' })
+        });
+        assert.equal(broken.status, 200);
+        const failed = await fetch(base + '/notify', {
+            method: 'POST',
+            headers: auth(admin.token),
+            body: JSON.stringify({
+                actionType: 'Email',
+                docType: 'Job Report',
+                docId: 'FLD-1001',
+                contactInfo: 'north@example.com',
+                customMessage: 'should not deliver'
+            })
+        });
+        assert.notEqual(failed.status, 200);
+        const failedBody = await failed.json();
+        assert.match(failedBody.error, /ECONNREFUSED|connect|Invalid|error|fail/i);
+        assert.equal(smtp.messages.length, 1);
+    } finally {
+        await new Promise((resolve) => smtp.server.close(resolve));
+    }
 });

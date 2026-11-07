@@ -104,14 +104,16 @@ window.reports = {
         const posSales = (window.app.state.sales || []).filter(s => this.isInRange(s.date));
         const expenses = (window.app.state.expenses || []).filter(e => this.isInRange(e.date));
         
-        const invTotal = invoices.reduce((sum, i) => sum + (parseFloat(i.amount?.replace(/[^0-9.]/g, '')) || 0), 0);
-        const posTotal = posSales.reduce((sum, s) => sum + (parseFloat(s.total) || 0), 0);
-        const grandTotal = invTotal + posTotal;
-        
-        const expenseTotal = expenses.reduce((sum, e) => sum + (parseFloat(e.amount) || 0), 0);
-        const netProfit = grandTotal - expenseTotal;
+        const books = window.ItguyFixes
+            ? window.ItguyFixes.reconcileBooks({ invoices: invoices, sales: posSales, expenses: expenses })
+            : null;
+        const invTotal = books ? books.invTotal : invoices.reduce((sum, i) => sum + window.app.parseMoney(i.amount), 0);
+        const posTotal = books ? books.posTotal : posSales.reduce((sum, s) => sum + window.app.parseMoney(s.total), 0);
+        const grandTotal = books ? books.grandTotal : (invTotal + posTotal);
+        const expenseTotal = books ? books.expenseTotal : expenses.reduce((sum, e) => sum + window.app.parseMoney(e.amount), 0);
+        const netProfit = books ? books.netProfit : (grandTotal - expenseTotal);
 
-        const paidInv = invoices.filter(i => i.status === 'Paid').reduce((sum, i) => sum + (parseFloat(i.amount?.replace(/[^0-9.]/g, '')) || 0), 0);
+        const paidInv = invoices.filter(i => i.status === 'Paid').reduce((sum, i) => sum + window.app.parseMoney(i.amount), 0);
         const cashTotal = posSales.filter(s => s.method === 'Cash').reduce((sum, s) => sum + (parseFloat(s.total) || 0), 0);
         const cardTotal = posSales.filter(s => s.method === 'Card').reduce((sum, s) => sum + (parseFloat(s.total) || 0), 0);
         const eftTotal = posSales.filter(s => s.method === 'EFT').reduce((sum, s) => sum + (parseFloat(s.total) || 0), 0);
@@ -155,9 +157,9 @@ window.reports = {
                                     return `
                                         <tr>
                                             <td><strong>${s.id}</strong></td>
-                                            <td><span class="badge ${isExpense ? 'danger' : 'success'}">${isExpense ? 'Expense' : (s.id.startsWith('REC') ? 'POS' : 'Invoice')}</span></td>
-                                            <td>${s.customer || s.description}</td>
-                                            <td style="color: ${isExpense ? 'var(--danger)' : 'var(--success)'}; font-weight: bold;">${isExpense ? '-' : ''} R ${(parseFloat(s.amount?.replace(/[^0-9.]/g, '') || s.total || s.amount) || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                                            <td><span class="badge ${isExpense ? 'danger' : 'success'}">${isExpense ? 'Expense' : (String(s.id || '').startsWith('REC') ? 'POS' : 'Invoice')}</span></td>
+                                            <td>${s.customer || s.description || ''}</td>
+                                            <td style="color: ${isExpense ? 'var(--danger)' : 'var(--success)'}; font-weight: bold;">${isExpense ? '-' : ''} R ${window.app.parseMoney(s.amount != null ? s.amount : s.total).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                                             <td>${s.method || s.category || 'EFT/Invoiced'}</td>
                                         </tr>
                                     `;
@@ -186,7 +188,7 @@ window.reports = {
 
     renderQuotesReport() {
         const quotes = (window.app.state.quotations || []).filter(q => this.isInRange(q.date));
-        const totalVal = quotes.reduce((sum, q) => sum + (parseFloat(q.amount?.replace(/[^0-9.]/g, '')) || 0), 0);
+        const totalVal = quotes.reduce((sum, q) => sum + window.app.parseMoney(q.amount), 0);
         const accepted = quotes.filter(q => q.status === 'Accepted' || q.status === 'Invoiced');
         const pending = quotes.filter(q => q.status === 'Sent' || q.status === 'Draft');
 
@@ -224,8 +226,8 @@ window.reports = {
         
         inventory.forEach(item => {
             const qty = parseInt(item.qty) || 0;
-            const cost = parseFloat(item.cost?.replace(/[^0-9.]/g, '') || 0);
-            const sell = parseFloat(item.sell?.replace(/[^0-9.]/g, '') || item.sellPrice || 0);
+            const cost = window.app.parseMoney(item.cost);
+            const sell = window.app.parseMoney(item.sell != null ? item.sell : item.sellPrice);
             totalCostVal += (cost * qty);
             totalSellVal += (sell * qty);
         });

@@ -158,6 +158,33 @@ test('local API base follows the page origin instead of a hardcoded port', () =>
     assert.doesNotMatch(src, /localhost:3000\/api/);
 });
 
+test('books reconcile ZA currency, POS totals, and expenses', () => {
+    const books = fixes.reconcileBooks({
+        invoices: [{ amount: 'R 1 234,56' }, { amount: 10 }],
+        sales: [{ total: 20.5 }, { total: 'R 4.50' }],
+        expenses: [{ amount: '100,00' }]
+    });
+    assert.equal(books.invTotal, 1244.56);
+    assert.equal(books.posTotal, 25);
+    assert.equal(books.expenseTotal, 100);
+    assert.equal(books.netProfit, 1169.56);
+    assert.equal(fixes.parseMoney('R 1,234.56'), 1234.56);
+});
+
+test('image proxy rejects private hosts, numeric IPs, and redirect hops', () => {
+    assert.equal(fixes.assessProxyUrl('http://127.0.0.1/secret').ok, false);
+    assert.equal(fixes.assessProxyUrl('http://2130706433/').ok, false);
+    assert.equal(fixes.assessProxyUrl('http://127.1/').ok, false);
+    assert.equal(fixes.assessProxyUrl('file:///etc/passwd').ok, false);
+    assert.equal(fixes.assessProxyUrl('http://user:pass@example.com/').ok, false);
+    assert.equal(fixes.isPrivateIp('::ffff:127.0.0.1'), true);
+    const hop = fixes.assessProxyHop('http://example.com/a', 'http://192.168.0.8/x');
+    assert.equal(hop.ok, false);
+    const okHop = fixes.assessProxyHop('http://example.com/a', '/logo.png');
+    assert.equal(okHop.ok, true);
+    assert.equal(okHop.href, 'http://example.com/logo.png');
+});
+
 test('money totals round to cents and keep VAT off the subtotal when disabled', () => {
     assert.equal(fixes.lineTotal('10.10', 3), 30.3);
     assert.equal(fixes.lineTotal(0.1, 3), 0.3);

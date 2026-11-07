@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node app.js",
-    "test": "node --test --test-concurrency=1 test/*.test.js"
+    "test": "node --test --test-concurrency=1 test/fixes.test.js test/api.test.js && node test/mysql-standalone.js"
   },
   "dependencies": {
     "axios": "^1.6.8",
