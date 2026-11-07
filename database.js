@@ -78,7 +78,9 @@ class Database {
             } catch (e) {
                 throw new Error("SQLite library (sqlite3) is missing. If you are using MySQL, set DB_TYPE=mysql in your .env file.");
             }
-            const dbPath = path.resolve(__dirname, 'database.sqlite');
+            const dbPath = process.env.SQLITE_PATH
+                ? path.resolve(process.env.SQLITE_PATH)
+                : path.resolve(__dirname, 'database.sqlite');
             await new Promise((resolve, reject) => {
                 this.sqlite = new sqlite3.Database(dbPath, (err) => {
                     if (err) {
@@ -148,6 +150,8 @@ class Database {
             ['lastName', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
             ['employeeId', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
             ['phone', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
+            ['role', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
+            ['password', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
             ['sessionToken', isMySQL ? 'VARCHAR(512)' : 'TEXT']
         ];
         for (const [col, type] of extraCols) {

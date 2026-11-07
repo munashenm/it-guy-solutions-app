@@ -1,3 +1,4 @@
+const fixes = require('../lib/itguy-fixes');
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
@@ -60,17 +61,36 @@ router.get('/track/:id', async (req, res, next) => {
     }
 });
 
+function isSafeImageProxyUrl(raw) {
+    let parsed;
+    try { parsed = new URL(String(raw || '')); } catch (e) { return false; }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+    const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+    if (!host || host === 'localhost' || host.endsWith('.local') || host === '0.0.0.0' || host === '::1') return false;
+    if (/^(127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host)) return false;
+    const priv = host.match(/^172\.(\d+)\./);
+    if (priv && Number(priv[1]) >= 16 && Number(priv[1]) <= 31) return false;
+    return true;
+}
+
 router.get('/proxy-image', async (req, res) => {
     const { url } = req.query;
     if (!url) return res.status(400).send("URL is required");
+    if (!isSafeImageProxyUrl(url)) return res.status(400).send("Image URL is not allowed");
     try {
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
-        const contentType = response.headers['content-type'];
+        const response = await axios.get(url, {
+            responseType: 'arraybuffer',
+            timeout: 8000,
+            maxRedirects: 2,
+            maxContentLength: 2 * 1024 * 1024
+        });
+        const contentType = String(response.headers['content-type'] || '');
+        if (!contentType.startsWith('image/')) return res.status(415).send("URL did not return an image");
         res.set('Content-Type', contentType);
         res.send(response.data);
     } catch (e) {
-        logger.error("Proxy error:", { message: e.message, url });
-        res.status(500).send("Error proxying image");
+        logger.error("Proxy error:", { message: e.message });
+        res.status(502).send("Error proxying image");
     }
 });
 
@@ -119,6 +139,11 @@ router.post('/transaction/batch', requireAuth, async (req, res, next) => {
                  else await db.run("DELETE FROM collections WHERE name = ? AND id = ?", [u.coll, u.id]);
                  continue;
             }
+
+            const assignMethod = u.method === 'set' ? 'set' : 'patch';
+            const assignBody = u.method === 'set' ? (u.data || {}) : (u.data || {});
+            const denial = fixes.assignmentDenial(user, u.coll, currentData, assignBody, assignMethod);
+            if (denial) throw new Error('Forbidden: ' + denial);
 
             if (u.method === 'set') {
                 newData = u.data;
@@ -209,7 +234,11 @@ router.post('/notify', requireAuth, async (req, res, next) => {
         }
 
         if (actionType === 'Email') {
-            if(!sysSettings.smtpHost) throw new Error("SMTP is not configured in settings.");
+            if(!sysSettings.smtpHost || !sysSettings.smtpUser) {
+                const configErr = new Error(fixes.SMTP_BLOCKER);
+                configErr.status = 409;
+                throw configErr;
+            }
             
             const transporter = nodemailer.createTransport({
                 host: String(sysSettings.smtpHost).trim(),
@@ -276,7 +305,10 @@ router.post('/notify', requireAuth, async (req, res, next) => {
         }
 
     } catch(err) {
-        next(err);
+        const status = err.status && err.status < 500 ? err.status : 500;
+        const message = err.message || 'Email could not be sent.';
+        if (status >= 500) logger.error('Notify failed', { message: message });
+        return res.status(status).json({ error: message });
     }
 });
 

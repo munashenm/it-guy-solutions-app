@@ -239,7 +239,12 @@ window.pdfGenerator = {
 
             let contentHTML = '';
             
-            if (docType === 'Report') {
+            if (docType === 'Job Report') {
+                const report = (dataObj && dataObj.kind && dataObj.workPerformed !== undefined && window.ItguyFixes)
+                    ? dataObj
+                    : (window.ItguyFixes ? window.ItguyFixes.buildJobReport(dataObj, dataObj && dataObj.device ? 'Workshop' : 'Field') : { id: docId });
+                contentHTML = headerHTML + (window.ItguyFixes ? window.ItguyFixes.renderJobReportHtml(report) : '<p style="color:#111">Job report unavailable.</p>');
+            } else if (docType === 'Report') {
                 // Special handling for reports: Use cloned visual content
                 const reportContent = document.getElementById('report-view-content');
                 if(reportContent) {
@@ -296,15 +301,19 @@ window.pdfGenerator = {
                             </thead>
                             <tbody style="background-color: #ffffff;">
                                 ${dataObj.items && dataObj.items.length > 0 ? dataObj.items.map((item, idx) => {
-                                    const unit = parseFloat(item.unit || item.unitPrice) || 0;
-                                    const qty = parseInt(item.qty) || 0;
-                                    const total = unit * qty;
+                                    const unit = window.ItguyFixes ? window.ItguyFixes.moneyNumber(item.unit != null ? item.unit : item.unitPrice) : (parseFloat(item.unit || item.unitPrice) || 0);
+                                    const qty = parseFloat(item.qty != null ? item.qty : item.quantity);
+                                    const safeQty = isFinite(qty) ? qty : 0;
+                                    const total = window.ItguyFixes ? window.ItguyFixes.lineTotal(unit, safeQty) : unit * safeQty;
+                                    const descCell = window.ItguyFixes
+                                        ? window.ItguyFixes.renderDescriptionCell(item.desc || item.description || item.name || '')
+                                        : `<td class="pdf-desc" style="padding:15px;color:#111111;background:#ffffff;white-space:pre-wrap;">${item.desc || item.name || ''}</td>`;
                                     return `
                                         <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#fcfcff'}; border-bottom: 1px solid #f0f0f0;">
                                             <td style="padding: 15px; border-bottom: 1px solid #eee; font-weight: 600; color: ${themeColor}; width: 80px;">${item.type || 'Item'}</td>
-                                            <td style="padding: 15px; border-bottom: 1px solid #eee; line-height: 1.5; word-wrap: break-word;">${item.desc || item.name}</td>
+                                            ${descCell}
                                             <td style="padding: 15px 15px; text-align: right; color: #000000;">R ${unit.toFixed(2)}</td>
-                                            <td style="padding: 15px 15px; text-align: center; color: #000000;">${qty}</td>
+                                            <td style="padding: 15px 15px; text-align: center; color: #000000;">${safeQty}</td>
                                             <td style="padding: 15px 15px; text-align: right; font-weight: 700; color: #000000;">R ${total.toFixed(2)}</td>
                                         </tr>
                                     `;
@@ -413,18 +422,11 @@ window.pdfGenerator = {
 
             container.innerHTML = contentHTML;
 
-            // Universal Safety Pass: Convert absolutely ALL grey text to black for flawless print visibility on white paper across ALL document types
-            container.querySelectorAll('*').forEach(c => {
-                const computed = window.getComputedStyle(c);
-                const color = computed.color || c.style.color || '';
-                // Check if color is a shade of grey (e.g. #a0a0a0, rgb(160, 160, 160), #747d8c, etc)
-                if (color.includes('160, 160, 160') || color.includes('116, 125, 140') || color.includes('a0a0a0') || c.tagName === 'P' || c.tagName === 'SPAN') {
-                    // Ignore explicitly colored badges/themes
-                    if(!color.includes('var(--success)') && !color.includes('var(--danger)') && !color.includes('var(--primary)')) {
-                        // Force black text
-                        c.style.color = '#000000';
-                    }
-                }
+            // Dark theme paints table cells white. Force body copy to black before capture.
+            container.querySelectorAll('td, p, li, .pdf-desc').forEach(c => {
+                if (c.closest('thead')) return;
+                c.style.color = '#111111';
+                c.style.backgroundColor = c.style.backgroundColor || '#ffffff';
             });
 
             // Wait for fonts and stabilizing re-paint
@@ -450,16 +452,14 @@ window.pdfGenerator = {
             });
 
             const imgData = canvas.toDataURL('image/jpeg', 0.95);
-            
-            // Calculate proportional height to prevent squashing or cropping
-            const actualWidth = 794;
-            const actualHeight = (canvas.height * actualWidth) / canvas.width;
-            
-            // Use a dynamic page height so long reports don't get cut across awful page breaks
-            const pdfPageHeight = Math.max(1123, actualHeight);
-            
-            const pdf = new window.jspdf.jsPDF('p', 'px', [actualWidth, pdfPageHeight]);
-            pdf.addImage(imgData, 'JPEG', 0, 0, actualWidth, actualHeight);
+
+            // Real A4 pages. Short documents keep their height; long ones continue on the next page.
+            const pdf = new window.jspdf.jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', compress: true });
+            if (window.ItguyFixes) {
+                window.ItguyFixes.applyA4Plan(pdf, imgData, canvas.width, canvas.height, 'JPEG');
+            } else {
+                pdf.addImage(imgData, 'JPEG', 12, 12, 186, 186 * (canvas.height / canvas.width));
+            }
             
             const filename = `${docType.replace(' ', '_')}_${docId}.pdf`;
             

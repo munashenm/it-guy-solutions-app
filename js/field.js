@@ -16,17 +16,10 @@ window.field = {
         console.log(`Field View Render: Total Jobs=${jobs.length}, Role=${currentUser?.role}`);
         
         if(isTech && currentUser) {
-            const uMail = (currentUser.email || '').toLowerCase();
-            const uName = (uMail.split('@')[0] || '').toLowerCase();
-            const fName = (currentUser.firstName || '').toLowerCase();
-            
-            jobs = jobs.filter(j => {
-                if (!j.technician) return false;
-                const techField = j.technician.toLowerCase();
-                // Match by full email, email prefix, or first name
-                return techField.includes(uMail) || techField.includes(uName) || (fName && techField.includes(fName));
-            });
-            console.log(`Technician Filter: ${jobs.length} jobs for ${uName}`);
+            jobs = jobs.filter(j => window.ItguyFixes
+                ? window.ItguyFixes.technicianCanSeeJob(j, currentUser)
+                : !!(j.technician));
+            console.log(`Technician Filter: ${jobs.length} jobs`);
         }
         
         // Sorting: Newest first based on createdAt
@@ -66,9 +59,19 @@ window.field = {
     },
 
     renderFieldCard(job) {
+        const statusText = String((job && job.status) || 'Scheduled');
         let statusBadge = 'pending'; // Scheduled
-        if(job.status.toLowerCase() === 'on-site') statusBadge = 'active';
-        if(job.status.toLowerCase() === 'completed') statusBadge = 'success';
+        if(statusText.toLowerCase() === 'on-site') statusBadge = 'active';
+        if(statusText.toLowerCase() === 'completed') statusBadge = 'success';
+
+        const currentUser = window.authSystem && window.authSystem.currentUser;
+        const canAssign = window.ItguyFixes
+            ? window.ItguyFixes.canAssignTechnician(currentUser && currentUser.role)
+            : false;
+        const techLabel = job.technician || 'Unassigned';
+        const techControl = canAssign
+            ? `<select class="form-control" style="appearance:auto; max-width: 220px;" onchange="field.assignTechnician('${job.id}', this)">${window.app.staffSelectOptions(job.technician || '')}</select>`
+            : `<strong style="color:#fff;">${window.app.escapeHtml(techLabel)}</strong>`;
 
         return `
             <div class="glass-card" style="padding: 20px; display: flex; flex-direction: column;">
@@ -77,12 +80,16 @@ window.field = {
                         <div style="color: #a0a0a0; font-size: 0.8rem; margin-bottom: 4px;">${job.id}</div>
                         <h3 style="margin: 0; color: #ffffff;">${window.app.partyName(job, 'Customer')}</h3>
                     </div>
-                    <span class="badge ${statusBadge}">${job.status}</span>
+                    <span class="badge ${statusBadge}">${statusText}</span>
                 </div>
                 
                 <div style="display: flex; gap: 8px; align-items: flex-start; color: #a0a0a0; font-size: 0.9rem; margin-bottom: 8px;">
                     <span class="material-symbols-outlined" style="font-size: 1.1rem; color: #a29bfe;">location_on</span>
                     <span style="line-height: 1.4;">${job.address || 'Address missing'}</span>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; color: #a0a0a0; font-size: 0.9rem; margin-bottom: 8px;">
+                    <span class="material-symbols-outlined" style="font-size: 1.1rem; color: #a29bfe;">engineering</span>
+                    <span style="line-height: 1.4; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">Technician ${techControl}</span>
                 </div>
 
                 <div style="border-top: 1px solid #e0e0e0; margin: 16px 0;"></div>
@@ -116,11 +123,11 @@ window.field = {
                         <button class="btn-secondary" style="flex: 1; justify-content: center; background: rgba(37, 211, 102, 0.1); color: #25D366; border-color: #25D366;" onclick="field.sendETA('${job.id}')">
                             <span class="material-symbols-outlined" style="font-size: 1.1rem; margin-right: 4px;">chat</span> Send ETA
                         </button>
-                        ${job.status === 'On-site' ? `
+                        ${statusText === 'On-site' ? `
                             <button class="btn-primary" style="flex: 1; justify-content: center; background: var(--warning);" onclick="field.checkOut('${job.id}')">
                                 <span class="material-symbols-outlined" style="font-size: 1.1rem; margin-right: 4px;">logout</span> Check-out
                             </button>
-                        ` : job.status !== 'Completed' ? `
+                        ` : statusText !== 'Completed' ? `
                             <button class="btn-primary" style="flex: 1; justify-content: center; background: var(--accent);" onclick="field.checkIn('${job.id}')">
                                 <span class="material-symbols-outlined" style="font-size: 1.1rem; margin-right: 4px;">login</span> Check-in (GPS)
                             </button>
@@ -128,8 +135,11 @@ window.field = {
                     </div>
                     
                     <div style="display: flex; gap: 12px; align-items: center;">
+                        <button class="btn-secondary" style="flex: 1; justify-content: center;" onclick="field.openJobReport('${job.id}')">
+                            <span class="material-symbols-outlined" style="font-size: 1.1rem; margin-right: 4px;">print</span> Job report
+                        </button>
                         <button class="btn-secondary" style="flex: 1; justify-content: center;" onclick="field.addNote('${job.id}')">Update Log</button>
-                        ${job.status.toLowerCase() !== 'completed' ? `
+                        ${statusText.toLowerCase() !== 'completed' ? `
                             <button class="btn-primary" style="flex: 1; justify-content: center; background: var(--success);" onclick="field.changeStatus('${job.id}')">Complete Job</button>
                         ` : `
                             <button class="btn-primary" style="flex: 1; justify-content: center; background: var(--success);" onclick="field.viewReport('${job.id}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; margin-right: 4px;">assignment</span> Report</button>
@@ -138,6 +148,71 @@ window.field = {
                 </div>
             </div>
         `;
+    },
+
+    async assignTechnician(jobId, selectEl) {
+        const role = window.authSystem && window.authSystem.currentUser && window.authSystem.currentUser.role;
+        if (!window.ItguyFixes || !window.ItguyFixes.canAssignTechnician(role)) {
+            window.app.showToast('Only office staff can assign technicians.', 'error');
+            this.render();
+            return;
+        }
+        const job = (window.app.state.fieldJobs || []).find(j => j.id === jobId);
+        if (!job || !selectEl) return;
+        const opt = selectEl.options[selectEl.selectedIndex];
+        const technician = selectEl.value || '';
+        const technicianUid = opt ? (opt.getAttribute('data-uid') || '') : '';
+        const technicianEmail = opt ? (opt.getAttribute('data-email') || '') : '';
+        const note = {
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            text: `System: Assigned technician changed to '${technician || 'Unassigned'}'`,
+            user: 'System'
+        };
+        const notes = (job.notes || []).concat([note]);
+        job.technician = technician;
+        job.technicianUid = technicianUid;
+        job.technicianEmail = technicianEmail;
+        job.notes = notes;
+        try {
+            await window.fbDb.collection('fieldJobs').doc(jobId).update({
+                technician: technician,
+                technicianUid: technicianUid,
+                technicianEmail: technicianEmail,
+                notes: notes,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            window.app.logActivity('Field Technician Assigned', `${jobId} assigned to ${technician || 'Unassigned'}`);
+            window.app.showToast(technician ? ('Assigned to ' + technician) : 'Technician unassigned', 'success');
+            this.render();
+        } catch (e) {
+            console.error(e);
+            window.app.showToast(e.message || 'Could not save the technician assignment.', 'error');
+            this.render();
+        }
+    },
+
+    openJobReport(jobId) {
+        const job = (window.app.state.fieldJobs || []).find(j => j.id === jobId);
+        if (!job) return;
+        const report = window.ItguyFixes ? window.ItguyFixes.buildJobReport(job, 'Field') : job;
+        const summary = window.app.escapeHtml(report.workPerformed || report.fault || 'No work notes yet.');
+        window.app.showModal(`
+            <div class="modal-content" style="max-width: 640px;">
+                <div class="modal-header">
+                    <h2>Job report ${window.app.escapeHtml(job.id)}</h2>
+                    <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div class="modal-body">
+                    <p style="color:#a0a0a0; margin-top:0;">${window.app.escapeHtml(report.customer || 'Customer')} · ${window.app.escapeHtml(report.status || '')} · ${window.app.escapeHtml(report.technician || 'Unassigned')}</p>
+                    <div class="pdf-desc" style="color:#111; background:#fff; padding:12px; border-radius:8px; white-space:pre-wrap;">${summary}</div>
+                    <div class="modal-footer" style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button type="button" class="btn-secondary" onclick="app.executeDocumentAction('Print', 'Job Report', '${job.id}', this)">Print</button>
+                        <button type="button" class="btn-secondary" onclick="app.executeDocumentAction('Download', 'Job Report', '${job.id}', this)">Download</button>
+                        <button type="button" class="btn-primary" onclick="app.executeDocumentAction('Email', 'Job Report', '${job.id}', '${window.app.escapeHtml(job.email || '')}', this)">Email</button>
+                    </div>
+                </div>
+            </div>
+        `);
     },
 
     navTo(address) {
@@ -431,6 +506,11 @@ window.field = {
                     <div style="background: rgba(0,0,0,0.2); padding: 16px; border-radius: 8px; border: 1px solid var(--border);">
                         <h3 style="color: #a0a0a0; margin-bottom: 8px;">Client Sign-off</h3>
                         ${cd.signature ? `<img src="${cd.signature}" style="max-height: 100px; background: white; border-radius: 4px; padding: 4px;">` : '<p>No signature captured</p>'}
+                    </div>
+                    <div class="modal-footer" style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button type="button" class="btn-secondary" onclick="app.executeDocumentAction('Print', 'Job Report', '${job.id}', this)">Print</button>
+                        <button type="button" class="btn-secondary" onclick="app.executeDocumentAction('Download', 'Job Report', '${job.id}', this)">Download</button>
+                        <button type="button" class="btn-primary" onclick="app.executeDocumentAction('Email', 'Job Report', '${job.id}', '${window.app.escapeHtml(job.email || '')}', this)">Email</button>
                     </div>
                 </div>
             </div>

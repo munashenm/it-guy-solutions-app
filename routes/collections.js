@@ -3,6 +3,14 @@ const router = express.Router();
 const db = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const logger = require('../utils/logger');
+const fixes = require('../lib/itguy-fixes');
+
+function denyAssignment(res, actor, name, current, nextBody, method) {
+    const denial = fixes.assignmentDenial(actor, name, current || {}, nextBody || {}, method);
+    if (!denial) return false;
+    res.status(403).json({ error: denial });
+    return true;
+}
 
 router.get('/settings/companyProfile', async (req, res, next) => {
     try {
@@ -132,6 +140,10 @@ router.post('/:name/:id', async (req, res, next) => {
             }
         }
 
+        const existing = await db.get("SELECT data FROM collections WHERE name = ? AND id = ?", [name, id]);
+        const currentData = existing ? safeJsonParse(existing.data, {}, `Assign check: ${name}/${id}`) : {};
+        if (denyAssignment(res, req.user, name, currentData, req.body, 'set')) return;
+
         await saveDoc(name, id, req.body);
         res.json({ success: true });
     } catch (e) {
@@ -157,6 +169,8 @@ router.patch('/:name/:id', async (req, res, next) => {
                 return res.status(403).json({ error: "Forbidden: You do not own this document." });
             }
         }
+
+        if (denyAssignment(res, req.user, name, currentData, req.body, 'patch')) return;
 
         const newData = { ...currentData, ...req.body };
         await saveDoc(name, id, newData);

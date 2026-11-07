@@ -3,33 +3,62 @@ const router = express.Router();
 const db = require('../database');
 const bcrypt = require('bcryptjs');
 const { requireAuth, requireAdmin } = require('../middleware/auth');
+const fixes = require('../lib/itguy-fixes');
+
+async function mirrorUser(uid, userData) {
+    const jsonData = JSON.stringify(userData);
+    if (db.type === 'mysql') {
+        await db.run(`INSERT INTO collections (id, name, data, updatedAt) VALUES (?, 'users', ?, CURRENT_TIMESTAMP)
+                     ON DUPLICATE KEY UPDATE data = VALUES(data), updatedAt = CURRENT_TIMESTAMP`, [uid, jsonData]);
+    } else {
+        await db.run(`INSERT OR REPLACE INTO collections (id, name, data, updatedAt) VALUES (?, 'users', ?, CURRENT_TIMESTAMP)`, [uid, jsonData]);
+    }
+}
 
 // All routes here require auth
 router.use(requireAuth);
 
 router.post('/', requireAdmin, async (req, res, next) => {
-    const { email, password, role, username, firstName, lastName, employeeId } = req.body;
-    if(!email || !password || !role) return res.status(400).json({ error: "Missing required fields" });
-    
+    const parsed = fixes.validateStaffCreate(req.body || {});
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+
     const uid = 'user-' + Math.random().toString(36).substring(2, 12);
-    
+
     try {
-        const hashedPassword = await bcrypt.hash(password, 12);
-        await db.run("INSERT INTO users (uid, email, username, firstName, lastName, employeeId, role, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
-            [uid, email, username||'', firstName||'', lastName||'', employeeId||'', role, hashedPassword]);
-        
-        const userData = { uid, email, username: username||'', firstName: firstName||'', lastName: lastName||'', employeeId: employeeId||'', role, createdAt: new Date().toISOString() };
-        
-        const jsonData = JSON.stringify(userData);
-        if(process.env.DB_TYPE === 'mysql') {
-            await db.run(`INSERT INTO collections (id, name, data, updatedAt) VALUES (?, 'users', ?, CURRENT_TIMESTAMP) 
-                         ON DUPLICATE KEY UPDATE data = VALUES(data), updatedAt = CURRENT_TIMESTAMP`, [uid, jsonData]);
-        } else {
-            await db.run(`INSERT OR REPLACE INTO collections (id, name, data, updatedAt) VALUES (?, 'users', ?, CURRENT_TIMESTAMP)`, [uid, jsonData]);
+        const duplicate = await db.get(
+            "SELECT uid FROM users WHERE LOWER(email) = LOWER(?) OR (? != '' AND LOWER(username) = LOWER(?))",
+            [parsed.email, parsed.username, parsed.username]
+        );
+        if (duplicate) {
+            return res.status(409).json({ error: 'A staff account with this email or username already exists.' });
+        }
+
+        const hashedPassword = await bcrypt.hash(parsed.password, 12);
+        await db.run(
+            "INSERT INTO users (uid, email, username, firstName, lastName, employeeId, role, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [uid, parsed.email, parsed.username, parsed.firstName, parsed.lastName, parsed.employeeId, parsed.role, hashedPassword]
+        );
+
+        const userData = {
+            uid,
+            email: parsed.email,
+            username: parsed.username,
+            firstName: parsed.firstName,
+            lastName: parsed.lastName,
+            employeeId: parsed.employeeId,
+            role: parsed.role,
+            createdAt: new Date().toISOString()
+        };
+
+        try {
+            await mirrorUser(uid, userData);
+        } catch (mirrorErr) {
+            await db.run("DELETE FROM users WHERE uid = ?", [uid]);
+            throw mirrorErr;
         }
 
         res.json({ success: true, user: userData });
-    } catch(err) {
+    } catch (err) {
         next(err);
     }
 });
@@ -85,13 +114,7 @@ router.put('/:uid', requireAdmin, async (req, res, next) => {
                 [email, username, firstName, lastName, employeeId, phone, role, uid]);
         
         const userData = { uid, email, username, firstName, lastName, employeeId, phone, role, updatedAt: new Date().toISOString() };
-        const jsonData = JSON.stringify(userData);
-        if(process.env.DB_TYPE === 'mysql') {
-            await db.run(`INSERT INTO collections (id, name, data, updatedAt) VALUES (?, 'users', ?, CURRENT_TIMESTAMP) 
-                         ON DUPLICATE KEY UPDATE data = VALUES(data), updatedAt = CURRENT_TIMESTAMP`, [uid, jsonData]);
-        } else {
-            await db.run(`INSERT OR REPLACE INTO collections (id, name, data, updatedAt) VALUES (?, 'users', ?, CURRENT_TIMESTAMP)`, [uid, jsonData]);
-        }
+        await mirrorUser(uid, userData);
         res.json({ success: true });
     } catch(err) {
         next(err);

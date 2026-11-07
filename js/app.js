@@ -317,19 +317,40 @@ const app = {
     },
 
     staffSelectOptions(selected = '') {
-        const names = new Set();
+        const people = [];
+        const seen = new Set();
         (this.state.users || []).forEach(u => {
             if ((u.role || '').toLowerCase() === 'client') return;
             const name = this.personName(u);
-            if (name) names.add(name);
+            if (!name || seen.has(name)) return;
+            seen.add(name);
+            people.push({
+                name,
+                uid: u.uid || u.id || '',
+                email: u.email || ''
+            });
         });
-        if (selected) names.add(selected);
+        if (selected && !seen.has(selected)) people.push({ name: selected, uid: '', email: '' });
+        people.sort((a, b) => a.name.localeCompare(b.name));
         let html = `<option value="">Unassigned</option>`;
-        [...names].sort((a, b) => a.localeCompare(b)).forEach(name => {
-            const sel = selected === name ? 'selected' : '';
-            html += `<option value="${this.escapeHtml(name)}" ${sel}>${this.escapeHtml(name)}</option>`;
+        people.forEach(p => {
+            const sel = selected === p.name ? 'selected' : '';
+            html += `<option value="${this.escapeHtml(p.name)}" data-uid="${this.escapeHtml(p.uid)}" data-email="${this.escapeHtml(p.email)}" ${sel}>${this.escapeHtml(p.name)}</option>`;
         });
         return html;
+    },
+
+    rememberStaffUser(user) {
+        if (!user) return;
+        const row = Object.assign({ id: user.uid || user.id }, user);
+        if (!this.state.users) this.state.users = [];
+        const idx = this.state.users.findIndex(u => (u.uid || u.id) === (row.uid || row.id));
+        if (idx >= 0) this.state.users[idx] = Object.assign({}, this.state.users[idx], row);
+        else this.state.users.push(row);
+        const coll = window.fbDb && window.fbDb.collection && window.fbDb.collection('users');
+        if (coll && typeof coll.fetch === 'function') {
+            coll.fetch().catch((e) => console.warn('User list refresh failed', e.message));
+        }
     },
 
     toggleNotifications(event) {
@@ -824,7 +845,8 @@ const app = {
 
     fillCustomerDetails(name, prefix) {
         if(!this.state.customers) return;
-        const c = this.state.customers.find(x => x.name.toLowerCase() === name.toLowerCase());
+        const wanted = String(name || '').toLowerCase();
+        const c = this.state.customers.find(x => x && x.name && x.name.toLowerCase() === wanted);
         if(c) {
             const phoneEl = document.getElementById(prefix + '-phone');
             const emailEl = document.getElementById(prefix + '-email');
@@ -857,12 +879,13 @@ const app = {
         const val = input.value;
         const item = (this.state.inventory || []).find(i => i.name === val);
         if (item) {
-            const row = input.closest('.quo-item-row, .inv-item-row');
+            const row = input.closest('.quo-item-row, .invoice-item-row');
             if (row) {
-                const priceInput = row.querySelector(`.${prefix}-unit`);
-                const typeSelect = row.querySelector(`.${prefix}-type`);
+                const priceInput = row.querySelector(prefix === 'quo' ? '.quo-unit' : '.item-unit');
+                const typeSelect = row.querySelector(prefix === 'quo' ? '.quo-type' : '.item-type');
                 if (priceInput) {
-                    priceInput.value = item.sell;
+                    const numeric = window.ItguyFixes ? window.ItguyFixes.moneyNumber(item.sell) : item.sell;
+                    priceInput.value = numeric;
                     this[prefix === 'quo' ? 'calcQuotationTotal' : 'calcInvoiceTotal']();
                 }
                 if (typeSelect) {
@@ -982,11 +1005,17 @@ const app = {
             }
         });
 
-        // Close modal on outside click
+        // Backdrop clicks close ordinary modals. Protected forms decide in closeModal.
         this.modalContainer.addEventListener('click', (e) => {
             if(e.target === this.modalContainer) {
-                this.closeModal();
+                this.closeModal({ reason: 'backdrop' });
             }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            if (!this.modalContainer || !this.modalContainer.classList.contains('active')) return;
+            e.preventDefault();
+            this.closeModal({ reason: 'escape' });
         });
 
         // Topbar Settings Binding
@@ -1126,19 +1155,84 @@ const app = {
         }
     },
 
-    showModal(contentHTML) {
-        this.modalContainer.innerHTML = contentHTML;
+    showModal(contentHTML, options) {
+        if (!this.modalContainer) this.modalContainer = document.getElementById('modal-container');
+        const opts = options || {};
+        if (!opts.stack) {
+            const top = this._topModalLayer();
+            if (top && top.dataset.protectUnsaved === 'true' && top.dataset.dirty === 'true' && !opts.force) {
+                const decision = window.ItguyFixes
+                    ? window.ItguyFixes.modalDismissDecision({ reason: 'close', protectedForm: true, dirty: true })
+                    : { action: 'confirm' };
+                if (decision.action === 'confirm' && !window.confirm('You have unsaved invoice details. Close and discard them?')) {
+                    return false;
+                }
+            }
+            this.modalContainer.innerHTML = '';
+        }
+        const layer = document.createElement('div');
+        layer.className = 'modal-layer';
+        layer.innerHTML = contentHTML;
+        if (layer.querySelector('[data-protect-unsaved]')) layer.dataset.protectUnsaved = 'true';
+        this.modalContainer.appendChild(layer);
         this.modalContainer.classList.add('active');
-        
-        // specific modal setups
-        if (contentHTML.includes('signature-pad')) {
+        this._bindModalLayer(layer);
+        if (String(contentHTML || '').includes('signature-pad') || layer.querySelector('.signature-pad, #signature-canvas')) {
             this.initSignaturePad();
         }
+        return true;
     },
 
-    closeModal() {
-        this.modalContainer.classList.remove('active');
-        this.modalContainer.innerHTML = '';
+    _topModalLayer() {
+        if (!this.modalContainer) return null;
+        const layers = this.modalContainer.querySelectorAll('.modal-layer');
+        return layers.length ? layers[layers.length - 1] : null;
+    },
+
+    _bindModalLayer(layer) {
+        layer.addEventListener('click', (e) => {
+            if (e.target !== layer) return;
+            this.closeModal({ reason: 'backdrop' });
+        });
+        const mark = () => {
+            if (layer.dataset.protectUnsaved === 'true') layer.dataset.dirty = 'true';
+        };
+        layer.addEventListener('input', mark);
+        layer.addEventListener('change', mark);
+    },
+
+    markModalDirty() {
+        const top = this._topModalLayer();
+        if (top && top.dataset.protectUnsaved === 'true') top.dataset.dirty = 'true';
+    },
+
+    closeModal(arg) {
+        const opts = (arg && typeof arg === 'object') ? arg : {};
+        if (!this.modalContainer) return true;
+        const top = this._topModalLayer();
+        if (!top) {
+            this.modalContainer.classList.remove('active');
+            this.modalContainer.innerHTML = '';
+            return true;
+        }
+        const decision = window.ItguyFixes
+            ? window.ItguyFixes.modalDismissDecision({
+                reason: opts.reason || 'cancel',
+                protectedForm: top.dataset.protectUnsaved === 'true',
+                dirty: top.dataset.dirty === 'true',
+                force: !!opts.force
+            })
+            : { action: 'close' };
+        if (decision.action === 'ignore') return false;
+        if (decision.action === 'confirm') {
+            if (!window.confirm('You have unsaved invoice details. Close and discard them?')) return false;
+        }
+        top.remove();
+        if (!this.modalContainer.querySelector('.modal-layer')) {
+            this.modalContainer.classList.remove('active');
+            this.modalContainer.innerHTML = '';
+        }
+        return true;
     },
 
     showSendModal(docId, docType) {
@@ -1386,10 +1480,8 @@ const app = {
                             </div>
                             <div class="form-group">
                                 <label>Assigned Technician</label>
-                                <select id="callout-technician" class="form-control" required style="appearance: auto;">
-                                    <option value="" disabled selected>Select from team</option>
-                                    ${(this.state.users || []).filter(u => u.role === 'technician').map(t => `<option value="${t.firstName} ${t.lastName || ''}">${t.firstName} ${t.lastName || ''} (${t.username})</option>`).join('')}
-                                    ${(this.state.users || []).filter(u => u.role === 'admin').map(a => `<option value="${a.firstName} ${a.lastName || ''}">${a.firstName} ${a.lastName || ''} (Admin)</option>`).join('')}
+                                <select id="callout-technician" class="form-control" style="appearance: auto;">
+                                    ${this.staffSelectOptions('')}
                                 </select>
                             </div>
                         </div>
@@ -1422,7 +1514,11 @@ const app = {
         const email = document.getElementById('callout-email').value;
         const contactPerson = document.getElementById('callout-contact-person').value;
         const address = document.getElementById('callout-address').value;
-        const technician = document.getElementById('callout-technician').value;
+        const techSel = document.getElementById('callout-technician');
+        const techOpt = techSel && techSel.options[techSel.selectedIndex];
+        const technician = techSel ? techSel.value : '';
+        const technicianUid = techOpt ? (techOpt.getAttribute('data-uid') || '') : '';
+        const technicianEmail = techOpt ? (techOpt.getAttribute('data-email') || '') : '';
         const dateBooked = document.getElementById('callout-booked-date').value;
         const desc = document.getElementById('callout-description').value;
         const special = document.getElementById('callout-special').value;
@@ -1437,6 +1533,8 @@ const app = {
                 contactPerson: contactPerson,
                 address: address,
                 technician: technician,
+                technicianUid: technicianUid,
+                technicianEmail: technicianEmail,
                 status: 'Scheduled',
                 dateBooked: dateBooked,
                 description: desc,
@@ -1462,7 +1560,7 @@ const app = {
     showCreateInvoiceModal() {
         const dateStr = new Date().toISOString().split('T')[0];
         const modalHTML = `
-            <div class="modal-content" style="max-width: 800px;">
+            <div class="modal-content" data-protect-unsaved="true" style="max-width: 800px;">
                 <div class="modal-header">
                     <h2>Create Invoice</h2>
                     <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
@@ -1498,6 +1596,9 @@ const app = {
                                 ${this.generateCustomerDatalist()}
                                 ${this.generateInventoryDatalist()}
                             </div>
+                        </div>
+                        <input type="hidden" id="inv-customer-id" value="">
+                        <div id="inv-source-notice" class="hidden" style="margin-bottom: 16px; padding: 10px 12px; border-radius: 8px; background: rgba(253, 203, 110, 0.12); color: #fdcb6e; font-size: 0.9rem;"></div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>VAT Number (Optional)</label>
@@ -1511,11 +1612,11 @@ const app = {
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Phone Number</label>
-                                <input type="tel" id="inv-phone" class="form-control" placeholder="e.g. 082 123 4567" required>
+                                <input type="tel" id="inv-phone" class="form-control" placeholder="e.g. 082 123 4567">
                             </div>
                             <div class="form-group">
                                 <label>Email Address</label>
-                                <input type="email" id="inv-email" class="form-control" placeholder="e.g. name@example.com" required>
+                                <input type="email" id="inv-email" class="form-control" placeholder="e.g. name@example.com">
                             </div>
                         </div>
                         <div class="form-group">
@@ -1583,7 +1684,8 @@ const app = {
         
         if (arr.length > 0) {
             arr.forEach(item => {
-                selectId.innerHTML += `<option value="${item.id}" style="background: #1a1d2d; color: #fff;">${item.id} - ${item.customer}</option>`;
+                const label = this.partyName(item, 'Customer');
+                selectId.innerHTML += `<option value="${this.escapeHtml(item.id)}" style="background: #1a1d2d; color: #fff;">${this.escapeHtml(item.id)} - ${this.escapeHtml(label)}</option>`;
             });
             selectId.disabled = false;
         } else if (type !== 'None') {
@@ -1591,35 +1693,56 @@ const app = {
         }
     },
 
+    applyBillingDraft(prefix, draft) {
+        if (!draft) return;
+        const clientEl = document.getElementById(prefix + '-client');
+        if (clientEl) clientEl.value = draft.customer || '';
+        const map = { phone: draft.phone, email: draft.email, address: draft.address, vat: draft.vat, reg: draft.regNo };
+        Object.keys(map).forEach(key => {
+            const el = document.getElementById(prefix + '-' + key);
+            if (el) el.value = map[key] || '';
+        });
+        const idEl = document.getElementById(prefix + '-customer-id');
+        if (idEl) idEl.value = draft.customerId || '';
+    },
+
+    billingNotice(draft, duplicate) {
+        const bits = [];
+        if (!draft) return '';
+        if (draft.missing.customer) bits.push('This record has no customer name. Nothing was invented.');
+        if (draft.missing.phone || draft.missing.email) bits.push('Contact details that were not on the original job were left blank.');
+        if (duplicate) bits.push('Invoice ' + duplicate.id + ' is already linked to this job. Saving creates another invoice only if you confirm.');
+        return bits.join(' ');
+    },
+
     handleInvoiceSourceIdChange() {
         const type = document.getElementById('inv-source-type').value;
         const id = document.getElementById('inv-source-id').value;
+        const notice = document.getElementById('inv-source-notice');
         
         let sourceObj = null;
-        if (type === 'Workshop') sourceObj = this.state.jobs.find(j => j.id === id);
-        if (type === 'Field') sourceObj = this.state.fieldJobs.find(j => j.id === id);
+        if (type === 'Workshop') sourceObj = (this.state.jobs || []).find(j => j.id === id);
+        if (type === 'Field') sourceObj = (this.state.fieldJobs || []).find(j => j.id === id);
         if (type === 'Quotation') sourceObj = (this.state.quotations || []).find(q => q.id === id);
         
-        if (sourceObj) {
-            document.getElementById('inv-client').value = sourceObj.customer || '';
-            const vatEl = document.getElementById('inv-vat');
-            if(vatEl) vatEl.value = sourceObj.vat || '';
-            
-            const regEl = document.getElementById('inv-reg');
-            if(regEl) regEl.value = sourceObj.regNo || '';
-
-            document.getElementById('inv-phone').value = sourceObj.phone || '';
-            document.getElementById('inv-email').value = sourceObj.email || '';
-            document.getElementById('inv-address').value = sourceObj.address || '';
-            
-            // Auto-fill items if they exist
-            if (sourceObj.items && sourceObj.items.length > 0) {
-                const container = document.getElementById('invoice-items-container');
-                container.innerHTML = ''; // clear current items
-                sourceObj.items.forEach(item => {
-                    this.addInvoiceItemLine(item);
-                });
+        if (sourceObj && window.ItguyFixes) {
+            const draft = window.ItguyFixes.mapSourceToBilling(sourceObj, this.state.customers || []);
+            this.applyBillingDraft('inv', draft);
+            const duplicate = window.ItguyFixes.findInvoiceForSource(this.state.invoices || [], draft.sourceId);
+            const text = this.billingNotice(draft, duplicate);
+            if (notice) {
+                notice.textContent = text;
+                notice.classList.toggle('hidden', !text);
             }
+            const container = document.getElementById('invoice-items-container');
+            if (container) {
+                container.innerHTML = '';
+                if (draft.items.length) draft.items.forEach(item => this.addInvoiceItemLine(item));
+                else this.addInvoiceItemLine();
+            }
+            this.markModalDirty();
+        } else if (notice) {
+            notice.classList.add('hidden');
         }
     },
 
@@ -1654,7 +1777,7 @@ const app = {
 
                 <div class="form-group" style="margin-bottom: 12px;">
                     <label style="font-size: 0.7rem; color: var(--accent); text-transform: uppercase;">Description / Service Details</label>
-                    <input type="text" class="form-control item-desc" placeholder="e.g. SSD Upgrade or Labour" value="${desc}" list="inventory-items-list" oninput="app.fillLinePriceFromInventory(this, 'inv')" required>
+                    <textarea class="form-control item-desc" placeholder="e.g. SSD Upgrade or Labour" list="inventory-items-list" oninput="app.fillLinePriceFromInventory(this, 'inv')" required>${this.escapeHtml(desc)}</textarea>
                 </div>
 
                 <div class="form-row" style="margin-bottom: 0;">
@@ -1688,13 +1811,14 @@ const app = {
 
     calcInvoiceTotal() {
         const rows = document.querySelectorAll('.invoice-item-row');
+        const fixes = window.ItguyFixes;
         let subtotal = 0;
         
         rows.forEach(row => {
-            const unitPrice = parseFloat(row.querySelector('.item-unit').value) || 0;
-            const qty = parseInt(row.querySelector('.item-qty').value) || 0;
-            const rowTotal = unitPrice * qty;
-            subtotal += rowTotal;
+            const unitPrice = row.querySelector('.item-unit').value;
+            const qty = row.querySelector('.item-qty').value;
+            const rowTotal = fixes ? fixes.lineTotal(unitPrice, qty) : ((parseFloat(unitPrice) || 0) * (parseFloat(qty) || 0));
+            subtotal = fixes ? fixes.grandTotal(subtotal, rowTotal) : (subtotal + rowTotal);
             row.querySelector('.item-row-total').textContent = 'R ' + rowTotal.toFixed(2);
         });
         
@@ -1706,8 +1830,8 @@ const app = {
         let grandTotal = subtotal;
         
         if (isVatRegistered) {
-            vatAmount = subtotal * (vatRate / 100);
-            grandTotal = subtotal + vatAmount;
+            vatAmount = fixes ? fixes.vatAmount(subtotal, vatRate, true) : subtotal * (vatRate / 100);
+            grandTotal = fixes ? fixes.grandTotal(subtotal, vatAmount) : (subtotal + vatAmount);
             
             const vatRow = document.getElementById('inv-vat-row');
             if (vatRow) vatRow.classList.remove('hidden');
@@ -1729,105 +1853,20 @@ const app = {
         }
     },
 
-    showScheduleCalloutModal() {
-        const dateStr = new Date().toISOString().split('T')[0];
-        const customers = this.state.customers || [];
-        const techsHtml = this.staffSelectOptions();
-        
-        const modalHTML = `
-            <div class="modal-content" style="max-width: 500px;">
-                <div class="modal-header">
-                    <h2>Schedule Field Call-out</h2>
-                    <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
-                </div>
-                <div class="modal-body">
-                    <form onsubmit="app.scheduleCalloutAction(event)">
-                        <div class="form-group">
-                            <label>Client / Customer</label>
-                            <input type="text" id="call-client" class="form-control" placeholder="Search or Type Client Name..." list="customers-list" required>
-                            <datalist id="customers-list">
-                                ${customers.map(c => `<option value="${c.name || c.id}">${c.company || ''}</option>`).join('')}
-                            </datalist>
-                        </div>
-                        <div class="form-group">
-                            <label>Service Address</label>
-                            <input type="text" id="call-address" class="form-control" placeholder="123 Street Name, Suburb" required onfocus="app.autoFillClientAddress()">
-                        </div>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label>Date</label>
-                                <input type="date" id="call-date" class="form-control" value="${dateStr}" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Preferred Time</label>
-                                <input type="time" id="call-time" class="form-control" value="09:00">
-                            </div>
-                        </div>
-                        <div class="form-group">
-                            <label>Assign Technician</label>
-                            <select id="call-tech" class="form-control" style="appearance: auto;">
-                                ${techsHtml}
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Problem / Description</label>
-                            <textarea id="call-desc" class="form-control" rows="3" placeholder="Describe the issue to resolve on-site..." required></textarea>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancel</button>
-                            <button type="submit" class="btn-primary">Book Call-out</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        `;
-        this.showModal(modalHTML);
-    },
-
-    autoFillClientAddress() {
-        const clientName = document.getElementById('call-client').value;
-        const client = (this.state.customers || []).find(c => (c.name || c.id) === clientName || c.company === clientName);
-        if (client && client.address) {
-            document.getElementById('call-address').value = client.address;
-        }
-    },
-
-    async scheduleCalloutAction(e) {
-        e.preventDefault();
-        const btn = e.target.querySelector('button[type="submit"]');
-        if(btn) { btn.innerHTML = 'Scheduling...'; btn.disabled = true; }
-
-        const jobData = {
-            id: 'CALL-' + Math.floor(1000 + Math.random() * 9000),
-            customer: document.getElementById('call-client').value,
-            address: document.getElementById('call-address').value,
-            date: document.getElementById('call-date').value,
-            time: document.getElementById('call-time').value,
-            technician: document.getElementById('call-tech').value,
-            desc: document.getElementById('call-desc').value,
-            status: 'Scheduled',
-            items: [],
-            notes: [],
-            createdAt: new Date().toISOString()
-        };
-
-        try {
-            await window.fbDb.collection('fieldJobs').doc(jobData.id).set(jobData);
-            this.logActivity('Call-out Scheduled', `Scheduled ${jobData.id} for ${jobData.customer} on ${jobData.date}`);
-            this.closeModal();
-            // Refresh view
-            if (window.field) window.field.render();
-        } catch (err) {
-            console.error(err);
-            alert("Error scheduling call-out: " + err.message);
-            if(btn) { btn.innerHTML = 'Book Call-out'; btn.disabled = false; }
-        }
-    },
-
     async handleCreateInvoice(e) {
         e.preventDefault();
         const btn = e.target.querySelector('button[type="submit"]');
         if(btn) { btn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span> Processing...'; btn.disabled = true; }
+
+        const sourceType = (document.getElementById('inv-source-type') || {}).value || 'None';
+        const sourceId = (document.getElementById('inv-source-id') || {}).value || '';
+        if (sourceType !== 'None' && sourceId && window.ItguyFixes) {
+            const duplicate = window.ItguyFixes.findInvoiceForSource(this.state.invoices || [], sourceId);
+            if (duplicate && !confirm('Invoice ' + duplicate.id + ' is already linked to ' + sourceId + '. Create another invoice anyway?')) {
+                if (btn) { btn.innerHTML = 'Generate Invoice'; btn.disabled = false; }
+                return;
+            }
+        }
 
         let client = document.getElementById('inv-client').value;
         const vat = document.getElementById('inv-vat').value;
@@ -1859,9 +1898,11 @@ const app = {
         
         try {
             const newId = await this.getNextSequence("INV");
+            const customerId = (document.getElementById('inv-customer-id') || {}).value || '';
             const payload = {
                 id: newId,
-                customer: client + (vat ? ' (VAT: ' + vat + ')' : ''),
+                customer: client,
+                customerId: customerId,
                 vatNumber: vat,
                 regNo: regNo,
                 phone: phone,
@@ -1874,13 +1915,16 @@ const app = {
                 amount: amount,
                 status: 'Unpaid',
                 date: date,
+                sourceType: sourceType !== 'None' ? sourceType : '',
+                sourceId: sourceType !== 'None' ? sourceId : '',
+                sourceCollection: window.ItguyFixes ? window.ItguyFixes.sourceCollectionName(sourceType) : '',
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             };
             
             await window.fbDb.collection('invoices').doc(newId).set(payload, { merge: true });
             this.state._lastCreatedDoc = payload; // Cache for immediate actions
             this.logActivity('Invoice Created', `Generated ${newId} for ${client} (Amount: ${amount})`);
-            this.closeModal(); // closes current modal
+            this.closeModal({ force: true });
             
             setTimeout(() => {
                 this.showDocumentActionModal('Invoice', newId, client, amount, email, phone);
@@ -1953,7 +1997,7 @@ const app = {
         if (!dataObj && docType === 'Invoice') dataObj = app.state.invoices.find(i => i.id === docId);
         if (!dataObj && docType === 'Quotation') dataObj = (app.state.quotations || []).find(q => q.id === docId);
         if (docType === 'Cash Receipt') dataObj = (app.state.sales || []).find(s => s.id === docId);
-        if (docType === 'Job Card') {
+        if (docType === 'Job Card' || docType === 'Job Report') {
             dataObj = (app.state.jobs || []).find(j => j.id === docId) || (app.state.fieldJobs || []).find(f => f.id === docId);
         }
         if (docType === 'Statement') {
@@ -1967,7 +2011,7 @@ const app = {
                 if(docType === 'Invoice') collName = 'invoices';
                 else if(docType === 'Quotation') collName = 'quotations';
                 else if(docType === 'Cash Receipt') collName = 'sales';
-                else if(docType === 'Job Card') collName = (docId.startsWith('FLD-')) ? 'fieldJobs' : 'jobs';
+                else if(docType === 'Job Card' || docType === 'Job Report') collName = (String(docId).indexOf('FLD') === 0) ? 'fieldJobs' : 'jobs';
                 
                 if(collName) {
                     console.log(`Document ${docId} not in state. Attempting direct DB fetch...`);
@@ -2005,9 +2049,10 @@ const app = {
         } else {
             // Action is Email or WhatsApp
             try {
-                if(!contactInfo || contactInfo === 'undefined' || contactInfo === 'null' || contactInfo.trim() === '') {
+                if (actionType !== 'Email' && (!contactInfo || contactInfo === 'undefined' || contactInfo === 'null' || contactInfo.trim() === '')) {
                     throw new Error(`No valid contact provided for ${actionType}. Please edit the client profile.`);
                 }
+                if (!contactInfo || contactInfo === 'undefined' || contactInfo === 'null') contactInfo = '';
 
                 // Prepare Content Preview
                 const sysSettings = this.state.settings || {};
@@ -2027,6 +2072,23 @@ const app = {
                 }
 
                 const finalMessage = confirmed.message;
+                const recipient = window.ItguyFixes
+                    ? window.ItguyFixes.reviewedRecipient(confirmed, contactInfo)
+                    : (confirmed.recipient !== undefined ? String(confirmed.recipient || '').trim() : contactInfo);
+                if (actionType === 'Email' && window.ItguyFixes) {
+                    const plan = window.ItguyFixes.reviewEmailDispatch({
+                        confirmed: true,
+                        recipient: recipient,
+                        smtpState: window.ItguyFixes.smtpState(this.state.settings || {})
+                    });
+                    if (!plan.send) {
+                        const errText = plan.error || 'Email was not sent.';
+                        this.showToast(errText, 'error');
+                        alert(errText);
+                        if(btn && btn.tagName === 'BUTTON') { btn.innerHTML = oldContent; btn.disabled = false; }
+                        return;
+                    }
+                }
 
                 // If email, we actually generate the PDF base64 to send as an attachment
                 let pdfBase64 = null;
@@ -2039,7 +2101,7 @@ const app = {
                     actionType,
                     docType,
                     docId,
-                    contactInfo,
+                    contactInfo: actionType === 'Email' ? recipient : contactInfo,
                     pdfBase64,
                     dataObj,
                     customMessage: finalMessage,
@@ -2056,12 +2118,19 @@ const app = {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload)
                     });
-                    alert(`${docType} ${docId} successfully sent to ${contactInfo} via ${actionType}!`);
+                    const sentTo = actionType === 'Email' ? recipient : contactInfo;
+                    this.showToast(docType + ' sent to ' + sentTo + '.', 'success');
+                    alert(docType + ' ' + docId + ' sent to ' + sentTo + ' via ' + actionType + '.');
                 }
 
             } catch (err) {
                 console.error(err);
-                alert(`Failed to send ${actionType}: ` + err.message);
+                const raw = err && err.message ? err.message : 'Send failed';
+                const friendly = /smtp|not configured|not sent/i.test(raw) && window.ItguyFixes
+                    ? window.ItguyFixes.SMTP_BLOCKER
+                    : ('Failed to send ' + actionType + ': ' + raw);
+                this.showToast(friendly, 'error');
+                alert(friendly);
             }
             if(btn && btn.tagName === 'BUTTON') { btn.innerHTML = oldContent; btn.disabled = false; }
         }
@@ -2069,23 +2138,30 @@ const app = {
 
     showNotificationPreview(type, contact, subject, message) {
         return new Promise((resolve) => {
+            const safeContact = this.escapeHtml(contact || '');
+            const safeSubject = this.escapeHtml(subject || '');
+            const safeMessage = this.escapeHtml(message || '');
             const modalHTML = `
                 <div class="modal-content" style="max-width: 500px;">
                     <div class="modal-header">
-                        <h2>Preview ${type}</h2>
+                        <h2>Review ${this.escapeHtml(type)} before sending</h2>
                         <button class="btn-icon" onclick="app._resolvePreview(null)"><span class="material-symbols-outlined">close</span></button>
                     </div>
                     <div class="modal-body">
-                        <p style="margin-bottom: 12px; color: var(--text-secondary);">Sending to: <strong>${contact}</strong></p>
+                        <p style="margin-bottom: 12px; color: var(--text-secondary);">Check the recipient and message. Nothing is sent until you press Send.</p>
                         ${type === 'Email' ? `
                             <div class="form-group">
-                                <label>Subject</label>
-                                <input type="text" id="prev-subject" class="form-control" value="${subject}">
+                                <label>Recipient</label>
+                                <input type="email" id="prev-recipient" class="form-control" value="${safeContact}">
                             </div>
-                        ` : ''}
+                            <div class="form-group">
+                                <label>Subject</label>
+                                <input type="text" id="prev-subject" class="form-control" value="${safeSubject}">
+                            </div>
+                        ` : `<p style="margin-bottom: 12px;">Sending to: <strong>${safeContact}</strong></p>`}
                         <div class="form-group">
                             <label>Message Content</label>
-                            <textarea id="prev-message" class="form-control" style="height: 180px;">${message}</textarea>
+                            <textarea id="prev-message" class="form-control" style="height: 180px;">${safeMessage}</textarea>
                         </div>
                         <div class="modal-footer">
                             <button class="btn-secondary" onclick="app._resolvePreview(null)">Cancel</button>
@@ -2094,21 +2170,24 @@ const app = {
                     </div>
                 </div>
             `;
-            this.showModal(modalHTML);
+            this.showModal(modalHTML, { stack: true });
             this._previewResolver = resolve;
         });
     },
 
     _resolvePreview(status) {
         if (!status) {
-            this.closeModal();
-            this._previewResolver(null);
+            this.closeModal({ force: true });
+            if (this._previewResolver) this._previewResolver(null);
             return;
         }
         const msg = document.getElementById('prev-message').value;
         const sub = document.getElementById('prev-subject')?.value || '';
-        this.closeModal();
-        this._previewResolver({ message: msg, subject: sub });
+        const recipientEl = document.getElementById('prev-recipient');
+        const result = { message: msg, subject: sub };
+        if (recipientEl) result.recipient = recipientEl.value;
+        this.closeModal({ force: true });
+        if (this._previewResolver) this._previewResolver(result);
     },
 
     convertQuoteToInvoice(quoteId) {
@@ -2159,6 +2238,7 @@ const app = {
     },
 
     _renderQuotationModal(title, data = {}) {
+        const billingName = window.ItguyFixes ? window.ItguyFixes.partyName(data, '') : (data.customer || data.client || '');
         const modalHTML = `
             <div class="modal-content" style="max-width: 800px;">
                 <div class="modal-header">
@@ -2190,7 +2270,7 @@ const app = {
                             <div class="form-group">
                                 <label>Customer name</label>
                                 <div style="display: flex; gap: 8px;">
-                                    <input type="text" id="quo-client" list="crm-customers-list" class="form-control" placeholder="e.g. Acme Corp or John Doe" value="${data.customer || ''}" required oninput="app.fillCustomerDetails(this.value, 'quo')">
+                                    <input type="text" id="quo-client" list="crm-customers-list" class="form-control" placeholder="e.g. Acme Corp or John Doe" value="${this.escapeHtml(billingName)}" required oninput="app.fillCustomerDetails(this.value, 'quo')">
                                     <button type="button" class="btn-secondary" style="padding: 0 12px; height: 100%; border: 1px solid var(--primary);" onclick="customers.showAddCustomerModal('quotation')" title="Quick Add Customer"><span class="material-symbols-outlined">person_add</span></button>
                                 </div>
                                 ${this.generateCustomerDatalist()}
@@ -2198,13 +2278,13 @@ const app = {
                             </div>
                             <div class="form-group">
                                 <label>Phone Number</label>
-                                <input type="tel" id="quo-phone" class="form-control" placeholder="e.g. 082 123 4567" value="${data.phone || ''}" required>
+                                <input type="tel" id="quo-phone" class="form-control" placeholder="e.g. 082 123 4567" value="${data.phone || ''}">
                             </div>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Email Address</label>
-                                <input type="email" id="quo-email" class="form-control" placeholder="e.g. name@example.com" value="${data.email || ''}" required>
+                                <input type="email" id="quo-email" class="form-control" placeholder="e.g. name@example.com" value="${data.email || ''}">
                             </div>
                             <div class="form-group">
                                 <label>Physical Address (Optional)</label>
@@ -2269,7 +2349,8 @@ const app = {
         
         if (arr.length > 0) {
             arr.forEach(item => {
-                selectId.innerHTML += `<option value="${item.id}" style="background: #1a1d2d; color: #fff;">${item.id} - ${item.customer}</option>`;
+                const label = this.partyName(item, 'Customer');
+                selectId.innerHTML += `<option value="${this.escapeHtml(item.id)}" style="background: #1a1d2d; color: #fff;">${this.escapeHtml(item.id)} - ${this.escapeHtml(label)}</option>`;
             });
             selectId.disabled = false;
         } else if (type !== 'None') {
@@ -2281,19 +2362,17 @@ const app = {
         const type = document.getElementById('quo-source-type').value;
         const id = document.getElementById('quo-source-id').value;
         let sourceObj = null;
-        if (type === 'Workshop') sourceObj = this.state.jobs.find(j => j.id === id);
-        if (type === 'Field') sourceObj = this.state.fieldJobs.find(j => j.id === id);
+        if (type === 'Workshop') sourceObj = (this.state.jobs || []).find(j => j.id === id);
+        if (type === 'Field') sourceObj = (this.state.fieldJobs || []).find(j => j.id === id);
         
-        if (sourceObj) {
-            document.getElementById('quo-client').value = sourceObj.customer || '';
-            document.getElementById('quo-phone').value = sourceObj.phone || '';
-            document.getElementById('quo-email').value = sourceObj.email || '';
-            document.getElementById('quo-address').value = sourceObj.address || '';
-            
-            if (sourceObj.items && sourceObj.items.length > 0) {
-                const container = document.getElementById('quotation-items-container');
-                container.innerHTML = ''; 
-                sourceObj.items.forEach(item => this.addQuotationItemLine(item));
+        if (sourceObj && window.ItguyFixes) {
+            const draft = window.ItguyFixes.mapSourceToBilling(sourceObj, this.state.customers || []);
+            this.applyBillingDraft('quo', draft);
+            const container = document.getElementById('quotation-items-container');
+            if (container) {
+                container.innerHTML = '';
+                if (draft.items.length) draft.items.forEach(item => this.addQuotationItemLine(item));
+                else this.addQuotationItemLine();
             }
         }
     },
@@ -2328,7 +2407,7 @@ const app = {
 
                 <div class="form-group" style="margin-bottom: 12px;">
                     <label style="font-size: 0.7rem; color: var(--accent); text-transform: uppercase;">Description / Service Details</label>
-                    <input type="text" class="form-control quo-desc" placeholder="e.g. SSD Upgrade or Labour" value="${desc}" list="inventory-items-list" oninput="app.fillLinePriceFromInventory(this, 'quo')" required>
+                    <textarea class="form-control quo-desc" placeholder="e.g. SSD Upgrade or Labour" list="inventory-items-list" oninput="app.fillLinePriceFromInventory(this, 'quo')" required>${this.escapeHtml(desc)}</textarea>
                 </div>
 
                 <div class="form-row" style="margin-bottom: 0;">
@@ -2358,12 +2437,13 @@ const app = {
 
     calcQuotationTotal() {
         const rows = document.querySelectorAll('.quo-item-row');
+        const fixes = window.ItguyFixes;
         let subtotal = 0;
         rows.forEach(row => {
-            const unitPrice = parseFloat(row.querySelector('.quo-unit').value) || 0;
-            const qty = parseInt(row.querySelector('.quo-qty').value) || 0;
-            const rowTotal = unitPrice * qty;
-            subtotal += rowTotal;
+            const unitPrice = row.querySelector('.quo-unit').value;
+            const qty = row.querySelector('.quo-qty').value;
+            const rowTotal = fixes ? fixes.lineTotal(unitPrice, qty) : ((parseFloat(unitPrice) || 0) * (parseFloat(qty) || 0));
+            subtotal = fixes ? fixes.grandTotal(subtotal, rowTotal) : (subtotal + rowTotal);
             row.querySelector('.quo-row-total').textContent = 'R ' + rowTotal.toFixed(2);
         });
         
@@ -2375,8 +2455,8 @@ const app = {
         let grandTotal = subtotal;
         
         if (isVatRegistered) {
-            vatAmount = subtotal * (vatRate / 100);
-            grandTotal = subtotal + vatAmount;
+            vatAmount = fixes ? fixes.vatAmount(subtotal, vatRate, true) : subtotal * (vatRate / 100);
+            grandTotal = fixes ? fixes.grandTotal(subtotal, vatAmount) : (subtotal + vatAmount);
             
             const vatRow = document.getElementById('quo-vat-row');
             if (vatRow) vatRow.classList.remove('hidden');
@@ -2661,7 +2741,7 @@ const app = {
                 return;
             }
 
-            const foundItem = (this.state.inventory || []).find(i => i.sku.toLowerCase() === q || (i.serial && i.serial.toLowerCase() === q));
+            const foundItem = (this.state.inventory || []).find(i => (i.sku && String(i.sku).toLowerCase() === q) || (i.serial && String(i.serial).toLowerCase() === q));
             if (foundItem) {
                 document.querySelector('[data-target="inventory-view"]').click();
                 setTimeout(() => window.inventory.showEditPartModal(foundItem.id), 100);

@@ -109,7 +109,8 @@ window.customers = {
                 </div>
             </div>
         `;
-        window.app.showModal(modalHTML);
+        const stack = !!(source && window.app.modalContainer && window.app.modalContainer.classList.contains('active'));
+        window.app.showModal(modalHTML, { stack: stack });
     },
 
     async handleAddCustomer(e) {
@@ -129,16 +130,18 @@ window.customers = {
             await window.fbDb.collection('customers').add(payload);
             
             const source = this.lastModalSource;
-            window.app.closeModal(); // Close "Add Customer" modal
-            
-            // Intelligence: Return to previous modal if any
-            if (source === 'tickets') {
+            const parentIds = ['inv-client', 'quo-client', 'callout-client', 'job-customer', 'tck-customer'];
+            window.app.closeModal({ force: true });
+            const parentRemains = parentIds.some(id => document.getElementById(id));
+
+            // A stacked parent form is still on screen. Fill it instead of reopening and wiping unsaved lines.
+            if (!parentRemains && source === 'tickets') {
                 await window.tickets.showNewTicketModal();
                 const custEl = document.getElementById('tck-customer');
                 if(custEl) custEl.value = payload.name;
                 const phoneEl = document.getElementById('tck-phone');
                 if(phoneEl) phoneEl.value = payload.phone;
-            } else if (source === 'job') {
+            } else if (!parentRemains && source === 'job') {
                 window.app.showNewJobModal();
                 const custEl = document.getElementById('job-customer');
                 if(custEl) custEl.value = payload.name;
@@ -146,7 +149,7 @@ window.customers = {
                 if(phoneEl) phoneEl.value = payload.phone;
                 const emailEl = document.getElementById('job-email');
                 if(emailEl) emailEl.value = payload.email;
-            } else if (source === 'callout') {
+            } else if (!parentRemains && source === 'callout') {
                 window.app.showScheduleCalloutModal();
                 const custEl = document.getElementById('callout-client');
                 if(custEl) custEl.value = payload.name;
@@ -158,7 +161,7 @@ window.customers = {
                 if(addrEl) addrEl.value = payload.address;
                 const contactEl = document.getElementById('callout-contact-person');
                 if(contactEl) contactEl.value = payload.name;
-            } else if (source === 'invoice') {
+            } else if (!parentRemains && source === 'invoice') {
                 window.app.showCreateInvoiceModal();
                 const custEl = document.getElementById('inv-client');
                 if(custEl) custEl.value = payload.name;
@@ -172,7 +175,7 @@ window.customers = {
                 if(vatEl) vatEl.value = payload.vat;
                 const regEl = document.getElementById('inv-reg');
                 if(regEl) regEl.value = payload.regNo;
-            } else if (source === 'quotation') {
+            } else if (!parentRemains && source === 'quotation') {
                 window.app.showCreateQuotationModal();
                 const custEl = document.getElementById('quo-client');
                 if(custEl) custEl.value = payload.name;
@@ -182,7 +185,7 @@ window.customers = {
                 if(emailEl) emailEl.value = payload.email;
                 const addrEl = document.getElementById('quo-address');
                 if(addrEl) addrEl.value = payload.address;
-            } else if (source === 'pos' && window.posSystem) {
+            } else if (!parentRemains && source === 'pos' && window.posSystem) {
                 // POS might handle its own customer selection or we might need to populate a specific field
                 const custEl = document.getElementById('pos-customer');
                 if(custEl) custEl.value = payload.name;
@@ -205,6 +208,21 @@ window.customers = {
                     if (form.contactEl) { const target = document.getElementById(form.contactEl); if(target) target.value = payload.name; }
                 }
             });
+            const quoClient = document.getElementById('quo-client');
+            if (quoClient) {
+                quoClient.value = payload.name;
+                const qPhone = document.getElementById('quo-phone');
+                const qEmail = document.getElementById('quo-email');
+                const qAddr = document.getElementById('quo-address');
+                if (qPhone) qPhone.value = payload.phone;
+                if (qEmail) qEmail.value = payload.email;
+                if (qAddr) qAddr.value = payload.address;
+            }
+            const invVat = document.getElementById('inv-vat');
+            const invReg = document.getElementById('inv-reg');
+            if (invVat && payload.vat) invVat.value = payload.vat;
+            if (invReg && payload.regNo) invReg.value = payload.regNo;
+            if (parentRemains && window.app.markModalDirty) window.app.markModalDirty();
         } catch(error) {
             console.error("Error adding customer:", error);
             alert("Failed to save customer. Check connection.");
@@ -218,14 +236,14 @@ window.customers = {
 
         // Find Jobs using this customer's name (or email if available)
         // Since historical jobs lack the strict CRM ID, we fuzzy match the name or email
-        const histJobs = window.app.state.jobs.filter(j => 
+        const histJobs = (window.app.state.jobs || []).filter(j => 
             (c.email && j.email && j.email.toLowerCase() === c.email.toLowerCase()) || 
-            (j.customer && j.customer.toLowerCase() === c.name.toLowerCase())
+            (j.customer && c.name && String(j.customer).toLowerCase() === c.name.toLowerCase())
         );
 
         const histInvs = window.app.state.invoices.filter(i => 
             (c.email && i.email && i.email.toLowerCase() === c.email.toLowerCase()) || 
-            (i.customer && i.customer.toLowerCase().includes(c.name.toLowerCase()))
+            (i.customer && c.name && String(i.customer).toLowerCase().includes(c.name.toLowerCase()))
         );
 
         const renderJobs = histJobs.length > 0 ? histJobs.map(j => `
