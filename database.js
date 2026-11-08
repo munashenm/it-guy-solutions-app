@@ -42,6 +42,7 @@ class Database {
             console.log("DB: Initializing MySQL Connection Pool...");
             this.pool = mysql.createPool({
                 host: process.env.DB_HOST,
+                port: Number(process.env.DB_PORT) || 3306,
                 user: process.env.DB_USER,
                 password: process.env.DB_PASSWORD,
                 database: process.env.DB_NAME,
@@ -78,7 +79,10 @@ class Database {
             } catch (e) {
                 throw new Error("SQLite library (sqlite3) is missing. If you are using MySQL, set DB_TYPE=mysql in your .env file.");
             }
-            const dbPath = path.resolve(__dirname, 'database.sqlite');
+            const dbPath = process.env.SQLITE_PATH
+                ? path.resolve(process.env.SQLITE_PATH)
+                : path.resolve(__dirname, 'database.sqlite');
+            this.filePath = dbPath;
             await new Promise((resolve, reject) => {
                 this.sqlite = new sqlite3.Database(dbPath, (err) => {
                     if (err) {
@@ -93,6 +97,16 @@ class Database {
             await this.run('PRAGMA busy_timeout = 5000');
             try { await this.run('PRAGMA journal_mode = WAL'); } catch (e) {}
             await this.ensureSchema();
+        }
+    }
+
+    async closeSqlite() {
+        this.ready = false;
+        this._initPromise = null;
+        if (this.sqlite) {
+            const handle = this.sqlite;
+            this.sqlite = null;
+            await new Promise((resolve) => handle.close(() => resolve()));
         }
     }
 
@@ -148,6 +162,8 @@ class Database {
             ['lastName', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
             ['employeeId', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
             ['phone', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
+            ['role', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
+            ['password', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
             ['sessionToken', isMySQL ? 'VARCHAR(512)' : 'TEXT']
         ];
         for (const [col, type] of extraCols) {

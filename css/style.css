@@ -866,6 +866,20 @@ tr:hover {
     display: flex;
 }
 
+.modal-layer {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+.modal-layer:not(:last-child) {
+    visibility: hidden;
+    pointer-events: none;
+}
+
 .modal-content {
     background: var(--bg-secondary);
     background-image: var(--glass-shine);
@@ -1702,6 +1716,27 @@ body.page-public {
 
 #pdf-render-page table {
     width: 100% !important;
+}
+
+/* Dark-theme table text is white. Invoice and quotation descriptions must stay readable on the white page. */
+#pdf-render-page {
+    background: #ffffff !important;
+    color: #111111 !important;
+}
+#pdf-render-page td,
+#pdf-render-page .pdf-desc,
+#pdf-render-page p,
+#pdf-render-page li {
+    color: #111111 !important;
+}
+#pdf-render-page thead th,
+#pdf-render-page .pdf-on-accent {
+    color: #ffffff !important;
+}
+textarea.item-desc,
+textarea.quo-desc {
+    min-height: 72px;
+    white-space: pre-wrap;
 }
 
 /* --- MOBILE BOTTOM NAV --- */

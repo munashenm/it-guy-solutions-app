@@ -1,21 +1,32 @@
 window.pdfGenerator = {
     async getCompanyDetails() {
+        const fallback = {
+            name: "IT Guy Solutions",
+            address: "",
+            phone: "",
+            whatsapp: "",
+            email: "",
+            website: "",
+            logoUrl: ""
+        };
+        let data = null;
         if(window.fbDb) {
             try {
                 const doc = await window.fbDb.collection("settings").doc("companyProfile").get();
-                if(doc.exists) return doc.data();
+                if(doc.exists) data = doc.data() || {};
             } catch(e) {
                 console.error("Failed to load company profile for PDF", e);
             }
         }
+        data = data || {};
         return {
-            name: "IT Guy Solutions",
-            address: "102 President Street, Louis Trichardt, Limpopo, South Africa",
-            phone: "087 550 1813",
-            whatsapp: "065 866 3103",
-            email: "info@itguysa.co.za",
-            website: "www.itguysa.co.za",
-            logoUrl: ""
+            name: data.name || data.companyName || fallback.name,
+            address: data.address || data.physicalAddress || fallback.address,
+            phone: data.phone || data.contactNumber || fallback.phone,
+            whatsapp: data.whatsapp || data.whatsApp || fallback.whatsapp,
+            email: data.email || fallback.email,
+            website: data.website || fallback.website,
+            logoUrl: data.logoUrl || data.brandLogo || fallback.logoUrl
         };
     },
 
@@ -170,15 +181,16 @@ window.pdfGenerator = {
             background-color: #ffffff;
             color: #000000;
             width: 794px;
-            min-height: 1123px;
-            padding: 40px;
+            min-height: 0;
+            height: auto;
+            padding: 28px;
             box-sizing: border-box;
             font-family: Arial, sans-serif;
             position: absolute;
             left: -10000px;
             top: 0px;
             z-index: -9999;
-            overflow: hidden; /* Prevent horizontal scrollbars during capture */
+            overflow: visible;
             max-width: 794px !important;
         `;
         document.body.appendChild(container);
@@ -220,9 +232,11 @@ window.pdfGenerator = {
                                 : `<h2 style="color: ${themeColor}; font-size: 32px; margin: 0 0 10px 0; font-weight: 800;">${company.name}</h2>`
                             }
                             <div style="font-size: 13px; color: #000000; line-height: 1.6;">
-                                <span style="display: block; margin-bottom: 4px;">${company.address}</span>
-                                <strong>Tel:</strong> ${company.phone} | <strong>WA:</strong> ${company.whatsapp}<br>
-                                <strong>Email:</strong> ${company.email} | <strong>Web:</strong> ${company.website}${isVatRegistered && sysSettings.taxNo ? `<br><strong>VAT No:</strong> ${sysSettings.taxNo}` : ''}
+                                ${company.address ? `<span style="display: block; margin-bottom: 4px;">${company.address}</span>` : ''}
+                                ${[['Tel', company.phone], ['WA', company.whatsapp]].filter((pair) => pair[1]).map((pair) => `<strong>${pair[0]}:</strong> ${pair[1]}`).join(' | ')}
+                                ${(company.phone || company.whatsapp) ? '<br>' : ''}
+                                ${[['Email', company.email], ['Web', company.website]].filter((pair) => pair[1]).map((pair) => `<strong>${pair[0]}:</strong> ${pair[1]}`).join(' | ')}
+                                ${isVatRegistered && sysSettings.taxNo ? `<br><strong>VAT No:</strong> ${sysSettings.taxNo}` : ''}
                             </div>
                         </td>
                         <td style="vertical-align: top; text-align: right; padding-bottom: 25px; background-color: #ffffff;">
@@ -239,7 +253,12 @@ window.pdfGenerator = {
 
             let contentHTML = '';
             
-            if (docType === 'Report') {
+            if (docType === 'Job Report') {
+                const report = (dataObj && dataObj.kind && dataObj.workPerformed !== undefined && window.ItguyFixes)
+                    ? dataObj
+                    : (window.ItguyFixes ? window.ItguyFixes.buildJobReport(dataObj, dataObj && dataObj.device ? 'Workshop' : 'Field') : { id: docId });
+                contentHTML = headerHTML + (window.ItguyFixes ? window.ItguyFixes.renderJobReportHtml(report) : '<p style="color:#111">Job report unavailable.</p>');
+            } else if (docType === 'Report') {
                 // Special handling for reports: Use cloned visual content
                 const reportContent = document.getElementById('report-view-content');
                 if(reportContent) {
@@ -284,10 +303,10 @@ window.pdfGenerator = {
                 let bodyHTML = '';
                 if (docType === 'Invoice' || docType === 'Quotation' || docType === 'Cash Receipt') {
                     bodyHTML = `
-                        <table style="width: 100% !important; border-collapse: separate; border-spacing: 0; margin-bottom: 40px; font-size: 14px; font-family: ${fontStack}; color: #000000; background-color: #ffffff; border: 1px solid #eee; border-radius: 10px; overflow: hidden; table-layout: fixed;">
+                        <table style="width: 100% !important; border-collapse: separate; border-spacing: 0; margin-bottom: 40px; font-size: 14px; font-family: ${fontStack}; color: #000000; background-color: #ffffff; border: 1px solid #eee; border-radius: 10px; table-layout: fixed;">
                             <thead>
-                                <tr style="background-color: ${themeColor}; color: #ffffff;">
-                                    <th style="padding: 18px 15px; text-align: left; font-weight: 600; width: 80px;">Item</th>
+                                <tr class="pdf-on-accent" style="background-color: ${themeColor}; color: #ffffff;">
+                                    <th class="pdf-on-accent" style="padding: 12px 10px; text-align: left; font-weight: 600; width: 110px; color:#ffffff;">Item</th>
                                     <th style="padding: 18px 15px; text-align: left; width: auto; font-weight: 600; word-wrap: break-word;">Description</th>
                                     <th style="padding: 18px 15px; text-align: right; font-weight: 600;">Price</th>
                                     <th style="padding: 18px 15px; text-align: center; font-weight: 600;">Qty</th>
@@ -296,15 +315,19 @@ window.pdfGenerator = {
                             </thead>
                             <tbody style="background-color: #ffffff;">
                                 ${dataObj.items && dataObj.items.length > 0 ? dataObj.items.map((item, idx) => {
-                                    const unit = parseFloat(item.unit || item.unitPrice) || 0;
-                                    const qty = parseInt(item.qty) || 0;
-                                    const total = unit * qty;
+                                    const unit = window.ItguyFixes ? window.ItguyFixes.moneyNumber(item.unit != null ? item.unit : item.unitPrice) : (parseFloat(item.unit || item.unitPrice) || 0);
+                                    const qty = parseFloat(item.qty != null ? item.qty : item.quantity);
+                                    const safeQty = isFinite(qty) ? qty : 0;
+                                    const total = window.ItguyFixes ? window.ItguyFixes.lineTotal(unit, safeQty) : unit * safeQty;
+                                    const descCell = window.ItguyFixes
+                                        ? window.ItguyFixes.renderDescriptionCell(item.desc || item.description || item.name || '')
+                                        : `<td class="pdf-desc" style="padding:15px;color:#111111;background:#ffffff;white-space:pre-wrap;">${item.desc || item.name || ''}</td>`;
                                     return `
                                         <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#fcfcff'}; border-bottom: 1px solid #f0f0f0;">
-                                            <td style="padding: 15px; border-bottom: 1px solid #eee; font-weight: 600; color: ${themeColor}; width: 80px;">${item.type || 'Item'}</td>
-                                            <td style="padding: 15px; border-bottom: 1px solid #eee; line-height: 1.5; word-wrap: break-word;">${item.desc || item.name}</td>
+                                            <td style="padding: 12px 10px; border-bottom: 1px solid #eee; font-weight: 600; color: ${themeColor}; width: 110px; white-space: normal; word-wrap: break-word;">${item.type || 'Item'}</td>
+                                            ${descCell}
                                             <td style="padding: 15px 15px; text-align: right; color: #000000;">R ${unit.toFixed(2)}</td>
-                                            <td style="padding: 15px 15px; text-align: center; color: #000000;">${qty}</td>
+                                            <td style="padding: 15px 15px; text-align: center; color: #000000;">${safeQty}</td>
                                             <td style="padding: 15px 15px; text-align: right; font-weight: 700; color: #000000;">R ${total.toFixed(2)}</td>
                                         </tr>
                                     `;
@@ -413,32 +436,26 @@ window.pdfGenerator = {
 
             container.innerHTML = contentHTML;
 
-            // Universal Safety Pass: Convert absolutely ALL grey text to black for flawless print visibility on white paper across ALL document types
-            container.querySelectorAll('*').forEach(c => {
-                const computed = window.getComputedStyle(c);
-                const color = computed.color || c.style.color || '';
-                // Check if color is a shade of grey (e.g. #a0a0a0, rgb(160, 160, 160), #747d8c, etc)
-                if (color.includes('160, 160, 160') || color.includes('116, 125, 140') || color.includes('a0a0a0') || c.tagName === 'P' || c.tagName === 'SPAN') {
-                    // Ignore explicitly colored badges/themes
-                    if(!color.includes('var(--success)') && !color.includes('var(--danger)') && !color.includes('var(--primary)')) {
-                        // Force black text
-                        c.style.color = '#000000';
-                    }
-                }
+            // Dark theme paints table cells white. Force body copy to black before capture.
+            container.querySelectorAll('td, p, li, .pdf-desc').forEach(c => {
+                if (c.closest('thead')) return;
+                c.style.color = '#111111';
+                c.style.backgroundColor = c.style.backgroundColor || '#ffffff';
             });
 
             // Wait for fonts and stabilizing re-paint
             if(document.fonts) await document.fonts.ready;
-            await new Promise(r => setTimeout(r, 2000));
+            await new Promise(r => setTimeout(r, 300));
 
-            // Hardened Capture Options
+            const cssWidth = Math.max(container.scrollWidth, container.offsetWidth);
+            const cssHeight = Math.max(container.scrollHeight, container.offsetHeight);
             const canvas = await window.html2canvas(container, {
                 scale: 2,
                 useCORS: true,
                 backgroundColor: '#ffffff',
-                windowWidth: 1200, // Use a larger window width to avoid triggering mobile media queries
-                width: 794,        // Strictly capture only the intended 794px width
-                height: container.offsetHeight,
+                windowWidth: 1200,
+                width: cssWidth,
+                height: cssHeight,
                 logging: false,
                 onclone: (clonedDoc) => {
                     const clonedContainer = clonedDoc.getElementById('pdf-render-page');
@@ -450,16 +467,14 @@ window.pdfGenerator = {
             });
 
             const imgData = canvas.toDataURL('image/jpeg', 0.95);
-            
-            // Calculate proportional height to prevent squashing or cropping
-            const actualWidth = 794;
-            const actualHeight = (canvas.height * actualWidth) / canvas.width;
-            
-            // Use a dynamic page height so long reports don't get cut across awful page breaks
-            const pdfPageHeight = Math.max(1123, actualHeight);
-            
-            const pdf = new window.jspdf.jsPDF('p', 'px', [actualWidth, pdfPageHeight]);
-            pdf.addImage(imgData, 'JPEG', 0, 0, actualWidth, actualHeight);
+
+            // Real A4 pages. Short documents keep their height; long ones continue on the next page.
+            const pdf = new window.jspdf.jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', compress: true });
+            if (window.ItguyFixes) {
+                window.ItguyFixes.applyA4Plan(pdf, imgData, cssWidth, cssHeight, 'JPEG');
+            } else {
+                pdf.addImage(imgData, 'JPEG', 12, 12, 186, 186 * (canvas.height / canvas.width));
+            }
             
             const filename = `${docType.replace(' ', '_')}_${docId}.pdf`;
             

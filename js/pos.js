@@ -339,7 +339,26 @@ window.posSystem = {
         const btn = document.querySelector('.btn-primary[onclick="posSystem.completeSale()"]');
         if(btn) { btn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span> Processing...'; btn.disabled = true; }
 
+        if (method === 'Cash' && paid + 0.001 < total) {
+            alert('Amount paid is less than the sale total.');
+            if (btn) { btn.innerHTML = '<span class="material-symbols-outlined">point_of_sale</span> Complete Sale'; btn.disabled = false; }
+            return;
+        }
+
         try {
+            const stockError = this.cart.some(cartItem => {
+                if (!cartItem.docId) return false;
+                const inv = (window.app.state.inventory || []).find(i => i.id === cartItem.docId);
+                const onHand = window.app.parseMoney(inv && inv.qty);
+                return !inv || onHand < Number(cartItem.qty);
+            });
+            if (stockError) {
+                alert('Not enough stock for one or more items in this sale.');
+                if (btn) { btn.innerHTML = '<span class="material-symbols-outlined">point_of_sale</span> Complete Sale'; btn.disabled = false; }
+                return;
+            }
+
+            const docId = "REC-" + Math.floor(Math.random() * 900000 + 100000);
             const batch = window.fbDb.batch();
             this.cart.forEach(cartItem => {
                 if(cartItem.docId) {
@@ -349,24 +368,21 @@ window.posSystem = {
                     });
                 }
             });
-
-            await batch.commit();
-
-            const docId = "REC-" + Math.floor(Math.random() * 900000 + 100000);
-            
-            // Record Sale in Firestore
-            await window.fbDb.collection('sales').doc(docId).set({
+            const saleRef = window.fbDb.collection('sales').doc(docId);
+            batch.set(saleRef, {
                 id: docId,
                 customer: custName,
                 items: this.cart,
-                total: total,
+                total: Math.round(total * 100) / 100,
                 method: method,
                 amountPaid: paid,
-                change: change > 0 ? change : 0,
+                change: change > 0 ? Math.round(change * 100) / 100 : 0,
                 status: 'Completed',
                 date: new Date().toISOString(),
                 createdAt: firebase.firestore.FieldValue.serverTimestamp()
             });
+
+            await batch.commit();
             window.app.logActivity('POS Sale', `Completed sale ${docId} for ${custName} (Total: R ${total.toFixed(2)})`);
 
             const successHTML = `
@@ -431,6 +447,7 @@ window.posSystem = {
            customer: custName,
            items: pdfItems,
            method: method,
+           amount: 'R ' + Number(total).toFixed(2),
            amountPaid: paid,
            change: change,
            docType: 'Cash Receipt'

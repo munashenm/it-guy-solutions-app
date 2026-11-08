@@ -1,3 +1,5 @@
+const fixes = require('../lib/itguy-fixes');
+const dns = require('dns').promises;
 const express = require('express');
 const router = express.Router();
 const db = require('../database');
@@ -60,17 +62,69 @@ router.get('/track/:id', async (req, res, next) => {
     }
 });
 
+async function assertProxyTarget(raw) {
+    const verdict = fixes.assessProxyUrl(raw);
+    if (!verdict.ok) {
+        const err = new Error('Image URL is not allowed');
+        err.status = 400;
+        throw err;
+    }
+    let records = [];
+    try {
+        records = await dns.lookup(verdict.hostname, { all: true, verbatim: true });
+    } catch (e) {
+        const err = new Error('Image URL is not allowed');
+        err.status = 400;
+        throw err;
+    }
+    if (!records.length || records.some(rec => fixes.isPrivateIp(rec.address))) {
+        const err = new Error('Image URL is not allowed');
+        err.status = 400;
+        throw err;
+    }
+    return verdict.href;
+}
+
+async function fetchProxyImage(raw, hops) {
+    const target = await assertProxyTarget(raw);
+    const response = await axios.get(target, {
+        responseType: 'arraybuffer',
+        timeout: 8000,
+        maxRedirects: 0,
+        maxContentLength: 2 * 1024 * 1024,
+        validateStatus: () => true
+    });
+    if (response.status >= 300 && response.status < 400) {
+        if (hops >= 2) {
+            const err = new Error('Image URL is not allowed');
+            err.status = 400;
+            throw err;
+        }
+        const next = fixes.assessProxyHop(target, response.headers.location || '');
+        if (!next.ok) {
+            const err = new Error('Image URL is not allowed');
+            err.status = 400;
+            throw err;
+        }
+        return fetchProxyImage(next.href, hops + 1);
+    }
+    return response;
+}
+
 router.get('/proxy-image', async (req, res) => {
     const { url } = req.query;
     if (!url) return res.status(400).send("URL is required");
     try {
-        const response = await axios.get(url, { responseType: 'arraybuffer' });
-        const contentType = response.headers['content-type'];
+        const response = await fetchProxyImage(url, 0);
+        if (response.status !== 200) return res.status(502).send("Error proxying image");
+        const contentType = String(response.headers['content-type'] || '');
+        if (!contentType.startsWith('image/')) return res.status(415).send("URL did not return an image");
         res.set('Content-Type', contentType);
         res.send(response.data);
     } catch (e) {
-        logger.error("Proxy error:", { message: e.message, url });
-        res.status(500).send("Error proxying image");
+        if (e.status === 400) return res.status(400).send("Image URL is not allowed");
+        logger.error("Proxy error:", { message: e.message });
+        res.status(502).send("Error proxying image");
     }
 });
 
@@ -78,7 +132,8 @@ router.post('/transaction/batch', requireAuth, async (req, res, next) => {
     const { updates } = req.body;
     const type = process.env.DB_TYPE || 'sqlite';
     const user = req.user;
-    const isStaff = ['admin', 'employee', 'technician'].includes(user.role);
+    const role = String((user && user.role) || '').toLowerCase();
+    const isStaff = ['admin', 'employee', 'technician'].includes(role);
     
     let tx = null;
     try {
@@ -92,9 +147,8 @@ router.post('/transaction/batch', requireAuth, async (req, res, next) => {
                 throw new Error('Invalid batch item: missing coll or id');
             }
 
-            // Security Check
-            if (!isStaff) {
-                // Clients cannot touch these collections
+            const sellDesk = role === 'frontdesk' && ['inventory', 'sales'].includes(u.coll);
+            if (!isStaff && !sellDesk) {
                 if (['settings', 'users', 'inventory', 'expenses', 'invoices'].includes(u.coll)) {
                     throw new Error(`Forbidden: You do not have permission to modify ${u.coll}`);
                 }
@@ -104,7 +158,7 @@ router.post('/transaction/batch', requireAuth, async (req, res, next) => {
             let currentData = row ? JSON.parse(row.data) : {};
             
             // Ownership check for clients
-            if (!isStaff && row) {
+            if (!isStaff && !sellDesk && row) {
                 const itemEmail = (currentData.email || currentData.customerEmail || currentData.clientEmail || '').toLowerCase();
                 if (itemEmail !== user.email.toLowerCase()) {
                     throw new Error(`Forbidden: You do not have permission to modify document ${u.id} in ${u.coll}`);
@@ -120,10 +174,15 @@ router.post('/transaction/batch', requireAuth, async (req, res, next) => {
                  continue;
             }
 
+            const assignMethod = u.method === 'set' ? 'set' : 'patch';
+            const assignBody = u.method === 'set' ? (u.data || {}) : (u.data || {});
+            const denial = fixes.assignmentDenial(user, u.coll, currentData, assignBody, assignMethod);
+            if (denial) throw new Error('Forbidden: ' + denial);
+
             if (u.method === 'set') {
                 newData = u.data;
                 // Double check email consistency on set for clients
-                if (!isStaff) {
+                if (!isStaff && !sellDesk) {
                     const newEmail = (newData.email || newData.customerEmail || newData.clientEmail || '').toLowerCase();
                     if (newEmail !== user.email.toLowerCase()) {
                         throw new Error("Forbidden: You cannot change the email association of a document.");
@@ -146,6 +205,10 @@ router.post('/transaction/batch', requireAuth, async (req, res, next) => {
                 }
             }
 
+            if (u.coll === 'inventory' && newData.qty != null && Number(newData.qty) < 0) {
+                throw new Error('Insufficient stock for ' + u.id);
+            }
+
             const jsonData = JSON.stringify(newData);
             if (type === 'mysql') {
                 const sql = `INSERT INTO collections (id, name, data, updatedAt) VALUES (?, ?, ?, CURRENT_TIMESTAMP) 
@@ -166,8 +229,11 @@ router.post('/transaction/batch', requireAuth, async (req, res, next) => {
             } catch (re) {}
         }
         // Return 403 for forbidden, otherwise let errorHandler handle it
-        if (err.message.includes('Forbidden')) {
+        if (err.message && err.message.includes('Forbidden')) {
             return res.status(403).json({ error: err.message });
+        }
+        if (err.message && err.message.includes('Insufficient stock')) {
+            return res.status(409).json({ error: err.message });
         }
         next(err);
     }
@@ -199,7 +265,14 @@ router.post('/counters/:prefix', requireAuth, async (req, res, next) => {
 
 router.post('/notify', requireAuth, async (req, res, next) => {
     try {
+        const senderRole = String((req.user && req.user.role) || '').toLowerCase();
+        if (!['admin', 'frontdesk', 'technician', 'employee'].includes(senderRole)) {
+            return res.status(403).json({ error: 'Only staff can send documents from the app.' });
+        }
         const { actionType, docType, docId, contactInfo, pdfBase64, dataObj } = req.body;
+        if (actionType === 'Email' && (!contactInfo || String(contactInfo).indexOf('@') === -1)) {
+            return res.status(400).json({ error: 'Enter the recipient email address before sending.' });
+        }
         
         const rows = await db.all("SELECT data FROM collections WHERE name = ? AND id = ?", ['settings', 'systemSettings']);
         if (!rows || rows.length === 0) throw new Error("System settings not found. Cannot send notifications.");
@@ -209,7 +282,11 @@ router.post('/notify', requireAuth, async (req, res, next) => {
         }
 
         if (actionType === 'Email') {
-            if(!sysSettings.smtpHost) throw new Error("SMTP is not configured in settings.");
+            if(!sysSettings.smtpHost || !sysSettings.smtpUser) {
+                const configErr = new Error(fixes.SMTP_BLOCKER);
+                configErr.status = 409;
+                throw configErr;
+            }
             
             const transporter = nodemailer.createTransport({
                 host: String(sysSettings.smtpHost).trim(),
@@ -276,35 +353,62 @@ router.post('/notify', requireAuth, async (req, res, next) => {
         }
 
     } catch(err) {
-        next(err);
+        const status = err.status && err.status < 500 ? err.status : 500;
+        const message = err.message || 'Email could not be sent.';
+        if (status >= 500) logger.error('Notify failed', { message: message });
+        return res.status(status).json({ error: message });
     }
 });
 
-router.get('/backup', requireAuth, (req, res) => {
-    logger.info('Database backup requested');
-    res.download(dbPath, `it-guy-backup-${new Date().toISOString().split('T')[0]}.sqlite`);
+router.get('/backup', requireAuth, async (req, res, next) => {
+    if (String(req.user.role || '').toLowerCase() !== 'admin') {
+        return res.status(403).json({ error: 'Only an admin can download a database backup.' });
+    }
+    if (db.type !== 'sqlite' || !db.filePath) {
+        return res.status(400).json({ error: 'File backup is only available for the SQLite database. Use your host backup for MySQL.' });
+    }
+    try {
+        await db.run('PRAGMA wal_checkpoint(TRUNCATE)');
+        logger.info('Database backup requested');
+        res.download(db.filePath, `it-guy-backup-${new Date().toISOString().split('T')[0]}.sqlite`);
+    } catch (e) {
+        next(e);
+    }
 });
 
 router.post('/restore', requireAuth, upload.single('database'), async (req, res, next) => {
+    if (String(req.user.role || '').toLowerCase() !== 'admin') {
+        return res.status(403).json({ error: 'Only an admin can restore a database.' });
+    }
     if (!req.file) return res.status(400).json({ error: "No file uploaded." });
-    if(process.env.DB_TYPE === 'mysql') return res.status(400).json({ error: "Restore is only supported for SQLite mode." });
+    if (db.type !== 'sqlite' || !db.filePath) {
+        return res.status(400).json({ error: "Restore is only supported for SQLite mode." });
+    }
 
+    const target = db.filePath;
+    const backupCopy = target + '.bak';
     try {
-        if (db.sqlite && typeof db.sqlite.close === 'function') {
-            await new Promise((resolve, reject) => {
-                db.sqlite.close((err) => {
-                    if (err) reject(err);
-                    else resolve();
-                });
-            });
+        const fd = fs.openSync(req.file.path, 'r');
+        const header = Buffer.alloc(16);
+        fs.readSync(fd, header, 0, 16, 0);
+        fs.closeSync(fd);
+        if (!header.toString('utf8').startsWith('SQLite format 3')) {
+            fs.unlinkSync(req.file.path);
+            return res.status(400).json({ error: 'That file is not a SQLite database. The current database was left unchanged.' });
         }
 
-        if (fs.existsSync(dbPath)) fs.copyFileSync(dbPath, dbPath + '.bak');
-        fs.copyFileSync(req.file.path, dbPath);
+        if (fs.existsSync(target)) fs.copyFileSync(target, backupCopy);
+        await db.closeSqlite();
+        fs.copyFileSync(req.file.path, target);
         fs.unlinkSync(req.file.path);
-
-        await db.init();
-        res.json({ success: true, message: "Database restored successfully." });
+        try {
+            await db.init();
+        } catch (reopenErr) {
+            if (fs.existsSync(backupCopy)) fs.copyFileSync(backupCopy, target);
+            await db.init();
+            throw reopenErr;
+        }
+        res.json({ success: true, message: "Database restored successfully. A copy of the previous file is kept beside it as a .bak." });
     } catch (e) {
         next(e);
     }

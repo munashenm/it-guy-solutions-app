@@ -112,6 +112,9 @@ window.repair = {
                     <button class="btn-primary" style="background: var(--accent); height: 40px; padding: 0 16px;" onclick="repair.quickPhoto('${job.id}')">
                         <span class="material-symbols-outlined">photo_camera</span> <span>Photo</span>
                     </button>
+                    <button class="btn-secondary" style="height: 40px; padding: 0 16px;" onclick="repair.openJobReport('${job.id}')">
+                        <span class="material-symbols-outlined">print</span> <span>Job report</span>
+                    </button>
                     <!-- Quick Status Buttons (Technician Friendly) -->
                     <div class="quick-status-bar" style="display: flex; gap: 8px;">
                         <button class="btn-icon-label ${job.status === 'In Diagnosis' ? 'active' : ''}" onclick="repair.changeStatus('In Diagnosis')" title="Diagnosis">
@@ -297,6 +300,11 @@ window.repair = {
     },
 
     async changeTechnician() {
+        const role = window.authSystem && window.authSystem.currentUser && window.authSystem.currentUser.role;
+        if (window.ItguyFixes && !window.ItguyFixes.canAssignTechnician(role)) {
+            window.app.showToast('Only office staff can assign technicians.', 'error');
+            return;
+        }
         const dd = document.getElementById('repair-tech-dd');
         const newTech = dd.value;
         if(!this.activeJobId) return;
@@ -531,6 +539,30 @@ window.repair = {
             alert("Error saving completion report.");
             if(btn) { btn.innerHTML = 'Finalize & Archive'; btn.disabled = false; }
         }
+    },
+
+    openJobReport(jobId) {
+        const job = (window.app.state.jobs || []).find(j => j.id === jobId) || (this.activeJobId && (window.app.state.jobs || []).find(j => j.id === this.activeJobId));
+        const target = job || (window.app.state.jobs || []).find(j => j.id === jobId);
+        if (!target) return;
+        const report = window.ItguyFixes ? window.ItguyFixes.buildJobReport(target, 'Workshop') : target;
+        window.app.showModal(`
+            <div class="modal-content" style="max-width: 640px;">
+                <div class="modal-header">
+                    <h2>Job report ${window.app.escapeHtml(target.id)}</h2>
+                    <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
+                </div>
+                <div class="modal-body">
+                    <p style="color:#a0a0a0; margin-top:0;">${window.app.escapeHtml(report.customer || 'Customer')} · ${window.app.escapeHtml(report.status || '')} · ${window.app.escapeHtml(report.technician || 'Unassigned')}</p>
+                    <div style="color:#111; background:#fff; padding:12px; border-radius:8px; white-space:pre-wrap;">${window.app.escapeHtml(report.workPerformed || report.fault || 'No work notes yet.')}</div>
+                    <div class="modal-footer" style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <button type="button" class="btn-secondary" onclick="app.executeDocumentAction('Print', 'Job Report', '${target.id}', this)">Print</button>
+                        <button type="button" class="btn-secondary" onclick="app.executeDocumentAction('Download', 'Job Report', '${target.id}', this)">Download</button>
+                        <button type="button" class="btn-primary" onclick="app.executeDocumentAction('Email', 'Job Report', '${target.id}', '${window.app.escapeHtml(target.email || '')}', this)">Email</button>
+                    </div>
+                </div>
+            </div>
+        `);
     },
 
     viewReport(jobId) {

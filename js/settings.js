@@ -909,11 +909,12 @@ window.companySettings = {
         try {
             if (typeof window.localAuth !== 'undefined') {
                 // We are using the local-db adapter. Use the dedicated backend endpoint.
-                await window.safeFetch(`${window.API_BASE || '/api'}/users`, {
+                const created = await window.safeFetch(`${window.API_BASE || '/api'}/users`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password: pwd, role, firstName, lastName, username, employeeId })
                 });
+                if (created && created.user && window.app.rememberStaffUser) window.app.rememberStaffUser(created.user);
             } else {
                 // Real Firebase flow
                 if(!this.secondaryApp) this.initSecondaryApp();
@@ -931,8 +932,8 @@ window.companySettings = {
                 await secAuth.signOut();
             }
 
-            app.closeModal();
-            this.showMessage(`Staff member ${email} created!`, true);
+            app.closeModal({ force: true });
+            this.showMessage(`Staff member ${email} created. They can now be assigned to jobs.`, true);
             this.fetchUsers();
         } catch (error) {
             alert(`Error creating staff: ${error.message}`);
