@@ -164,7 +164,9 @@ class Database {
             ['phone', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
             ['role', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
             ['password', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
-            ['sessionToken', isMySQL ? 'VARCHAR(512)' : 'TEXT']
+            ['sessionToken', isMySQL ? 'VARCHAR(512)' : 'TEXT'],
+            ['active', isMySQL ? 'TINYINT(1) DEFAULT 1' : 'INTEGER DEFAULT 1'],
+            ['createdAt', isMySQL ? 'DATETIME NULL' : 'DATETIME']
         ];
         for (const [col, type] of extraCols) {
             try {

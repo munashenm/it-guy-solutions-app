@@ -6,31 +6,45 @@ PassengerStartupFile app.js
 
 
 Options -Indexes
+DirectoryIndex index.html
 
-# Block sensitive dotfiles and SQLite DB if ever exposed as static files
-<IfModule mod_authz_core.c>
-    <FilesMatch "^\.(env|bak|log)$">
-        Require all denied
-    </FilesMatch>
-    <Files "database.sqlite">
-        Require all denied
-    </Files>
-</IfModule>
-<IfModule !mod_authz_core.c>
-    <FilesMatch "^\.(env|bak|log)$">
-        Order allow,deny
-        Deny from all
-    </FilesMatch>
-</IfModule>
-
+# Apache is the document root, so it serves real files before Node ever sees them.
+# Only the staff/client pages and their assets are files. Everything else is refused
+# here. /api is not rewritten, so Passenger still handles it.
 RewriteEngine On
 
+# Certificate renewal. Every other dotfile is refused below.
+RewriteRule ^\.well-known/acme-challenge/ - [L]
+
 # Let /api reach Node (Passenger); do not rewrite
-RewriteCond %{REQUEST_URI} ^/api/ [NC]
+RewriteCond %{REQUEST_URI} ^/api(/|$) [NC]
 RewriteRule ^ - [L]
 
-# SPA: non-files → index.html (never for /api — handled above)
-RewriteCond %{REQUEST_URI} !^/api/ [NC]
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
+# Dotfiles (.env, .env.production, .git, ...) and dot-segments.
+RewriteCond %{REQUEST_URI} (^|/)\.|\.\. [NC]
+RewriteRule ^ - [F,L]
+
+# version.js is the footer/service-worker version. lib/itguy-fixes.js is loaded by index.html.
+# The rest of lib/ stays refused with the other server trees.
+RewriteCond %{REQUEST_URI} ^/(index\.html|client\.html|track\.html|manifest\.json|sw\.js|version\.js)$ [NC,OR]
+RewriteCond %{REQUEST_URI} ^/lib/itguy-fixes\.js$ [NC]
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+RewriteCond %{REQUEST_URI} ^/(css|js|img|public)/ [NC]
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+RewriteRule ^$ index.html [L]
+
+# Server JS, json, zips, sql, sqlite, txt, logs, md, and private folders
+# (routes, middleware, services, utils, lib, node_modules, logs, tmp,
+# deploy_temp, test, docs, mobile, uploads). uploads/ is multer scratch for
+# POST /api/restore; the browser never fetches those files.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [F,L]
+
+# Hash routes stay on the client. A direct path that is not a file still opens the app.
+RewriteCond %{REQUEST_URI} !^/api(/|$) [NC]
 RewriteRule ^ index.html [L]

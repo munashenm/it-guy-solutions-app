@@ -26,13 +26,14 @@ router.get('/settings/companyProfile', async (req, res, next) => {
 router.use(requireAuth);
 
 const safeJsonParse = (str, fallback = {}, context = '') => {
-    try {
-        if (!str || str.trim() === '') return fallback;
-        return JSON.parse(str);
-    } catch (e) {
-        logger.error(`JSON Parse Failed: ${context}`, { error: e.message, rawLength: str?.length });
+    if (str == null || str === '') return fallback;
+    const parsed = fixes.parseStoredJson(str);
+    if (parsed == null) {
+        logger.error(`JSON Parse Failed: ${context}`, { rawType: typeof str });
         return { ...fallback, _parseError: true };
     }
+    if (typeof parsed !== 'object' || Array.isArray(parsed)) return fallback;
+    return parsed;
 };
 
 const getCollection = async (name, query = {}, user = null) => {
