@@ -4,6 +4,22 @@ const db = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const fixes = require('../lib/itguy-fixes');
+const push = require('../services/pushService');
+
+async function notifySaved(req, name, id, before, after, isCreate) {
+    try {
+        await push.notifyCollectionChange({
+            collection: name,
+            id: id,
+            before: before || {},
+            after: after || {},
+            actorUid: req.user && req.user.uid,
+            isCreate: !!isCreate
+        });
+    } catch (err) {
+        logger.error('Push notification failed', { error: err.message });
+    }
+}
 
 function denyAssignment(res, actor, name, current, nextBody, method) {
     const denial = fixes.assignmentDenial(actor, name, current || {}, nextBody || {}, method);
@@ -145,6 +161,7 @@ router.post('/:name/:id', async (req, res, next) => {
         if (denyAssignment(res, req.user, name, currentData, req.body, 'set')) return;
 
         await saveDoc(name, id, req.body);
+        await notifySaved(req, name, id, existing ? currentData : {}, Object.assign({ id: id }, req.body), !existing);
         res.json({ success: true });
     } catch (e) {
         next(e);
@@ -172,8 +189,9 @@ router.patch('/:name/:id', async (req, res, next) => {
 
         if (denyAssignment(res, req.user, name, currentData, req.body, 'patch')) return;
 
-        const newData = { ...currentData, ...req.body };
+        const newData = { ...currentData, ...req.body, id };
         await saveDoc(name, id, newData);
+        await notifySaved(req, name, id, row ? currentData : {}, newData, !row);
         res.json({ success: true });
     } catch (e) {
         next(e);

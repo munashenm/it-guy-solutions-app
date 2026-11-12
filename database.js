@@ -180,6 +180,38 @@ class Database {
             }
         } catch (e) { /* index already exists */ }
 
+        const tokenSchema = isMySQL ?
+            `CREATE TABLE IF NOT EXISTS device_tokens (
+                token VARCHAR(512) PRIMARY KEY,
+                userUid VARCHAR(255) NOT NULL,
+                platform VARCHAR(32),
+                updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+            )` :
+            `CREATE TABLE IF NOT EXISTS device_tokens (
+                token TEXT PRIMARY KEY,
+                userUid TEXT NOT NULL,
+                platform TEXT,
+                updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+            )`;
+        await this.run(tokenSchema);
+        const tokenCols = [
+            ['userUid', isMySQL ? 'VARCHAR(255)' : 'TEXT'],
+            ['platform', isMySQL ? 'VARCHAR(32)' : 'TEXT'],
+            ['updatedAt', 'DATETIME']
+        ];
+        for (const [col, type] of tokenCols) {
+            try {
+                await this.run(`ALTER TABLE device_tokens ADD COLUMN ${col} ${type}`);
+            } catch (e) { /* column already exists */ }
+        }
+        try {
+            if (isMySQL) {
+                await this.run('CREATE INDEX idx_device_tokens_user ON device_tokens (userUid)');
+            } else {
+                await this.run('CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens (userUid)');
+            }
+        } catch (e) { /* index already exists */ }
+
         await this.seedDefaultAdmin();
         await this.seedDefaultSettings();
     }
