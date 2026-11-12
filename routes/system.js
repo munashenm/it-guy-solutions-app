@@ -5,6 +5,7 @@ const router = express.Router();
 const db = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const logger = require('../utils/logger');
+const push = require('../services/pushService');
 const axios = require('axios');
 const nodemailer = require('nodemailer');
 const path = require('path');
@@ -136,6 +137,7 @@ router.post('/transaction/batch', requireAuth, async (req, res, next) => {
     const isStaff = ['admin', 'employee', 'technician'].includes(role);
     
     let tx = null;
+    const pendingPush = [];
     try {
         if (!updates || !Array.isArray(updates)) {
             return res.status(400).json({ error: 'Invalid batch: request body must include an updates array' });
@@ -209,6 +211,16 @@ router.post('/transaction/batch', requireAuth, async (req, res, next) => {
                 throw new Error('Insufficient stock for ' + u.id);
             }
 
+            if ((u.coll === 'jobs' || u.coll === 'fieldJobs') && u.method !== 'delete') {
+                pendingPush.push({
+                    collection: u.coll,
+                    id: u.id,
+                    before: row ? currentData : {},
+                    after: Object.assign({ id: u.id }, newData),
+                    isCreate: !row
+                });
+            }
+
             const jsonData = JSON.stringify(newData);
             if (type === 'mysql') {
                 const sql = `INSERT INTO collections (id, name, data, updatedAt) VALUES (?, ?, ?, CURRENT_TIMESTAMP) 
@@ -220,6 +232,20 @@ router.post('/transaction/batch', requireAuth, async (req, res, next) => {
             }
         }
         await db.commitBatch(tx);
+        for (const change of pendingPush) {
+            try {
+                await push.notifyCollectionChange({
+                    collection: change.collection,
+                    id: change.id,
+                    before: change.before,
+                    after: change.after,
+                    actorUid: user && user.uid,
+                    isCreate: change.isCreate
+                });
+            } catch (err) {
+                logger.error('Push notification failed', { error: err.message });
+            }
+        }
         res.json({ success: true });
     } catch (err) {
         if (tx) {

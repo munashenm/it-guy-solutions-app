@@ -481,3 +481,136 @@ test('report email is captured by a local SMTP sink and failure stays an error',
         await new Promise((resolve) => smtp.server.close(resolve));
     }
 });
+
+test('device push tokens are stored per user and job events stay safe without Firebase', async () => {
+    const push = require('../services/pushService');
+    push.clearAttempts();
+
+    const anon = await fetch(base + '/devices/push-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: 'a'.repeat(32) })
+    });
+    assert.equal(anon.status, 401);
+
+    const admin = await login('admin', 'admin123');
+    const bad = await fetch(base + '/devices/push-token', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({ token: 'short' })
+    });
+    assert.equal(bad.status, 400);
+
+    const created = await fetch(base + '/users', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({
+            email: 'push.tech@example.com',
+            password: 'Welcome123!',
+            role: 'technician',
+            firstName: 'Push',
+            lastName: 'Tech',
+            username: 'pushtech',
+            employeeId: 'EMP-9001'
+        })
+    });
+    const createdBody = await created.json();
+    assert.equal(created.status, 200, JSON.stringify(createdBody));
+
+    const tech = await login('pushtech', 'Welcome123!');
+    const techToken = 'fcm-push-tech-' + 'b'.repeat(24);
+    const saved = await fetch(base + '/devices/push-token', {
+        method: 'POST',
+        headers: auth(tech.token),
+        body: JSON.stringify({ token: techToken, platform: 'android' })
+    });
+    assert.equal(saved.status, 200);
+    const again = await fetch(base + '/devices/push-token', {
+        method: 'POST',
+        headers: auth(tech.token),
+        body: JSON.stringify({ token: techToken, platform: 'android' })
+    });
+    assert.equal(again.status, 200);
+
+    const mine = await (await fetch(base + '/devices/push-tokens', { headers: auth(tech.token) })).json();
+    assert.equal(mine.tokens.length, 1);
+    assert.equal(mine.tokens[0].token, techToken);
+    assert.equal(mine.tokens[0].platform, 'android');
+
+    const adminList = await (await fetch(base + '/devices/push-tokens', { headers: auth(admin.token) })).json();
+    assert.equal(adminList.tokens.some((row) => row.token === techToken), false);
+
+    push.clearAttempts();
+    const callout = await fetch(base + '/collections/fieldJobs/FLD-PUSH-1', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({
+            id: 'FLD-PUSH-1',
+            customer: 'Acme Site',
+            status: 'Scheduled',
+            technician: 'Push Tech',
+            technicianUid: tech.user.uid,
+            technicianEmail: 'push.tech@example.com'
+        })
+    });
+    assert.equal(callout.status, 200);
+    const assignment = push.attempts.find((row) => row.type === 'assignment' && row.token === techToken);
+    assert.ok(assignment, JSON.stringify(push.attempts));
+    assert.equal(assignment.skipped, true);
+    assert.equal(assignment.reason, 'unconfigured');
+    assert.match(assignment.body, /Acme Site/);
+    assert.equal(push.attempts.some((row) => row.type === 'status' && row.token === techToken), false);
+
+    push.clearAttempts();
+    const workshop = await fetch(base + '/collections/jobs/JOB-PUSH-1', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({
+            id: 'JOB-PUSH-1',
+            customer: 'Walk-in',
+            status: 'Booked',
+            technician: 'Push Tech'
+        })
+    });
+    assert.equal(workshop.status, 200);
+    const byName = push.attempts.find((row) => row.type === 'assignment' && row.id === 'JOB-PUSH-1');
+    assert.ok(byName, JSON.stringify(push.attempts));
+    assert.equal(byName.uid, tech.user.uid);
+
+    push.clearAttempts();
+    const status = await fetch(base + '/collections/fieldJobs/FLD-PUSH-1', {
+        method: 'PATCH',
+        headers: auth(admin.token),
+        body: JSON.stringify({ status: 'On-site' })
+    });
+    assert.equal(status.status, 200);
+    const statusEvent = push.attempts.find((row) => row.type === 'status' && row.token === techToken);
+    assert.ok(statusEvent, JSON.stringify(push.attempts));
+    assert.match(statusEvent.body, /On-site/);
+    assert.equal(statusEvent.skipped, true);
+
+    push.clearAttempts();
+    const same = await fetch(base + '/collections/fieldJobs/FLD-PUSH-1', {
+        method: 'PATCH',
+        headers: auth(admin.token),
+        body: JSON.stringify({ status: 'On-site' })
+    });
+    assert.equal(same.status, 200);
+    assert.equal(push.attempts.some((row) => row.type === 'status'), false);
+
+    const removed = await fetch(base + '/devices/push-token', {
+        method: 'DELETE',
+        headers: auth(tech.token),
+        body: JSON.stringify({ token: techToken })
+    });
+    assert.equal(removed.status, 200);
+    const after = await (await fetch(base + '/devices/push-tokens', { headers: auth(tech.token) })).json();
+    assert.equal(after.tokens.length, 0);
+
+    const other = await fetch(base + '/devices/push-token', {
+        method: 'DELETE',
+        headers: auth(admin.token),
+        body: JSON.stringify({ token: 'missing-token-value-000000' })
+    });
+    assert.equal(other.status, 200);
+});

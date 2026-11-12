@@ -35,6 +35,7 @@ try {
     app.use('/api', authRoutes);
     app.use('/api/auth', authRoutes);
     app.use('/api/users', require('./routes/users'));
+    app.use('/api/devices', require('./routes/devices'));
     app.use('/api/collections', require('./routes/collections'));
     app.use('/api', require('./routes/system'));
     diagLog('API Routes Registered Successfully.');
@@ -57,7 +58,7 @@ const blockedExact = new Set([
     '/.env', '/.env.production', '/.env.example', '/package.json', '/package-lock.json',
     '/database.sqlite', '/app.js', '/database.js', '/seed.js', '/mailer.js'
 ]);
-const blockedPrefixes = ['/node_modules', '/routes/', '/middleware/', '/services/', '/utils/', '/.git'];
+const blockedPrefixes = ['/node_modules', '/routes/', '/middleware/', '/services/', '/utils/', '/.git', '/mobile', '/test/', '/.github'];
 app.use((req, res, next) => {
     const p = (req.path || '').toLowerCase();
     if (blockedExact.has(p) || blockedPrefixes.some((prefix) => p === prefix || p.startsWith(prefix))) {

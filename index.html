@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#0f111a">
+    <script src="lib/staff-shell.js?v=5.0"></script>
+    <script src="js/native-shell.js?v=5.0"></script>
     <link rel="manifest" href="manifest.json">
     <link id="app-favicon" rel="icon" type="image/x-icon" href="img/favicon.ico">
     <link id="app-apple-touch-icon" rel="apple-touch-icon" href="img/icon.png">
@@ -442,7 +444,7 @@
     <script>
         if ('serviceWorker' in navigator) {
           window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js?v=4.9').then(registration => {
+            navigator.serviceWorker.register('/sw.js?v=5.0').then(registration => {
               registration.update();
               console.log('ServiceWorker registration successful with scope: ', registration.scope);
             }, err => {

@@ -1,0 +1,24 @@
+{
+  "name": "it-guy-staff",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Android wrapper for the IT Guy Solutions staff app.",
+  "scripts": {
+    "sync:shell": "node sync-shell.js",
+    "cap:sync": "npm run sync:shell && npx cap sync android",
+    "android:debug": "npm run cap:sync && cd android && ./gradlew assembleDebug --no-daemon"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.6.2",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/browser": "^8.0.5",
+    "@capacitor/camera": "^8.2.6",
+    "@capacitor/core": "^8.6.2",
+    "@capacitor/filesystem": "^8.1.5",
+    "@capacitor/push-notifications": "^8.1.3",
+    "@capacitor/share": "^8.0.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^8.6.2"
+  }
+}
