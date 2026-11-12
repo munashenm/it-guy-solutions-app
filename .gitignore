@@ -12,3 +12,13 @@ logs/
 *.log
 startup_log.txt
 emergency_error.txt
+deploy.zip
+itguy-deploy.zip
+deploy_temp/
+test.txt
+diag.js
+diag-test.js
+db-test-prod.js
+test-db.js
+.htaccess.old
+backup.htaccess

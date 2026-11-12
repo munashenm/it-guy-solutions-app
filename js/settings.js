@@ -693,51 +693,84 @@ window.companySettings = {
         }
     },
 
+    esc(value) {
+        if (window.ItguyFixes && window.ItguyFixes.escapeHtml) return window.ItguyFixes.escapeHtml(value);
+        return String(value == null ? '' : value);
+    },
+
     async fetchUsers() {
-        if(!window.fbDb) return;
         try {
-            const usersSnap = await window.fbDb.collection("users").orderBy("createdAt", "desc").get();
-            this.allStaff = [];
-            this.allCustomers = [];
-
-            const allUsers = usersSnap.docs ? usersSnap.docs.map(d => d.data()) : usersSnap;
-            allUsers.sort((a,b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-
-            allUsers.forEach(data => {
-                if (['admin', 'technician', 'frontdesk'].includes(data.role)) this.allStaff.push(data);
-                else this.allCustomers.push(data);
-            });
-
-            this.renderStaffTable(this.allStaff);
-            this.renderCustomerTable(this.allCustomers);
-        } catch(e) {
+            let allUsers = [];
+            if (window.app && typeof window.app.loadUserDirectory === 'function') {
+                allUsers = await window.app.loadUserDirectory();
+            } else {
+                const res = await window.safeFetch(`${window.API_BASE || '/api'}/users`);
+                allUsers = Array.isArray(res) ? res : ((res && res.users) || []);
+            }
+            allUsers = Array.isArray(allUsers) ? allUsers.slice() : [];
+            allUsers.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+            const split = window.ItguyFixes.splitDirectory(allUsers);
+            this.allStaff = split.staff;
+            this.allCustomers = split.clients;
+            const search = document.getElementById('settings-user-search');
+            if (search && search.value) this.handleSearch({ target: search });
+            else {
+                this.renderStaffTable(this.allStaff);
+                this.renderCustomerTable(this.allCustomers);
+            }
+        } catch (e) {
             console.error("Error fetching users:", e);
+            const tbody = document.querySelector('#settings-staff-table tbody');
+            if (tbody) tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #ff7675;">Could not load the staff directory.</td></tr>`;
+        }
+    },
+
+    handleSearch(event) {
+        try {
+            const query = event && event.target ? event.target.value : '';
+            const match = (list) => window.ItguyFixes.filterPeople(list, query);
+            this.renderStaffTable(match(this.allStaff || []));
+            this.renderCustomerTable(match(this.allCustomers || []));
+        } catch (err) {
+            console.error('Staff search failed', err);
         }
     },
 
     renderStaffTable(staffList) {
         const tbody = document.querySelector('#settings-staff-table tbody');
         if(!tbody) return;
+        const list = Array.isArray(staffList) ? staffList : [];
         
-        if(staffList.length === 0) {
+        if(list.length === 0) {
             tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #a0a0a0;">No staff found.</td></tr>`;
             return;
         }
 
-        tbody.innerHTML = staffList.map(s => {
-            let displayName = s.firstName || s.lastName ? `${s.firstName || ''} ${s.lastName || ''}`.trim() : s.username || s.email;
-            let subDisplay = s.employeeId ? `EMP ID: ${s.employeeId} | ${s.email}` : s.email;
+        const selfUid = window.authSystem && window.authSystem.currentUser ? window.authSystem.currentUser.uid : '';
+        tbody.innerHTML = list.map(s => {
+            const displayName = s.firstName || s.lastName ? `${s.firstName || ''} ${s.lastName || ''}`.trim() : (s.username || s.email || 'Unnamed');
+            const subDisplay = s.employeeId ? `EMP ID: ${s.employeeId} | ${s.email || ''}` : (s.email || s.uid || '');
+            const active = window.ItguyFixes.accountIsActive(s.active);
+            const roleLabel = s.role || 'unspecified';
+            const uid = this.esc(s.uid || s.id);
+            const email = this.esc(s.email || '');
+            const self = (s.uid || s.id) === selfUid;
+            const statusBtn = self ? '' : `<button type="button" class="btn-icon" title="${active ? 'Deactivate' : 'Reactivate'}" onclick="companySettings.setUserActive('${uid}', ${active ? 'false' : 'true'})"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #74b9ff;">${active ? 'person_off' : 'how_to_reg'}</span></button>`;
             return `
             <tr>
                 <td>
-                    <strong>${displayName}</strong><br>
-                    <span style="font-size: 0.8rem; color: #a0a0a0;">${subDisplay}</span>
+                    <strong>${this.esc(displayName)}</strong><br>
+                    <span style="font-size: 0.8rem; color: #a0a0a0;">${this.esc(subDisplay)}</span>
                 </td>
-                <td><span class="badge ${s.role === 'admin' ? 'completed' : 'active'}">${s.role}</span></td>
+                <td>
+                    <span class="badge ${s.role === 'admin' ? 'completed' : 'active'}">${this.esc(roleLabel)}</span>
+                    ${active ? '' : '<span class="badge" style="margin-left: 6px; background: #636e72;">Inactive</span>'}
+                </td>
                 <td style="text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
-                    <button type="button" class="btn-icon" title="Edit Profile" onclick="companySettings.showEditUserModal('${s.uid}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #a29bfe;">edit</span></button>
-                    <button type="button" class="btn-icon" title="Reset Password" onclick="companySettings.showAdminPasswordResetModal('${s.uid}', '${s.email}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #fdcb6e;">lock_reset</span></button>
-                    <button type="button" class="btn-icon" title="Delete User" onclick="companySettings.deleteUser('${s.uid}', '${s.email}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #ff7675;">delete</span></button>
+                    <button type="button" class="btn-icon" title="Edit Profile" onclick="companySettings.showEditUserModal('${uid}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #a29bfe;">edit</span></button>
+                    <button type="button" class="btn-icon" title="Reset Password" onclick="companySettings.showAdminPasswordResetModal('${uid}', '${email}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #fdcb6e;">lock_reset</span></button>
+                    ${statusBtn}
+                    <button type="button" class="btn-icon" title="Delete User" onclick="companySettings.deleteUser('${uid}', '${email}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #ff7675;">delete</span></button>
                 </td>
             </tr>
             `;
@@ -747,24 +780,51 @@ window.companySettings = {
     renderCustomerTable(customerList) {
         const tbody = document.querySelector('#settings-customer-table tbody');
         if(!tbody) return;
-        if(customerList.length === 0) {
+        const list = Array.isArray(customerList) ? customerList : [];
+        if(list.length === 0) {
             tbody.innerHTML = `<tr><td colspan="3" style="text-align: center; color: #a0a0a0; padding: 20px;">No customers found.</td></tr>`;
             return;
         }
 
-        tbody.innerHTML = customerList.map(c => `
+        tbody.innerHTML = list.map(c => {
+            const uid = this.esc(c.uid || c.id);
+            const label = this.esc(c.phone || c.email || '');
+            return `
             <tr>
                 <td>
-                    <strong>${c.firstName ? `${c.firstName} ${c.lastName || ''}` : (c.phone || c.email || 'Unknown')}</strong><br>
-                    <small style="color:#a0a0a0">${c.email || ''}</small>
+                    <strong>${this.esc(c.firstName ? `${c.firstName} ${c.lastName || ''}` : (c.phone || c.email || 'Unknown'))}</strong><br>
+                    <small style="color:#a0a0a0">${this.esc(c.email || '')}</small>
                 </td>
                 <td><span class="badge active">client</span></td>
                 <td style="text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
-                    <button type="button" class="btn-icon" title="Edit" onclick="companySettings.showEditUserModal('${c.uid}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #a29bfe;">edit</span></button>
-                    <button type="button" class="btn-icon" title="Delete" onclick="companySettings.deleteUser('${c.uid}', '${c.phone || c.email}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #ff7675;">delete</span></button>
+                    <button type="button" class="btn-icon" title="Edit" onclick="companySettings.showEditUserModal('${uid}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #a29bfe;">edit</span></button>
+                    <button type="button" class="btn-icon" title="Delete" onclick="companySettings.deleteUser('${uid}', '${label}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #ff7675;">delete</span></button>
                 </td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
+    },
+
+    async setUserActive(uid, active) {
+        const verb = active ? 'reactivate' : 'deactivate';
+        if (window.authSystem && window.authSystem.currentUser && window.authSystem.currentUser.uid === uid && !active) {
+            alert('You cannot deactivate your own account.');
+            return;
+        }
+        if (!confirm(`Are you sure you want to ${verb} this account? ${active ? 'They will be able to sign in and be assigned to jobs again.' : 'They stay in this list, but they cannot sign in or be assigned to jobs until you turn them back on.'}`)) {
+            return;
+        }
+        try {
+            await window.safeFetch(`${window.API_BASE || '/api'}/users/${encodeURIComponent(uid)}/status`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ active: !!active })
+            });
+            this.showMessage(`Account ${active ? 'reactivated' : 'deactivated'}.`, true);
+            this.fetchUsers();
+        } catch (err) {
+            this.showMessage(err.message, false);
+        }
     },
 
     async sendResetEmail(email) {
@@ -997,8 +1057,13 @@ window.companySettings = {
     },
 
     showEditUserModal(uid) {
-        const user = [...this.allStaff, ...this.allCustomers].find(u => u.uid === uid);
+        const user = [...this.allStaff, ...this.allCustomers].find(u => (u.uid || u.id) === uid);
         if(!user) return;
+        const safeUid = this.esc(uid);
+        const knownRoles = ['technician', 'frontdesk', 'admin', 'employee', 'client'];
+        const extraRole = user.role && knownRoles.indexOf(user.role) === -1
+            ? `<option value="${this.esc(user.role)}" selected>${this.esc(user.role)}</option>`
+            : '';
 
         const modalHTML = `
             <div class="modal-content" style="max-width: 500px;">
@@ -1007,42 +1072,45 @@ window.companySettings = {
                     <button class="btn-icon" onclick="app.closeModal()"><span class="material-symbols-outlined">close</span></button>
                 </div>
                 <div class="modal-body">
-                    <form onsubmit="companySettings.handleUpdateUser(event, '${uid}')">
+                    <form onsubmit="companySettings.handleUpdateUser(event, '${safeUid}')">
                         <div class="form-row">
                             <div class="form-group">
                                 <label>First Name</label>
-                                <input type="text" id="edit-user-fn" class="form-control" value="${user.firstName || ''}" required>
+                                <input type="text" id="edit-user-fn" class="form-control" value="${this.esc(user.firstName || '')}">
                             </div>
                             <div class="form-group">
                                 <label>Last Name</label>
-                                <input type="text" id="edit-user-ln" class="form-control" value="${user.lastName || ''}">
+                                <input type="text" id="edit-user-ln" class="form-control" value="${this.esc(user.lastName || '')}">
                             </div>
                         </div>
                         <div class="form-group">
                             <label>Username</label>
-                            <input type="text" id="edit-user-un" class="form-control" value="${user.username || ''}">
+                            <input type="text" id="edit-user-un" class="form-control" value="${this.esc(user.username || '')}">
                         </div>
                         <div class="form-group">
                             <label>Email Address</label>
-                            <input type="email" id="edit-user-email" class="form-control" value="${user.email || ''}" required>
+                            <input type="email" id="edit-user-email" class="form-control" value="${this.esc(user.email || '')}" required>
                         </div>
                         <div class="form-group">
                             <label>Phone Number</label>
-                            <input type="tel" id="edit-user-phone" class="form-control" value="${user.phone || ''}" pattern="^0[0-9]{2}\s?[0-9]{3}\s?[0-9]{4}$" title="10-digit SA number starting with 0">
+                            <input type="tel" id="edit-user-phone" class="form-control" value="${this.esc(user.phone || '')}">
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Role</label>
-                                <select id="edit-user-role" class="form-control" required style="appearance: auto;">
+                                <select id="edit-user-role" class="form-control" style="appearance: auto;">
+                                    <option value="" ${!user.role ? 'selected' : ''}>Unspecified</option>
                                     <option value="technician" ${user.role === 'technician' ? 'selected' : ''}>Technician</option>
                                     <option value="frontdesk" ${user.role === 'frontdesk' ? 'selected' : ''}>Frontdesk</option>
                                     <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                                    <option value="employee" ${user.role === 'employee' ? 'selected' : ''}>Employee</option>
                                     <option value="client" ${user.role === 'client' ? 'selected' : ''}>Client</option>
+                                    ${extraRole}
                                 </select>
                             </div>
                             <div class="form-group">
                                 <label>Employee ID</label>
-                                <input type="text" id="edit-user-ei" class="form-control" value="${user.employeeId || ''}">
+                                <input type="text" id="edit-user-ei" class="form-control" value="${this.esc(user.employeeId || '')}">
                             </div>
                         </div>
                         <div class="modal-footer">
@@ -1072,7 +1140,7 @@ window.companySettings = {
         };
 
         try {
-            await window.safeFetch(`${window.API_BASE || '/api'}/users/${uid}`, {
+            await window.safeFetch(`${window.API_BASE || '/api'}/users/${encodeURIComponent(uid)}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
@@ -1144,7 +1212,7 @@ window.companySettings = {
         }
 
         try {
-            await window.safeFetch(`${window.API_BASE || '/api'}/users/${uid}`, {
+            await window.safeFetch(`${window.API_BASE || '/api'}/users/${encodeURIComponent(uid)}`, {
                 method: 'DELETE'
             });
 

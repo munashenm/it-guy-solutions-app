@@ -1,4 +1,4 @@
-// IT Guy Solutions - Stability Version (v4.8)
+// IT Guy Solutions - version is read from version.js
 const express = require('express');
 const path = require('path');
 const bodyParser = require('body-parser');
@@ -21,6 +21,7 @@ process.on('unhandledRejection', (reason) => {
     diagLog(`Unhandled rejection: ${msg}`);
 });
 
+const { APP_VERSION } = require('./version');
 const app = express();
 app.set('trust proxy', 1);
 
@@ -35,6 +36,7 @@ try {
     app.use('/api', authRoutes);
     app.use('/api/auth', authRoutes);
     app.use('/api/users', require('./routes/users'));
+    app.use('/api/customers', require('./routes/customers'));
     app.use('/api/collections', require('./routes/collections'));
     app.use('/api', require('./routes/system'));
     diagLog('API Routes Registered Successfully.');
@@ -48,24 +50,28 @@ app.get('/api/status', (req, res) => {
         status: 'online',
         dbStatus: dbReady ? 'Connected' : 'Initializing',
         dbType: (appDb && appDb.type) || process.env.DB_TYPE || 'sqlite',
-        version: '4.8',
+        version: APP_VERSION,
         timestamp: new Date().toISOString()
     });
 });
 
-const blockedExact = new Set([
-    '/.env', '/.env.production', '/.env.example', '/package.json', '/package-lock.json',
-    '/database.sqlite', '/app.js', '/database.js', '/seed.js', '/mailer.js'
+const publicFiles = new Set([
+    '/', '/index.html', '/client.html', '/track.html', '/manifest.json',
+    '/sw.js', '/version.js', '/lib/itguy-fixes.js'
 ]);
-const blockedPrefixes = ['/node_modules', '/routes/', '/middleware/', '/services/', '/utils/', '/.git'];
+const publicPrefixes = ['/css/', '/js/', '/img/', '/public/'];
+const privatePrefixes = [
+    '/node_modules', '/routes', '/middleware', '/services', '/utils', '/lib',
+    '/logs', '/tmp', '/deploy_temp', '/test', '/docs', '/mobile', '/.git', '/uploads'
+];
 app.use((req, res, next) => {
     const p = (req.path || '').toLowerCase();
-    if (blockedExact.has(p) || blockedPrefixes.some((prefix) => p === prefix || p.startsWith(prefix))) {
-        return res.status(404).end();
-    }
-    if (p.endsWith('.sqlite') || p.endsWith('.sql') || p.endsWith('.env')) {
-        return res.status(404).end();
-    }
+    if (p === '/api' || p.startsWith('/api/')) return next();
+    if (publicFiles.has(p) || publicPrefixes.some((prefix) => p.startsWith(prefix))) return next();
+    const hidden = p.split('/').some((part) => part.startsWith('.'));
+    const privateTree = privatePrefixes.some((prefix) => p === prefix || p.startsWith(prefix + '/'));
+    const privateExt = /\.(js|mjs|cjs|json|zip|sql|sqlite|txt|log|md|env|bak|old|map|lock|yml|yaml|ps1|sh|ini|conf)$/.test(p);
+    if (hidden || privateTree || privateExt || p.endsWith('.env')) return res.status(404).end();
     next();
 });
 

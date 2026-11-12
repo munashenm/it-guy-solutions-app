@@ -481,3 +481,151 @@ test('report email is captured by a local SMTP sink and failure stays an error',
         await new Promise((resolve) => smtp.server.close(resolve));
     }
 });
+
+test('staff directory lists sql-only, collection-only, and legacy roles', async () => {
+    const status = await (await fetch(base + '/status')).json();
+    assert.equal(status.version, '4.9');
+
+    const admin = await login('admin', 'admin123');
+    const created = await fetch(base + '/users', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({
+            email: 'qa-test-tech@example.com', password: 'Welcome123!', role: 'technician',
+            firstName: 'Qa', lastName: 'Tech', username: 'qatech', employeeId: 'EMP-QA'
+        })
+    });
+    const createdBody = await created.json();
+    assert.equal(created.status, 200, JSON.stringify(createdBody));
+    const uid = createdBody.user.uid;
+
+    await db.run("DELETE FROM collections WHERE name = 'users' AND id = ?", [uid]);
+    await db.run(
+        "INSERT INTO users (uid, email, role, firstName) VALUES (?, ?, ?, ?)",
+        ['legacy-tech', 'old.tech@example.com', 'Technician', 'Old']
+    );
+    await db.run(
+        "INSERT INTO collections (id, name, data, updatedAt) VALUES (?, 'users', ?, CURRENT_TIMESTAMP)",
+        ['user-json', JSON.stringify({ uid: 'user-json', email: 'json.only@example.com', role: 'tech', firstName: 'Json' })]
+    );
+
+    const listedRes = await fetch(base + '/users', { headers: auth(admin.token) });
+    const listed = await listedRes.json();
+    assert.equal(listedRes.status, 200, JSON.stringify(listed));
+    const byEmail = Object.fromEntries(listed.map(u => [u.email, u]));
+    assert.equal(byEmail['qa-test-tech@example.com'].role, 'technician');
+    assert.equal(byEmail['qa-test-tech@example.com'].storage, 'sql');
+    assert.equal(byEmail['qa-test-tech@example.com'].password, undefined);
+    assert.equal(byEmail['old.tech@example.com'].role, 'technician');
+    assert.equal(byEmail['json.only@example.com'].role, 'technician');
+    assert.equal(byEmail['json.only@example.com'].storage, 'collection');
+    assert.equal(fixes.isStaffAccount(byEmail['old.tech@example.com']), true);
+
+    const edited = await fetch(base + '/users/' + uid, {
+        method: 'PUT',
+        headers: auth(admin.token),
+        body: JSON.stringify({
+            email: 'qa-test-tech@example.com', username: 'qatech', firstName: 'Qa', lastName: 'Updated',
+            employeeId: 'EMP-QA', phone: '', role: 'technician'
+        })
+    });
+    assert.equal(edited.status, 200, await edited.text());
+
+    const off = await fetch(base + '/users/' + uid + '/status', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({ active: false })
+    });
+    assert.equal(off.status, 200, await off.text());
+    const afterOff = await (await fetch(base + '/users', { headers: auth(admin.token) })).json();
+    const inactive = afterOff.find(u => u.uid === uid);
+    assert.equal(inactive.active, false);
+    const blocked = await fetch(base + '/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'qa-test-tech@example.com', password: 'Welcome123!' })
+    });
+    assert.equal(blocked.status, 403);
+
+    const selfOff = await fetch(base + '/users/' + admin.user.uid + '/status', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({ active: false })
+    });
+    assert.equal(selfOff.status, 400);
+
+    const removed = await fetch(base + '/users/' + uid, { method: 'DELETE', headers: auth(admin.token) });
+    assert.equal(removed.status, 200);
+    const afterDelete = await (await fetch(base + '/users', { headers: auth(admin.token) })).json();
+    assert.equal(afterDelete.some(u => u.uid === uid), false);
+});
+
+test('customers can be deleted only when they have no records, otherwise archived', async () => {
+    const admin = await login('admin', 'admin123');
+    const tech = await fetch(base + '/users', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({
+            email: 'cust.guard@example.com', password: 'Welcome123!', role: 'technician',
+            firstName: 'Guard', lastName: 'Tech', username: 'custguard', employeeId: 'EMP-G'
+        })
+    });
+    const techBody = await tech.json();
+    assert.equal(tech.status, 200, JSON.stringify(techBody));
+    const techLogin = await login('custguard', 'Welcome123!');
+
+    async function putCustomer(id, body) {
+        const res = await fetch(base + '/collections/customers/' + id, {
+            method: 'POST',
+            headers: auth(admin.token),
+            body: JSON.stringify(body)
+        });
+        assert.equal(res.status, 200, await res.text());
+    }
+
+    await putCustomer('cust-free', { name: 'Free Customer', email: 'free@example.com', phone: '0820000001' });
+    await putCustomer('cust-busy', { name: 'Busy Customer', email: 'busy@example.com', phone: '0820000002' });
+    const job = await fetch(base + '/collections/jobs/JOB-BUSY', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({ id: 'JOB-BUSY', customer: 'Busy Customer', status: 'Received' })
+    });
+    assert.equal(job.status, 200, await job.text());
+
+    const forbidden = await fetch(base + '/customers/cust-free', { method: 'DELETE', headers: auth(techLogin.token) });
+    assert.equal(forbidden.status, 403);
+
+    const blocked = await fetch(base + '/customers/cust-busy', { method: 'DELETE', headers: auth(admin.token) });
+    const blockedBody = await blocked.json();
+    assert.equal(blocked.status, 409);
+    assert.match(blockedBody.error, /Archive/);
+
+    const archived = await fetch(base + '/customers/cust-busy/archive', { method: 'POST', headers: auth(admin.token) });
+    const archivedBody = await archived.json();
+    assert.equal(archived.status, 200, JSON.stringify(archivedBody));
+    assert.equal(archivedBody.customer.archived, true);
+    const kept = await (await fetch(base + '/collections/jobs/JOB-BUSY', { headers: auth(admin.token) })).json();
+    assert.equal(kept.customer, 'Busy Customer');
+
+    const restored = await fetch(base + '/customers/cust-busy/restore', { method: 'POST', headers: auth(admin.token) });
+    assert.equal(restored.status, 200);
+    const restoredDoc = await (await fetch(base + '/collections/customers/cust-busy', { headers: auth(admin.token) })).json();
+    assert.equal(restoredDoc.archived, false);
+
+    const deleted = await fetch(base + '/customers/cust-free', { method: 'DELETE', headers: auth(admin.token) });
+    assert.equal(deleted.status, 200, await deleted.text());
+    const gone = await fetch(base + '/collections/customers/cust-free', { headers: auth(admin.token) });
+    assert.equal(gone.status, 404);
+});
+
+test('server files are not served as static assets', async () => {
+    const origin = base.replace(/\/api$/, '');
+    for (const hidden of ['/database.js', '/package.json', '/app.js', '/.env.example', '/routes/users.js', '/lib/secret.js', '/deploy.zip', '/startup_log.txt']) {
+        const res = await fetch(origin + hidden);
+        assert.equal(res.status, 404, hidden);
+    }
+    assert.equal((await fetch(origin + '/version.js')).status, 200);
+    assert.equal((await fetch(origin + '/index.html')).status, 200);
+    assert.equal((await fetch(origin + '/lib/itguy-fixes.js')).status, 200);
+    assert.equal((await fetch(origin + '/js/app.js')).status, 200);
+});

@@ -100,9 +100,10 @@ async function main() {
         const status = await waitStatus('http://127.0.0.1:' + appPort + '/api/status');
         if (status.dbType !== 'mysql') fail('App did not report mysql');
         const after = await columns(conn);
-        ['password', 'role', 'username', 'firstName', 'lastName', 'employeeId', 'phone', 'sessionToken'].forEach(col => {
+        ['password', 'role', 'username', 'firstName', 'lastName', 'employeeId', 'phone', 'sessionToken', 'active'].forEach(col => {
             if (!after.includes(col)) fail('Migration did not add column ' + col + ' columns=' + after.join(','));
         });
+        if (status.version !== '4.9') fail('Status version is ' + status.version + ', expected 4.9');
         const [legacy] = await conn.query(`SELECT email FROM \`${dbName}\`.users WHERE uid = 'legacy-admin'`);
         if (!legacy.length || legacy[0].email !== 'legacy@example.com') fail('Legacy user row was lost');
 
@@ -155,7 +156,76 @@ async function main() {
         if (stored.sourceId !== 'FLD-M1' || stored.customer !== 'Mysql Client') fail('Invoice source fields missing ' + JSON.stringify(stored));
         const job = await (await fetch('http://127.0.0.1:' + appPort + '/api/collections/fieldJobs/FLD-M1', { headers })).json();
         if (job.technician !== 'My Sql') fail('Assignment did not persist on MySQL');
-        console.log('MySQL fixture passed: migration, technician, assignment, invoice source fields');
+
+        await conn.query(`DELETE FROM \`${dbName}\`.collections WHERE name = 'users' AND id = ?`, [tech.user.uid]);
+        await conn.query(
+            `INSERT INTO \`${dbName}\`.users (uid, email, role, firstName) VALUES ('old-tech', 'old.tech@example.com', 'Technician', 'Old')`
+        );
+        await conn.query(
+            `INSERT INTO \`${dbName}\`.collections (id, name, data, updatedAt) VALUES ('user-json', 'users', ?, CURRENT_TIMESTAMP)`,
+            [JSON.stringify({ uid: 'user-json', email: 'json.only@example.com', role: 'tech', firstName: 'Json' })]
+        );
+        try {
+            await conn.query(`ALTER TABLE \`${dbName}\`.collections MODIFY data JSON`);
+            await conn.query(
+                `INSERT INTO \`${dbName}\`.collections (id, name, data, updatedAt) VALUES ('user-json-col', 'users', CAST(? AS JSON), CURRENT_TIMESTAMP)`,
+                [JSON.stringify({ uid: 'user-json-col', email: 'json.column@example.com', role: 'Technician', firstName: 'Column' })]
+            );
+        } catch (alterErr) {
+            console.log('MySQL JSON column check skipped: ' + alterErr.message);
+        }
+
+        const directoryRes = await fetch('http://127.0.0.1:' + appPort + '/api/users', { headers });
+        const directory = await directoryRes.json();
+        if (directoryRes.status !== 200 || !Array.isArray(directory)) fail('Directory failed ' + JSON.stringify(directory));
+        const byEmail = {};
+        directory.forEach(u => { byEmail[u.email] = u; });
+        if (!byEmail['mysql.tech@example.com'] || byEmail['mysql.tech@example.com'].storage !== 'sql') {
+            fail('SQL-only technician missing from directory ' + JSON.stringify(directory));
+        }
+        if (!byEmail['legacy@example.com']) fail('Legacy admin missing from directory');
+        if (!byEmail['old.tech@example.com'] || byEmail['old.tech@example.com'].role !== 'technician') {
+            fail('Legacy Technician role was not listed ' + JSON.stringify(byEmail['old.tech@example.com']));
+        }
+        if (!byEmail['json.only@example.com'] || byEmail['json.only@example.com'].role !== 'technician') {
+            fail('Collection-only tech missing ' + JSON.stringify(byEmail['json.only@example.com']));
+        }
+        if (byEmail['json.column@example.com'] && byEmail['json.column@example.com'].role !== 'technician') {
+            fail('JSON-column tech was dropped or not normalised');
+        }
+        directory.forEach(u => {
+            if (u.password || u.sessionToken) fail('Directory leaked a secret for ' + u.email);
+        });
+
+        const off = await fetch('http://127.0.0.1:' + appPort + '/api/users/' + tech.user.uid + '/status', {
+            method: 'POST', headers, body: JSON.stringify({ active: false })
+        });
+        if (off.status !== 200) fail('Deactivate failed ' + await off.text());
+        const loginOff = await fetch('http://127.0.0.1:' + appPort + '/api/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: 'mysql.tech@example.com', password: 'Welcome123!' })
+        });
+        if (loginOff.status !== 403) fail('Deactivated technician could still log in ' + loginOff.status);
+
+        const free = await fetch('http://127.0.0.1:' + appPort + '/api/collections/customers/cust-free', {
+            method: 'POST', headers,
+            body: JSON.stringify({ name: 'Free Customer', email: 'free@example.com' })
+        });
+        if (free.status !== 200) fail('Customer create failed ' + await free.text());
+        const del = await fetch('http://127.0.0.1:' + appPort + '/api/customers/cust-free', { method: 'DELETE', headers });
+        if (del.status !== 200) fail('Customer delete failed ' + await del.text());
+        const busy = await fetch('http://127.0.0.1:' + appPort + '/api/collections/customers/cust-busy', {
+            method: 'POST', headers,
+            body: JSON.stringify({ name: 'Mysql Client', email: 'busy@example.com' })
+        });
+        if (busy.status !== 200) fail('Busy customer create failed ' + await busy.text());
+        const blocked = await fetch('http://127.0.0.1:' + appPort + '/api/customers/cust-busy', { method: 'DELETE', headers });
+        if (blocked.status !== 409) fail('Customer with an invoice was deleted ' + blocked.status);
+        const archived = await fetch('http://127.0.0.1:' + appPort + '/api/customers/cust-busy/archive', { method: 'POST', headers });
+        if (archived.status !== 200) fail('Archive failed ' + await archived.text());
+
+        console.log('MySQL fixture passed: migration, directory, deactivate, customer archive, assignment, invoice source fields');
     } catch (e) {
         console.error(logs.slice(-2000));
         fail(e.stack || e.message);

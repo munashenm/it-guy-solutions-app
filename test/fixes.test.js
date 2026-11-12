@@ -194,3 +194,106 @@ test('money totals round to cents and keep VAT off the subtotal when disabled', 
     assert.equal(fixes.grandTotal(10.01, 1.5), 11.51);
     assert.equal(fixes.grandTotal(0.1, 0.2), 0.3);
 });
+
+test('staff directory keeps every non-client role and storage shape', () => {
+    assert.equal(fixes.canonicalRole('Technician'), 'technician');
+    assert.equal(fixes.canonicalRole('tech'), 'technician');
+    assert.equal(fixes.canonicalRole('Front Desk'), 'frontdesk');
+    assert.equal(fixes.isStaffAccount({ role: 'technician', email: 'a@b.co' }), true);
+    assert.equal(fixes.isStaffAccount({ role: 'TECHNICIAN' }), true);
+    assert.equal(fixes.isStaffAccount({ role: 'employee' }), true);
+    assert.equal(fixes.isStaffAccount({ role: '', email: 'legacy@example.com' }), true);
+    assert.equal(fixes.isStaffAccount({ role: 'client' }), false);
+    assert.equal(fixes.accountIsActive(null), true);
+    assert.equal(fixes.accountIsActive(0), false);
+    assert.equal(fixes.accountIsActive('0'), false);
+    assert.equal(fixes.accountIsActive(1), true);
+    const split = fixes.splitDirectory([
+        { uid: 'u1', role: 'Technician', email: 'tech@example.com' },
+        { uid: 'u2', role: 'client', email: 'c@example.com' },
+        { id: 'u3', email: 'blank@example.com' }
+    ]);
+    assert.deepEqual(split.staff.map(u => u.uid), ['u1', 'u3']);
+    assert.equal(split.clients.length, 1);
+});
+
+test('staff search never throws when a field is not a string', () => {
+    const rows = [
+        { email: 'qa-test-tech@example.com', role: new Date('2024-01-01'), firstName: null, employeeId: 12 },
+        { email: null, username: 'desk', role: { unexpected: true } }
+    ];
+    assert.doesNotThrow(() => fixes.filterPeople(rows, 'qa-test'));
+    const found = fixes.filterPeople(rows, 'QA-TEST');
+    assert.equal(found.length, 1);
+    assert.equal(found[0].email, 'qa-test-tech@example.com');
+    assert.deepEqual(fixes.filterPeople(null, 'x'), []);
+});
+
+test('stored JSON accepts MySQL objects and buffers', () => {
+    assert.deepEqual(fixes.parseStoredJson({ role: 'technician', email: 'a@b.co' }), { role: 'technician', email: 'a@b.co' });
+    assert.deepEqual(fixes.parseStoredJson(Buffer.from('{"role":"tech"}')), { role: 'tech' });
+    assert.equal(fixes.parseStoredJson('not-json'), null);
+    assert.equal(fixes.parseStoredJson(''), null);
+});
+
+test('customer delete is blocked once a job, invoice, quote, or ticket exists', () => {
+    const customer = { id: 'cust-1', name: 'Acme', email: 'acme@example.com' };
+    assert.equal(fixes.customerLinkCount(customer, { jobs: [], invoices: [] }), 0);
+    assert.equal(fixes.customerLinkCount(customer, { jobs: [{ customer: 'acme' }] }), 1);
+    assert.equal(fixes.customerLinkCount(customer, { invoices: [{ customerId: 'cust-1' }] }), 1);
+    assert.equal(fixes.customerLinkCount(customer, { fieldJobs: [{ customer: 'Other' }] }), 0);
+    assert.equal(fixes.customerLinkCount(customer, { quotations: [{ email: 'acme@example.com' }] }), 1);
+    assert.equal(fixes.customerLinkCount(customer, { tickets: [{ customer: 'Acme' }] }), 1);
+});
+
+test('call-out notify never sends unless SMTP is ready and a customer email is present', () => {
+    const saved = fixes.calloutSavePlan({ notify: false, email: 'a@b.co', smtpState: 'ready' });
+    assert.equal(saved.send, false);
+    assert.match(saved.notice, /Nobody was notified/);
+    const noSmtp = fixes.calloutSavePlan({ notify: true, email: 'a@b.co', smtpState: 'missing' });
+    assert.equal(noSmtp.send, false);
+    assert.match(noSmtp.notice, /SMTP is not set up/);
+    const unknown = fixes.calloutSavePlan({ notify: true, email: 'a@b.co', smtpState: 'unknown' });
+    assert.equal(unknown.send, false);
+    const noEmail = fixes.calloutSavePlan({ notify: true, email: '', smtpState: 'ready' });
+    assert.equal(noEmail.send, false);
+    assert.match(noEmail.notice, /No customer email/);
+    const send = fixes.calloutSavePlan({ notify: true, email: 'a@b.co', smtpState: 'ready' });
+    assert.equal(send.send, true);
+    assert.equal(send.recipient, 'a@b.co');
+});
+
+test('app version is 4.9 from version.js', () => {
+    const version = require('../version');
+    assert.equal(version.APP_VERSION, '4.9');
+    const server = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
+    const footer = fs.readFileSync(path.join(__dirname, '../js/app.js'), 'utf8');
+    const sw = fs.readFileSync(path.join(__dirname, '../sw.js'), 'utf8');
+    assert.match(server, /require\('\.\/version'\)/);
+    assert.doesNotMatch(server, /version:\s*'4\./);
+    assert.match(footer, /window\.APP_VERSION/);
+    assert.doesNotMatch(footer, /v4\.8/);
+    assert.match(sw, /importScripts\('version\.js'\)/);
+    assert.match(footer, /Schedule &amp; Notify/);
+    assert.match(footer, /handleScheduledCallout\(event, false\)/);
+    const settings = fs.readFileSync(path.join(__dirname, '../js/settings.js'), 'utf8');
+    assert.match(settings, /handleSearch\(event\)/);
+    assert.match(settings, /setUserActive/);
+});
+
+test('htaccess keeps Passenger and serves only the public front end', () => {
+    const ht = fs.readFileSync(path.join(__dirname, '../.htaccess'), 'utf8');
+    assert.match(ht, /PassengerAppRoot "\/home\/itguysaco\/public_html\/app\.itguysa\.co\.za"/);
+    assert.match(ht, /PassengerBaseURI "\/"/);
+    assert.match(ht, /PassengerAppType node/);
+    assert.match(ht, /PassengerStartupFile app\.js/);
+    assert.match(ht, /RewriteCond %\{REQUEST_URI\} \^\/api\(\/\|\$\) \[NC\]/);
+    [
+        'index\\.html', 'client\\.html', 'track\\.html', 'manifest\\.json',
+        'sw\\.js', 'version\\.js', 'lib/itguy-fixes\\.js', 'css|js|img|public'
+    ].forEach((asset) => {
+        assert.equal(ht.includes(asset), true, asset);
+    });
+    assert.match(ht, /\[F,L\]/);
+    assert.doesNotMatch(ht, /REQUEST_FILENAME\} !-f/);
+});

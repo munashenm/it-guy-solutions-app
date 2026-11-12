@@ -90,7 +90,7 @@ const app = {
         'inventory-view': ['inventory', 'suppliers'],
         'mystock-view': ['techStock', 'inventory'],
         'pos-view': ['inventory', 'sales', 'customers'],
-        'customers-view': ['customers', 'jobs', 'invoices', 'quotations'],
+        'customers-view': ['customers', 'jobs', 'fieldJobs', 'invoices', 'quotations', 'tickets'],
         'reports-view': ['sales', 'invoices', 'expenses', 'jobs'],
         'tickets-view': ['tickets', 'customers'],
         'purchases-view': ['purchaseOrders', 'suppliers', 'inventory'],
@@ -113,6 +113,7 @@ const app = {
 
         // Always sync core settings for branding and logic
         this.requestSync(['settings', 'companyProfile', 'systemSettings', 'users', 'customers', 'tickets']);
+        this.loadUserDirectory().catch(() => {});
         
         // Initial sync for current view
         const hash = window.location.hash || '#dashboard';
@@ -149,6 +150,15 @@ const app = {
                 const fp = this._fingerprint(rows);
                 if (this._collFp[coll] === fp) return;
                 this._collFp[coll] = fp;
+
+                if (coll === 'users') {
+                    this.loadUserDirectory().catch(() => {
+                        if (!this._directoryLoaded) {
+                            this.state.users = rows.map(r => Object.assign({ id: r.uid || r.id }, r));
+                        }
+                    }).finally(() => this.refreshActiveViews());
+                    return;
+                }
 
                 this._syncRawData[stateKey][coll] = rows;
                 this.state[stateKey] = Object.values(this._syncRawData[stateKey]).flat();
@@ -322,6 +332,10 @@ const app = {
         const seen = new Set();
         (this.state.users || []).forEach(u => {
             if ((u.role || '').toLowerCase() === 'client') return;
+            const active = window.ItguyFixes && window.ItguyFixes.accountIsActive
+                ? window.ItguyFixes.accountIsActive(u.active)
+                : u.active !== false && u.active !== 0 && u.active !== '0';
+            if (!active) return;
             const name = this.personName(u);
             if (!name || seen.has(name)) return;
             seen.add(name);
@@ -348,10 +362,20 @@ const app = {
         const idx = this.state.users.findIndex(u => (u.uid || u.id) === (row.uid || row.id));
         if (idx >= 0) this.state.users[idx] = Object.assign({}, this.state.users[idx], row);
         else this.state.users.push(row);
+        this.loadUserDirectory().catch(() => {});
         const coll = window.fbDb && window.fbDb.collection && window.fbDb.collection('users');
         if (coll && typeof coll.fetch === 'function') {
             coll.fetch().catch((e) => console.warn('User list refresh failed', e.message));
         }
+    },
+
+    async loadUserDirectory() {
+        if (!window.safeFetch) return this.state.users || [];
+        const res = await window.safeFetch(`${window.API_BASE || '/api'}/users`);
+        const users = Array.isArray(res) ? res : ((res && res.users) || []);
+        this.state.users = users.map(u => Object.assign({ id: u.uid || u.id }, u));
+        this._directoryLoaded = true;
+        return this.state.users;
     },
 
     toggleNotifications(event) {
@@ -492,7 +516,8 @@ const app = {
             text.textContent = isHealthy ? 'System Online' : 'DB Sync Error';
             text.style.color = isHealthy ? '#00b894' : '#ff7675';
             const engineInfo = status.dbType ? `${status.dbType.toUpperCase()} Engine` : 'Local Engine';
-            if (label) label.textContent = `${engineInfo} | v4.8`;
+            const ver = (typeof window !== 'undefined' && window.APP_VERSION) || '4.9';
+            if (label) label.textContent = `${engineInfo} | v${ver}`;
             
             if (!isHealthy && status.dbError) {
                 console.error("Database Health Warning:", status.dbError);
@@ -864,8 +889,9 @@ const app = {
     
     generateCustomerDatalist() {
         if(!this.state.customers) return '';
+        const visible = this.state.customers.filter(c => c && c.archived !== true);
         return `<datalist id="crm-customers-list">
-            ${this.state.customers.map(c => `<option value="${c.name}">${c.email || c.phone || 'No contact info'}</option>`).join('')}
+            ${visible.map(c => `<option value="${this.escapeHtml(c.name)}">${this.escapeHtml(c.email || c.phone || 'No contact info')}</option>`).join('')}
         </datalist>`;
     },
     
@@ -1494,9 +1520,17 @@ const app = {
                             <label>Special Instructions</label>
                             <textarea id="callout-special" class="form-control" placeholder="Gate codes, parking info, access times..."></textarea>
                         </div>
+                        <p style="color: #a0a0a0; font-size: 0.85rem; margin: 4px 0 12px; line-height: 1.45;">
+                            <strong>Save</strong> stores the call-out and does not email or message anyone.
+                            <strong>Schedule &amp; Notify</strong> stores the call-out and emails the customer address on this form
+                            with the visit date, site address, and assigned technician.
+                            That email is sent only when SMTP is set up under Settings → Email.
+                            If SMTP is not set up, the call-out is still saved and nothing is sent.
+                        </p>
                         <div class="modal-footer">
                             <button type="button" class="btn-secondary" onclick="app.closeModal()">Cancel</button>
-                            <button type="submit" class="btn-primary">Schedule & Notify</button>
+                            <button type="button" class="btn-secondary" onclick="app.handleScheduledCallout(event, false)">Save</button>
+                            <button type="submit" class="btn-primary" data-notify="1">Schedule &amp; Notify</button>
                         </div>
                     </form>
                 </div>
@@ -1505,10 +1539,15 @@ const app = {
         this.showModal(modalHTML);
     },
 
-    async handleScheduledCallout(e) {
-        e.preventDefault();
-        const btn = e.target.querySelector('button[type="submit"]');
-        if(btn) { btn.innerHTML = '<span class="material-symbols-outlined">hourglass_empty</span> Processing...'; btn.disabled = true; }
+    async handleScheduledCallout(e, notifyFlag) {
+        if (e && e.preventDefault) e.preventDefault();
+        let notify = false;
+        if (notifyFlag === true) notify = true;
+        else if (notifyFlag === false) notify = false;
+        else if (e && e.submitter && e.submitter.getAttribute('data-notify') === '1') notify = true;
+        const form = e && e.target && e.target.closest ? e.target.closest('form') : null;
+        const buttons = form ? Array.from(form.querySelectorAll('button')) : [];
+        buttons.forEach(btn => { btn.disabled = true; });
 
         const client = document.getElementById('callout-client').value;
         const phone = document.getElementById('callout-phone').value;
@@ -1547,14 +1586,42 @@ const app = {
             this.state._lastCreatedDoc = payload; // Cache for immediate actions
             this.closeModal();
 
-            const notifyMethod = email ? 'Email' : 'WhatsApp';
-            let notifMsg = `Job ${newId} scheduled for ${client} in Live DB.\n\n`;
-            notifMsg += `A notification has been sent to ${contactPerson} via ${notifyMethod} providing the technician's details and visit schedule.`;
-            alert(notifMsg);
+            const plan = (window.ItguyFixes && window.ItguyFixes.calloutSavePlan)
+                ? window.ItguyFixes.calloutSavePlan({
+                    notify: notify,
+                    email: email,
+                    smtpState: window.ItguyFixes.smtpState(this.state.settings || {})
+                })
+                : { save: true, send: false, notice: 'Call-out saved. Nobody was notified.' };
+
+            if (plan.send) {
+                try {
+                    const who = contactPerson || client || 'there';
+                    const techLine = technician ? `Technician: ${technician}.` : 'No technician is assigned yet.';
+                    const message = `Hi ${who},\n\nA site visit has been scheduled for ${dateBooked || 'the booked date'}.\nAddress: ${address}\n${techLine}${desc ? `\nWork: ${desc}` : ''}`;
+                    await window.safeFetch(`${window.API_BASE || '/api'}/notify`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            actionType: 'Email',
+                            docType: 'Call-out',
+                            docId: newId,
+                            contactInfo: plan.recipient,
+                            subject: `Visit scheduled: ${newId}`,
+                            customMessage: message
+                        })
+                    });
+                    this.showToast(plan.notice, 'success');
+                } catch (err) {
+                    this.showToast(`Call-out saved, but the email to ${plan.recipient} failed: ${err.message}`, 'error');
+                }
+            } else {
+                this.showToast(plan.notice, notify ? 'warning' : 'success');
+            }
         } catch(err) {
             console.error(err);
             alert("Database Error: Could not schedule callout.");
-            if(btn) { btn.innerHTML = 'Schedule Job'; btn.disabled = false; }
+            buttons.forEach(btn => { btn.disabled = false; });
         }
     },
 
