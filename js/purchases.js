@@ -83,7 +83,7 @@ window.purchases = {
         
         const totalSpent = poList
             .filter(p => p.status === 'Received')
-            .reduce((sum, p) => sum + (parseFloat(p.amount.replace('R ', '').replace(',', '')) || 0), 0)
+            .reduce((sum, p) => sum + (window.app && window.app.parseMoney ? window.app.parseMoney(p.amount) : 0), 0)
             .toFixed(2);
 
         return { pending, received, totalSpent };
@@ -95,13 +95,13 @@ window.purchases = {
             return `<tr><td colspan="6" style="text-align: center; color: #a0a0a0; padding: 40px;">No purchase orders recorded.</td></tr>`;
         }
 
-        return poList.sort((a, b) => new Date(b.date) - new Date(a.date)).map(p => `
+        return poList.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)).map(p => `
             <tr>
                 <td><strong>${p.id}</strong></td>
-                <td>${p.date}</td>
-                <td>${p.supplier}</td>
-                <td><strong>${p.amount}</strong></td>
-                <td><span class="badge ${p.status.toLowerCase()}">${p.status}</span></td>
+                <td>${p.date || ''}</td>
+                <td>${p.supplier || ''}</td>
+                <td><strong>${p.amount || ''}</strong></td>
+                <td><span class="badge ${String(p.status || 'ordered').toLowerCase()}">${p.status || 'Ordered'}</span></td>
                 <td>
                     <div style="display: flex; gap: 8px;">
                         <button class="btn-icon" title="View PDF" onclick="app.executeDocumentAction('Print', 'Purchase Order', '${p.id}')"><span class="material-symbols-outlined">picture_as_pdf</span></button>
