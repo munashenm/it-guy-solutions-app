@@ -1176,7 +1176,7 @@ body.page-public {
 
 @media (max-width: 600px) {
     .content-wrapper {
-        padding: 16px;
+        padding: 16px 16px 96px;
     }
     .stats-grid, .dashboard-grid {
         grid-template-columns: 1fr;
@@ -1706,7 +1706,8 @@ body.page-public {
 #pdf-render-page {
     width: 794px !important;
     max-width: 794px !important;
-    overflow: hidden !important;
+    height: auto !important;
+    overflow: visible !important;
 }
 
 #pdf-render-page * {
@@ -1722,6 +1723,13 @@ body.page-public {
 #pdf-render-page {
     background: #ffffff !important;
     color: #111111 !important;
+}
+#pdf-render-page td,
+#pdf-render-page th {
+    /* The app table rule (20px 24px) was inflating every invoice row on paper. */
+    padding: 6px 8px !important;
+    line-height: 1.35 !important;
+    font-size: 13px !important;
 }
 #pdf-render-page td,
 #pdf-render-page .pdf-desc,

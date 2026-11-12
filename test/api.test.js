@@ -336,6 +336,38 @@ test('POS stock, purchases, expenses, backup safeguards, and permissions', async
     const stillThere = await login('admin', 'admin123');
     assert.equal(stillThere.user.role, 'admin');
 
+    const marker = await fetch(base + '/collections/expenses/EXP-KEEP', {
+        method: 'POST',
+        headers: auth(stillThere.token),
+        body: JSON.stringify({ id: 'EXP-KEEP', description: 'Keep me', category: 'Other', amount: '10.00', date: '2026-11-12' })
+    });
+    assert.equal(marker.status, 200);
+    const goodBackup = await fetch(base + '/backup', { headers: auth(stillThere.token) });
+    assert.equal(goodBackup.status, 200);
+    const goodBytes = Buffer.from(await goodBackup.arrayBuffer());
+    assert.equal(goodBytes.subarray(0, 15).toString(), 'SQLite format 3');
+    const gone = await fetch(base + '/collections/expenses/EXP-GONE', {
+        method: 'POST',
+        headers: auth(stillThere.token),
+        body: JSON.stringify({ id: 'EXP-GONE', description: 'Should disappear', category: 'Other', amount: '1.00', date: '2026-11-12' })
+    });
+    assert.equal(gone.status, 200);
+    const goodRestore = new FormData();
+    goodRestore.append('database', new Blob([goodBytes]), 'good.sqlite');
+    const restoredGood = await fetch(base + '/restore', {
+        method: 'POST',
+        headers: { Authorization: 'Bearer ' + stillThere.token },
+        body: goodRestore
+    });
+    assert.equal(restoredGood.status, 200, await restoredGood.clone().text());
+    const afterRestore = await login('admin', 'admin123');
+    assert.equal(afterRestore.user.role, 'admin');
+    const kept = await fetch(base + '/collections/expenses/EXP-KEEP', { headers: auth(afterRestore.token) });
+    const goneAfter = await fetch(base + '/collections/expenses/EXP-GONE', { headers: auth(afterRestore.token) });
+    assert.equal(kept.status, 200);
+    assert.equal((await kept.json()).description, 'Keep me');
+    assert.equal(goneAfter.status, 404);
+
     const clientNotify = await fetch(base + '/notify', {
         method: 'POST',
         headers: auth(client.token),
