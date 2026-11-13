@@ -1,5 +1,6 @@
 const db = require('../database');
 const jwt = require('jsonwebtoken');
+const fixes = require('../lib/itguy-fixes');
 
 const requireAuth = async (req, res, next) => {
     const dbReady = db && ((db.type === 'mysql' && db.pool) || (db.type !== 'mysql' && db.sqlite));
@@ -38,7 +39,7 @@ const requireAuth = async (req, res, next) => {
 };
 
 const requireAdmin = (req, res, next) => {
-    const role = req.user && String(req.user.role || '').toLowerCase();
+    const role = fixes.canonicalRole(req.user && req.user.role);
     if (role === 'admin') {
         next();
     } else {

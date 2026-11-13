@@ -1620,7 +1620,7 @@ const app = {
             }
         } catch(err) {
             console.error(err);
-            alert("Database Error: Could not schedule callout.");
+            alert("Could not schedule the call-out. " + (err && err.message ? err.message : "Please try again."));
             buttons.forEach(btn => { btn.disabled = false; });
         }
     },

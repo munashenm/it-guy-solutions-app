@@ -197,13 +197,30 @@ router.post('/:uid/status', requireAdmin, async (req, res, next) => {
         if (!active && req.user && req.user.uid === uid) {
             return res.status(400).json({ error: 'You cannot deactivate your own account.' });
         }
-        const sqlRow = await db.get('SELECT uid, email, username, firstName, lastName, employeeId, phone, role FROM users WHERE uid = ?', [uid]);
-        const coll = await db.get("SELECT data FROM collections WHERE name = 'users' AND id = ?", [uid]);
+        let sqlRow = await db.get('SELECT uid, email, username, firstName, lastName, employeeId, phone, role FROM users WHERE uid = ?', [uid]);
+        let coll = await db.get("SELECT id, data FROM collections WHERE name = 'users' AND id = ?", [uid]);
+        if (!sqlRow || !coll) {
+            const rows = await db.all("SELECT id, data FROM collections WHERE name = 'users'");
+            const match = rows.find((row) => {
+                const data = fixes.parseStoredJson(row.data) || {};
+                return row.id === uid || data.uid === uid || String(data.email || '').toLowerCase() === String(uid).toLowerCase();
+            });
+            if (!coll && match) coll = match;
+            if (!sqlRow && match) {
+                const data = fixes.parseStoredJson(match.data) || {};
+                const sqlUid = data.uid || match.id;
+                sqlRow = await db.get('SELECT uid, email, username, firstName, lastName, employeeId, phone, role FROM users WHERE uid = ?', [sqlUid]);
+            }
+        }
         const prev = coll ? (fixes.parseStoredJson(coll.data) || {}) : {};
+        const recordUid = (sqlRow && sqlRow.uid) || prev.uid || (coll && coll.id) || uid;
         if (!sqlRow && !coll) return res.status(404).json({ error: 'User not found' });
-        if (sqlRow) await db.run('UPDATE users SET active = ? WHERE uid = ?', [active ? 1 : 0, uid]);
+        if (!active && req.user && req.user.uid === recordUid) {
+            return res.status(400).json({ error: 'You cannot deactivate your own account.' });
+        }
+        if (sqlRow) await db.run('UPDATE users SET active = ? WHERE uid = ?', [active ? 1 : 0, recordUid]);
         const merged = withoutSecrets(Object.assign({}, prev, {
-            uid,
+            uid: recordUid,
             email: (sqlRow && sqlRow.email) || prev.email || '',
             username: (sqlRow && sqlRow.username) || prev.username || '',
             firstName: (sqlRow && sqlRow.firstName) || prev.firstName || '',
@@ -214,8 +231,8 @@ router.post('/:uid/status', requireAdmin, async (req, res, next) => {
             active,
             updatedAt: new Date().toISOString()
         }));
-        await mirrorUser(uid, merged);
-        res.json({ success: true, active });
+        await mirrorUser(recordUid, merged);
+        res.json({ success: true, active, uid: recordUid });
     } catch (err) {
         next(err);
     }
