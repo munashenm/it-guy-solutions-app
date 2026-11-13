@@ -139,12 +139,12 @@ window.companySettings = {
 
                         <h4 style="margin-top: 24px; margin-bottom: 16px; color: #a29bfe;">Document Terms & Conditions</h4>
                         <div class="form-group">
-                            <label>Invoice Terms (Prints at bottom of Invoices)</label>
-                            <textarea id="cs-terms-invoice" class="form-control" rows="3" placeholder="Payment strictly due on receipt. Electronic goods non-refundable..."></textarea>
+                            <label>Invoice Terms (Prints at the bottom of invoices. Leave blank to use the standard terms.)</label>
+                            <textarea id="cs-terms-invoice" class="form-control" rows="4" placeholder="Leave blank to use the standard invoice terms."></textarea>
                         </div>
                         <div class="form-group">
-                            <label>Quotation Validity (Prints at bottom of Quotes)</label>
-                            <input type="text" id="cs-terms-quote" class="form-control" placeholder="Quotation valid for 7 days from generation.">
+                            <label>Quotation Terms (Prints at the bottom of quotations. Leave blank to use the standard terms.)</label>
+                            <textarea id="cs-terms-quote" class="form-control" rows="4" placeholder="Leave blank to use the standard 14-day quotation terms."></textarea>
                         </div>
                         <div class="form-group">
                             <label>Job Card Disclaimer (Prints at bottom of Job Cards)</label>

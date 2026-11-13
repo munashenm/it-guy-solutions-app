@@ -287,13 +287,40 @@ test('htaccess keeps Passenger and serves only the public front end', () => {
     assert.match(ht, /PassengerBaseURI "\/"/);
     assert.match(ht, /PassengerAppType node/);
     assert.match(ht, /PassengerStartupFile app\.js/);
-    assert.match(ht, /RewriteCond %\{REQUEST_URI\} \^\/api\(\/\|\$\) \[NC\]/);
+    assert.match(ht, /RewriteCond %\{THE_REQUEST\} \\s\/\+api\(\/\|\\s\|\\\?\) \[NC\]/);
+    assert.match(ht, /RewriteRule \^ - \[END\]/);
+    const apiRule = ht.indexOf('THE_REQUEST');
+    const forbidDir = ht.indexOf('REQUEST_FILENAME} -d');
+    assert.equal(forbidDir, -1);
+    assert.ok(apiRule > -1 && apiRule < ht.indexOf('[F,END]'));
     [
         'index\\.html', 'client\\.html', 'track\\.html', 'manifest\\.json',
         'sw\\.js', 'version\\.js', 'lib/itguy-fixes\\.js', 'css|js|img|public'
     ].forEach((asset) => {
         assert.equal(ht.includes(asset), true, asset);
     });
-    assert.match(ht, /\[F,L\]/);
-    assert.doesNotMatch(ht, /REQUEST_FILENAME\} !-f/);
+    ['routes', 'middleware', 'services', 'utils', 'node_modules', 'uploads'].forEach((dir) => {
+        assert.equal(ht.includes(dir), true, dir);
+    });
+});
+
+test('invoice and quotation terms fall back without replacing saved text', () => {
+    const invoice = fixes.documentTerms('Invoice', {});
+    const quote = fixes.documentTerms('Quotation', {});
+    assert.equal(invoice.source, 'default');
+    assert.match(invoice.text, /due on receipt/);
+    assert.match(invoice.text, /info@itguysa\.co\.za/);
+    assert.match(invoice.text, /3 months/);
+    assert.match(invoice.text, /ZAR/);
+    assert.equal(quote.source, 'default');
+    assert.match(quote.text, /14 days/);
+    assert.doesNotMatch(quote.text, /Customer Signature/);
+    const custom = fixes.documentTerms('Invoice', { termsInvoice: 'Pay within 7 days.' });
+    assert.equal(custom.source, 'custom');
+    assert.equal(custom.text, 'Pay within 7 days.');
+    const blank = fixes.documentTerms('Quotation', { termsQuote: '   ' });
+    assert.equal(blank.source, 'default');
+    const pdf = fs.readFileSync(path.join(__dirname, '../js/pdf.js'), 'utf8');
+    assert.match(pdf, /commercialDoc = docType === 'Invoice' \|\| docType === 'Quotation'/);
+    assert.match(pdf, /commercialDoc \? ''/);
 });
