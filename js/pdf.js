@@ -26,7 +26,7 @@ window.pdfGenerator = {
             whatsapp: data.whatsapp || data.whatsApp || fallback.whatsapp,
             email: data.email || fallback.email,
             website: data.website || fallback.website,
-            logoUrl: data.logoUrl || data.brandLogo || fallback.logoUrl
+            logoUrl: data.logoUrl || data.brandLogo || 'img/logo.png'
         };
     },
 
@@ -55,34 +55,33 @@ window.pdfGenerator = {
     },
 
     async imgToBase64(url) {
-        if(!url || url.trim() === '') return null;
-        if(url.startsWith('data:image')) return url; // Already Base64
-        try {
-            // Use our local backend proxy to avoid CORS issues
-            const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
-            
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                // When using a local proxy, we don't need crossOrigin if the proxy is the same origin
-                img.onload = function() {
-                    console.log("PDF: Proxy Image Loaded successfully");
-                    const canvas = document.createElement('canvas');
-                    canvas.width = this.naturalWidth;
-                    canvas.height = this.naturalHeight;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(this, 0, 0);
-                    resolve(canvas.toDataURL('image/png'));
-                };
-                img.onerror = (err) => {
-                    console.error("PDF: Proxy Image load failed", url, err);
-                    resolve(null);
-                };
-                img.src = proxyUrl;
-            });
-        } catch(e) {
-            console.error("PDF: imgToBase64 exception", e);
-            return null;
+        if(!url || String(url).trim() === '') return null;
+        if(String(url).startsWith('data:image')) return url;
+        const absolute = /^https?:\/\//i.test(url) ? url : new URL(url, window.location.href).href;
+        const sameOrigin = absolute.indexOf(window.location.origin) === 0;
+        const sources = sameOrigin ? [absolute] : [`/api/proxy-image?url=${encodeURIComponent(url)}`, absolute];
+        for (const src of sources) {
+            try {
+                const encoded = await new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = function() {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = this.naturalWidth || this.width;
+                            canvas.height = this.naturalHeight || this.height;
+                            canvas.getContext('2d').drawImage(this, 0, 0);
+                            resolve(canvas.toDataURL('image/png'));
+                        } catch (err) {
+                            resolve(null);
+                        }
+                    };
+                    img.onerror = () => resolve(null);
+                    img.src = src;
+                });
+                if (encoded) return encoded;
+            } catch (e) { /* try the next source */ }
         }
+        return null;
     },
 
     async download(docType, docId, dataObj) {
@@ -220,17 +219,22 @@ window.pdfGenerator = {
             if(docType === 'Invoice' && docSettings.invPrefix) visualDocId = docSettings.invPrefix + docId;
             if(docType === 'Quotation' && docSettings.quoPrefix) visualDocId = docSettings.quoPrefix + docId;
 
-            const companyLogoBase64 = company.logoUrl ? await this.imgToBase64(company.logoUrl) : null;
+            const logoUrl = (window.ItguyFixes && window.ItguyFixes.logoSource)
+                ? window.ItguyFixes.logoSource(company)
+                : (company.logoUrl || 'img/logo.png');
+            const companyLogoBase64 = await this.imgToBase64(logoUrl) || (String(logoUrl).startsWith('data:image') ? logoUrl : null);
+            const logoSrc = companyLogoBase64 || logoUrl;
+            const esc = (value) => (window.ItguyFixes && window.ItguyFixes.escapeHtml)
+                ? window.ItguyFixes.escapeHtml(value)
+                : String(value == null ? '' : value);
 
             // Header section (common for all types except pure reports)
             const headerHTML = `
-                <table style="width: 100%; border-bottom: 4px solid ${themeColor}; border-collapse: collapse; margin-bottom: 35px; background-color: #ffffff; font-family: ${fontStack}; color: #000000;">
+                <table style="width: 100%; border-bottom: 3px solid ${themeColor}; border-collapse: collapse; margin-bottom: 16px; background-color: #ffffff; font-family: ${fontStack}; color: #000000;">
                     <tr>
-                        <td style="vertical-align: top; padding-bottom: 25px; background-color: #ffffff;">
-                            ${companyLogoBase64
-                                ? `<img src="${companyLogoBase64}" style="max-width: 220px; max-height: 100px; margin-bottom: 15px;">` 
-                                : `<h2 style="color: ${themeColor}; font-size: 32px; margin: 0 0 10px 0; font-weight: 800;">${company.name}</h2>`
-                            }
+                        <td style="vertical-align: top; padding-bottom: 8px; background-color: #ffffff;">
+                            <img src="${logoSrc}" alt="${esc(company.name)}" style="max-width: 180px; max-height: 64px; margin-bottom: 8px; display: block;">
+                            ${companyLogoBase64 ? '' : `<h2 style="color: ${themeColor}; font-size: 22px; margin: 0 0 6px 0; font-weight: 800;">${esc(company.name)}</h2>`}
                             <div style="font-size: 13px; color: #000000; line-height: 1.6;">
                                 ${company.address ? `<span style="display: block; margin-bottom: 4px;">${company.address}</span>` : ''}
                                 ${[['Tel', company.phone], ['WA', company.whatsapp]].filter((pair) => pair[1]).map((pair) => `<strong>${pair[0]}:</strong> ${pair[1]}`).join(' | ')}
@@ -239,8 +243,8 @@ window.pdfGenerator = {
                                 ${isVatRegistered && sysSettings.taxNo ? `<br><strong>VAT No:</strong> ${sysSettings.taxNo}` : ''}
                             </div>
                         </td>
-                        <td style="vertical-align: top; text-align: right; padding-bottom: 25px; background-color: #ffffff;">
-                            <h1 style="color: ${themeColor}; font-size: 42px; margin: 0; text-transform: uppercase; font-weight: 900; line-height: 1;">${docType}</h1>
+                        <td style="vertical-align: top; text-align: right; padding-bottom: 8px; background-color: #ffffff;">
+                            <h1 style="color: ${themeColor}; font-size: 28px; margin: 0; text-transform: uppercase; font-weight: 900; line-height: 1;">${docType}</h1>
                             <div style="font-size: 15px; color: #000000; margin-top: 15px; line-height: 1.6;">
                                 <div style="margin-bottom: 5px;"><strong>Ref #:</strong> <span style="font-size: 18px; color: ${themeColor};">${visualDocId}</span></div>
                                 <div style="margin-bottom: 5px;"><strong>Date:</strong> ${dataObj.date || new Date().toLocaleDateString()}</div>
@@ -393,17 +397,18 @@ window.pdfGenerator = {
                     `;
                 }
 
+                const bank = (window.ItguyFixes && window.ItguyFixes.bankingDetails)
+                    ? window.ItguyFixes.bankingDetails(docSettings)
+                    : { filled: !!docSettings.bankAcc, lines: [], placeholder: 'Bank details have not been entered yet.' };
                 let bankHTML = '';
-                if ((docType === 'Invoice' || docType === 'Quotation') && docSettings.bankAcc) {
+                if (docType === 'Invoice' || docType === 'Quotation') {
+                    const rows = bank.filled
+                        ? bank.lines.map((pair) => `<div><strong>${esc(pair[0])}:</strong> ${esc(pair[1])}</div>`).join('')
+                        : `<div>${esc(bank.placeholder)}</div>`;
                     bankHTML = `
-                        <div style="margin-top: 20px; border: 2px dashed ${themeColor}; padding: 20px; font-size: 12px; border-radius: 12px; background-color: #ffffff; font-family: ${fontStack};">
-                            <strong style="color: ${themeColor}; text-transform: uppercase; display: block; margin-bottom: 8px;">Banking Information:</strong>
-                            <div style="display: flex; justify-content: space-between;">
-                                <div><strong>Bank:</strong> ${docSettings.bankName || 'N/A'}</div>
-                                <div><strong>Holder:</strong> ${docSettings.bankHolder || 'N/A'}</div>
-                                <div><strong>Account:</strong> ${docSettings.bankAcc || 'N/A'}</div>
-                                <div><strong>Branch:</strong> ${docSettings.bankBranch || 'N/A'}</div>
-                            </div>
+                        <div style="margin-top: 12px; border: 2px dashed ${themeColor}; padding: 10px 12px; font-size: 12px; border-radius: 8px; background-color: #ffffff; font-family: ${fontStack};">
+                            <strong style="color: ${themeColor}; text-transform: uppercase; display: block; margin-bottom: 6px;">Banking Details</strong>
+                            <div style="display: flex; flex-wrap: wrap; gap: 6px 16px;">${rows}</div>
                         </div>
                     `;
                 }
@@ -434,6 +439,7 @@ window.pdfGenerator = {
                             <div>${termsText}</div>
                         </div>
                         <div style="text-align: center; font-size: 9px; color: #333333; margin-top: 8px;">System generated on ${new Date().toLocaleString()}</div>
+                        ${commercialDoc ? '<div style="text-align: center; font-size: 12px; font-weight: 600; color: #111111; margin-top: 10px;">Thank you for your support.</div>' : ''}
                     </div>
                 `;
                 contentHTML = headerHTML + clientHTML + bodyHTML + footerHTML;

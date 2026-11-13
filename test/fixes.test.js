@@ -323,4 +323,21 @@ test('invoice and quotation terms fall back without replacing saved text', () =>
     const pdf = fs.readFileSync(path.join(__dirname, '../js/pdf.js'), 'utf8');
     assert.match(pdf, /commercialDoc = docType === 'Invoice' \|\| docType === 'Quotation'/);
     assert.match(pdf, /commercialDoc \? ''/);
+    assert.match(pdf, /Thank you for your support\./);
+    assert.match(pdf, /img\/logo\.png/);
+});
+
+test('documents always have a logo source and a banking box', () => {
+    assert.equal(fixes.logoSource({}), 'img/logo.png');
+    assert.equal(fixes.logoSource({ logoUrl: ' data:image/png;base64,abc ' }), 'data:image/png;base64,abc');
+    const empty = fixes.bankingDetails({});
+    assert.equal(empty.filled, false);
+    assert.match(empty.placeholder, /Document Settings/);
+    const filled = fixes.bankingDetails({
+        bankName: 'FNB', bankHolder: 'IT Guy Solutions', bankAcc: '62000000000',
+        bankBranch: '250655', bankType: 'Cheque'
+    });
+    assert.equal(filled.filled, true);
+    assert.deepEqual(filled.lines.map(pair => pair[0]), ['Bank', 'Account holder', 'Account number', 'Branch code', 'Account type']);
+    assert.equal(fixes.bankingDetails({ bankAcc: '1' }).lines.length, 1);
 });

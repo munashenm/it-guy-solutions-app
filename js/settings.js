@@ -105,7 +105,7 @@ window.companySettings = {
                             </div>
                         </div>
                         
-                        <h4 style="margin-top: 24px; margin-bottom: 16px; color: #a29bfe;">Bank Account Details (Prints on Invoices)</h4>
+                        <h4 style="margin-top: 24px; margin-bottom: 16px; color: #a29bfe;">Banking Details (prints on every invoice and quotation)</h4>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Bank Name</label>
@@ -124,6 +124,10 @@ window.companySettings = {
                             <div class="form-group">
                                 <label>Branch Code</label>
                                 <input type="text" id="cs-bank-branch" class="form-control" placeholder="e.g. 250655">
+                            </div>
+                            <div class="form-group">
+                                <label>Account Type</label>
+                                <input type="text" id="cs-bank-type" class="form-control" placeholder="e.g. Cheque / Current">
                             </div>
                         </div>
 
@@ -448,6 +452,7 @@ window.companySettings = {
                 document.getElementById('cs-bank-holder').value = data.bankHolder || '';
                 document.getElementById('cs-bank-acc').value = data.bankAcc || '';
                 document.getElementById('cs-bank-branch').value = data.bankBranch || '';
+                document.getElementById('cs-bank-type').value = data.bankType || '';
                 document.getElementById('cs-terms-invoice').value = data.termsInvoice || '';
                 document.getElementById('cs-terms-quote').value = data.termsQuote || '';
                 document.getElementById('cs-terms-job').value = data.termsJob || '';
@@ -550,6 +555,7 @@ window.companySettings = {
             bankHolder: document.getElementById('cs-bank-holder').value,
             bankAcc: document.getElementById('cs-bank-acc').value,
             bankBranch: document.getElementById('cs-bank-branch').value,
+            bankType: document.getElementById('cs-bank-type').value,
             termsInvoice: document.getElementById('cs-terms-invoice').value,
             termsQuote: document.getElementById('cs-terms-quote').value,
             termsJob: document.getElementById('cs-terms-job').value,
