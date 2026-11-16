@@ -228,7 +228,8 @@ window.pdfGenerator = {
                 ? window.ItguyFixes.escapeHtml(value)
                 : String(value == null ? '' : value);
 
-            // Header section (common for all types except pure reports)
+            const commercialDoc = docType === 'Invoice' || docType === 'Quotation';
+            const dueLabel = dataObj.dueDate || dataObj.due || '';
             const headerHTML = `
                 <table style="width: 100%; border-bottom: 3px solid ${themeColor}; border-collapse: collapse; margin-bottom: 16px; background-color: #ffffff; font-family: ${fontStack}; color: #000000;">
                     <tr>
@@ -236,19 +237,20 @@ window.pdfGenerator = {
                             <img src="${logoSrc}" alt="${esc(company.name)}" style="max-width: 180px; max-height: 64px; margin-bottom: 8px; display: block;">
                             ${companyLogoBase64 ? '' : `<h2 style="color: ${themeColor}; font-size: 22px; margin: 0 0 6px 0; font-weight: 800;">${esc(company.name)}</h2>`}
                             <div style="font-size: 13px; color: #000000; line-height: 1.6;">
-                                ${company.address ? `<span style="display: block; margin-bottom: 4px;">${company.address}</span>` : ''}
-                                ${[['Tel', company.phone], ['WA', company.whatsapp]].filter((pair) => pair[1]).map((pair) => `<strong>${pair[0]}:</strong> ${pair[1]}`).join(' | ')}
+                                ${company.address ? `<span style="display: block; margin-bottom: 4px;">${esc(company.address)}</span>` : ''}
+                                ${[['Tel', company.phone], ['WA', company.whatsapp]].filter((pair) => pair[1]).map((pair) => `<strong>${pair[0]}:</strong> ${esc(pair[1])}`).join(' | ')}
                                 ${(company.phone || company.whatsapp) ? '<br>' : ''}
-                                ${[['Email', company.email], ['Web', company.website]].filter((pair) => pair[1]).map((pair) => `<strong>${pair[0]}:</strong> ${pair[1]}`).join(' | ')}
-                                ${isVatRegistered && sysSettings.taxNo ? `<br><strong>VAT No:</strong> ${sysSettings.taxNo}` : ''}
+                                ${[['Email', company.email], ['Web', company.website]].filter((pair) => pair[1]).map((pair) => `<strong>${pair[0]}:</strong> ${esc(pair[1])}`).join(' | ')}
+                                ${isVatRegistered && sysSettings.taxNo ? `<br><strong>VAT No:</strong> ${esc(sysSettings.taxNo)}` : ''}
                             </div>
                         </td>
                         <td style="vertical-align: top; text-align: right; padding-bottom: 8px; background-color: #ffffff;">
-                            <h1 style="color: ${themeColor}; font-size: 28px; margin: 0; text-transform: uppercase; font-weight: 900; line-height: 1;">${docType}</h1>
+                            <h1 style="color: ${themeColor}; font-size: 28px; margin: 0; text-transform: uppercase; font-weight: 900; line-height: 1;">${esc(docType)}</h1>
                             <div style="font-size: 15px; color: #000000; margin-top: 15px; line-height: 1.6;">
-                                <div style="margin-bottom: 5px;"><strong>Ref #:</strong> <span style="font-size: 18px; color: ${themeColor};">${visualDocId}</span></div>
-                                <div style="margin-bottom: 5px;"><strong>Date:</strong> ${dataObj.date || new Date().toLocaleDateString()}</div>
-                                ${dataObj.dateBooked ? `<div style="margin-bottom: 5px;"><strong>Booked: </strong> ${dataObj.dateBooked}</div>` : ''}
+                                <div style="margin-bottom: 5px;"><strong>Ref #:</strong> <span style="font-size: 18px; color: ${themeColor};">${esc(visualDocId)}</span></div>
+                                <div style="margin-bottom: 5px;"><strong>Date:</strong> ${esc(dataObj.date || new Date().toLocaleDateString())}</div>
+                                ${commercialDoc && dueLabel ? `<div style="margin-bottom: 5px;"><strong>Due:</strong> ${esc(dueLabel)}</div>` : ''}
+                                ${!commercialDoc && dataObj.dateBooked ? `<div style="margin-bottom: 5px;"><strong>Booked: </strong> ${esc(dataObj.dateBooked)}</div>` : ''}
                             </div>
                         </td>
                     </tr>
@@ -305,7 +307,58 @@ window.pdfGenerator = {
                 `;
 
                 let bodyHTML = '';
-                if (docType === 'Invoice' || docType === 'Quotation' || docType === 'Cash Receipt') {
+                let totalsHTML = '';
+                const money = (n) => 'R ' + (Number(n) || 0).toFixed(2);
+                if (docType === 'Invoice' || docType === 'Quotation') {
+                    const vatRate = parseFloat(sysSettings.vatRate);
+                    const rate = isFinite(vatRate) ? vatRate : 15;
+                    const lines = (dataObj.items || []).map((item, idx) => (
+                        window.ItguyFixes
+                            ? window.ItguyFixes.commercialLine(item, idx, rate, isVatRegistered)
+                            : { number: idx + 1, desc: item.desc || item.name || '', unit: 0, qty: 0, ex: 0, incl: 0 }
+                    ));
+                    const totals = window.ItguyFixes
+                        ? window.ItguyFixes.commercialTotals(lines, rate, isVatRegistered)
+                        : { subtotal: 0, vat: 0, total: 0, rate: rate };
+                    bodyHTML = `
+                        <table style="width: 100% !important; border-collapse: collapse; margin-bottom: 8px; font-size: 13px; font-family: ${fontStack}; color: #000000; background-color: #ffffff; table-layout: fixed;">
+                            <thead>
+                                <tr class="pdf-on-accent" style="background-color: ${themeColor}; color: #ffffff;">
+                                    <th class="pdf-on-accent" style="padding: 8px 6px; text-align: center; width: 36px; color:#ffffff;">#</th>
+                                    <th class="pdf-on-accent" style="padding: 8px 8px; text-align: left; color:#ffffff;">Description</th>
+                                    <th class="pdf-on-accent" style="padding: 8px 6px; text-align: right; width: 52px; color:#ffffff;">Qty</th>
+                                    <th class="pdf-on-accent" style="padding: 8px 6px; text-align: right; width: 90px; color:#ffffff;">Unit Price</th>
+                                    <th class="pdf-on-accent" style="padding: 8px 6px; text-align: right; width: 110px; color:#ffffff;">Amount (Incl.)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${lines.length ? lines.map((line, idx) => {
+                                    const descCell = window.ItguyFixes
+                                        ? window.ItguyFixes.renderDescriptionCell(line.desc || '')
+                                        : `<td class="pdf-desc">${esc(line.desc || '')}</td>`;
+                                    return `
+                                        <tr style="background-color: ${idx % 2 === 0 ? '#ffffff' : '#fcfcff'};">
+                                            <td style="padding: 8px 6px; text-align: center; border-bottom: 1px solid #eee; color: #111;">${line.number}</td>
+                                            ${descCell}
+                                            <td style="padding: 8px 6px; text-align: right; border-bottom: 1px solid #eee; color: #111;">${line.qty}</td>
+                                            <td style="padding: 8px 6px; text-align: right; border-bottom: 1px solid #eee; color: #111;">${money(line.unit)}</td>
+                                            <td style="padding: 8px 6px; text-align: right; border-bottom: 1px solid #eee; font-weight: 700; color: #111;">${money(line.incl)}</td>
+                                        </tr>
+                                    `;
+                                }).join('') : '<tr><td colspan="5" style="padding:16px; text-align:center;">No items added.</td></tr>'}
+                            </tbody>
+                        </table>
+                    `;
+                    totalsHTML = `
+                        <div style="display: flex; justify-content: flex-end; margin: 4px 0 12px; font-family: ${fontStack}; color: #111;">
+                            <div style="width: 230px; font-size: 13px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span>Subtotal</span><strong>${money(totals.subtotal)}</strong></div>
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;"><span>VAT (${totals.rate}%)</span><strong>${money(totals.vat)}</strong></div>
+                                <div style="display: flex; justify-content: space-between; border-top: 1px solid #111; margin-top: 6px; padding-top: 6px; font-size: 15px;"><span>Total</span><strong>${money(totals.total)}</strong></div>
+                            </div>
+                        </div>
+                    `;
+                } else if (docType === 'Cash Receipt') {
                     bodyHTML = `
                         <table style="width: 100% !important; border-collapse: separate; border-spacing: 0; margin-bottom: 40px; font-size: 14px; font-family: ${fontStack}; color: #000000; background-color: #ffffff; border: 1px solid #eee; border-radius: 10px; table-layout: fixed;">
                             <thead>
@@ -419,7 +472,6 @@ window.pdfGenerator = {
                 const termsText = (window.ItguyFixes && window.ItguyFixes.escapeHtml)
                     ? window.ItguyFixes.escapeHtml(chosenTerms.text).replace(/\n/g, '<br>')
                     : String(chosenTerms.text || '').replace(/\n/g, '<br>');
-                const commercialDoc = docType === 'Invoice' || docType === 'Quotation';
                 const signatureHTML = commercialDoc ? '' : `
                         <div style="display: flex; justify-content: space-between; margin-bottom: 28px;">
                             <div style="width: 45%; border-bottom: 1px solid #000; height: 70px; display: flex; align-items: flex-end; padding-bottom: 5px;">
@@ -430,19 +482,22 @@ window.pdfGenerator = {
                             </div>
                         </div>`;
 
-                const footerHTML = `
-                    ${bankHTML}
-                    <div style="margin-top: ${commercialDoc ? '18px' : '28px'}; border-top: 2px solid ${themeColor}; padding-top: 12px; font-family: ${fontStack}; color: #000000; background-color: #ffffff;">
+                const termsBlock = `
+                    <div style="border-top: 2px solid ${themeColor}; padding-top: 8px; font-family: ${fontStack}; color: #000000; background-color: #ffffff;">
                         ${signatureHTML}
                         <div class="pdf-terms" style="font-size: 9.5px; color: #111111; line-height: 1.35; column-count: 2; column-gap: 18px; text-align: left;">
                             <div style="font-weight: 700; margin-bottom: 4px; column-span: all;">Terms &amp; Conditions</div>
                             <div>${termsText}</div>
                         </div>
-                        <div style="text-align: center; font-size: 9px; color: #333333; margin-top: 8px;">System generated on ${new Date().toLocaleString()}</div>
-                        ${commercialDoc ? '<div style="text-align: center; font-size: 12px; font-weight: 600; color: #111111; margin-top: 10px;">Thank you for your support.</div>' : ''}
-                    </div>
-                `;
-                contentHTML = headerHTML + clientHTML + bodyHTML + footerHTML;
+                        ${commercialDoc ? '' : `<div style="text-align: center; font-size: 9px; color: #333333; margin-top: 8px;">System generated on ${new Date().toLocaleString()}</div>`}
+                        ${commercialDoc ? '<p style="text-align: center; font-size: 12px; font-weight: 600; color: #111111; margin: 10px 0 0;">Thank you for your support.</p>' : ''}
+                    </div>`;
+
+                if (commercialDoc) {
+                    contentHTML = `<div class="pdf-sheet-main">${headerHTML}${clientHTML}${bodyHTML}${totalsHTML}${bankHTML}</div><div class="pdf-page-foot">${termsBlock}</div>`;
+                } else {
+                    contentHTML = headerHTML + clientHTML + bodyHTML + bankHTML + termsBlock;
+                }
             }
 
             container.innerHTML = contentHTML;
@@ -454,9 +509,21 @@ window.pdfGenerator = {
                 c.style.backgroundColor = c.style.backgroundColor || '#ffffff';
             });
 
-            // Wait for fonts and stabilizing re-paint
-            if(document.fonts) await document.fonts.ready;
-            await new Promise(r => setTimeout(r, 300));
+            if (document.fonts) await document.fonts.ready;
+            await Promise.all(Array.from(container.querySelectorAll('img')).map((img) => (
+                img.complete ? Promise.resolve() : new Promise((resolve) => { img.onload = img.onerror = resolve; })
+            )));
+            await new Promise((resolve) => setTimeout(resolve, 50));
+
+            if (docType === 'Invoice' || docType === 'Quotation') {
+                const pagePx = 1165;
+                const foot = container.querySelector('.pdf-page-foot');
+                if (foot) {
+                    foot.style.marginTop = '0px';
+                    const natural = container.scrollHeight;
+                    foot.style.marginTop = natural < pagePx ? (pagePx - natural) + 'px' : '0px';
+                }
+            }
 
             const cssWidth = Math.max(container.scrollWidth, container.offsetWidth);
             const cssHeight = Math.max(container.scrollHeight, container.offsetHeight);

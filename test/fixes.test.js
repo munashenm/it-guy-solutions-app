@@ -326,6 +326,8 @@ test('invoice and quotation terms fall back without replacing saved text', () =>
     assert.match(pdf, /commercialDoc = docType === 'Invoice' \|\| docType === 'Quotation'/);
     assert.match(pdf, /commercialDoc \? ''/);
     assert.match(pdf, /Thank you for your support\./);
+    assert.match(pdf, /Amount \(Incl\.\)/);
+    assert.match(pdf, /bodyHTML\}\$\{totalsHTML\}\$\{bankHTML\}<\/div><div class="pdf-page-foot">\$\{termsBlock\}/);
     assert.match(pdf, /img\/logo\.png/);
 });
 
@@ -342,4 +344,21 @@ test('documents always have a logo source and a banking box', () => {
     assert.equal(filled.filled, true);
     assert.deepEqual(filled.lines.map(pair => pair[0]), ['Bank', 'Account holder', 'Account number', 'Branch code', 'Account type']);
     assert.equal(fixes.bankingDetails({ bankAcc: '1' }).lines.length, 1);
+});
+
+test('invoice line amounts include VAT and are numbered', () => {
+    const line = fixes.commercialLine({ desc: 'Screen', unit: 100, qty: 2 }, 0, 15, true);
+    assert.equal(line.number, 1);
+    assert.equal(line.ex, 200);
+    assert.equal(line.incl, 230);
+    const second = fixes.commercialLine({ description: 'Labour', unitPrice: 50, quantity: 1 }, 1, 15, true);
+    assert.equal(second.number, 2);
+    assert.equal(second.incl, 57.5);
+    const totals = fixes.commercialTotals([line, second], 15, true);
+    assert.equal(totals.subtotal, 250);
+    assert.equal(totals.vat, 37.5);
+    assert.equal(totals.total, 287.5);
+    const plain = fixes.commercialTotals([fixes.commercialLine({ unit: 10, qty: 1 }, 0, 15, false)], 15, false);
+    assert.equal(plain.vat, 0);
+    assert.equal(plain.total, 10);
 });
