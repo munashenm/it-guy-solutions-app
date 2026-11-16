@@ -548,10 +548,11 @@ const app = {
 
         // 2. Network Monitoring
         window.addEventListener('online', () => {
-            this.showToast("Internet connection restored.", "success");
+            this.showToast('Internet connection restored. Queued changes will send now.', 'success');
+            if (typeof window.itguyFlushOfflineQueue === 'function') window.itguyFlushOfflineQueue();
         });
         window.addEventListener('offline', () => {
-            this.showToast("You are currently offline. Changes may not save.", "warning");
+            this.showToast("You're offline. Changes are queued on this device and will send when you reconnect.", 'warning');
         });
 
         // 3. Search Keyboard Navigation State

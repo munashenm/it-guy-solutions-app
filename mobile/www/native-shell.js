@@ -428,7 +428,8 @@
 
     function openExternal(url) {
         var kind = shell.externalLinkKind(url);
-        if (kind === 'whatsapp' && plugins().Browser && /^https?:/i.test(url)) {
+        var httpsKind = kind === 'whatsapp' || kind === 'maps' || kind === 'pdf';
+        if (httpsKind && plugins().Browser && /^https?:/i.test(url)) {
             plugins().Browser.open({ url: url });
             return;
         }
@@ -443,15 +444,18 @@
             if (!anchor) return;
             var href = anchor.getAttribute('href') || '';
             var kind = shell.externalLinkKind(anchor.href || href);
-            if (kind !== 'tel' && kind !== 'mailto' && kind !== 'sms' && kind !== 'whatsapp') return;
+            if (kind !== 'tel' && kind !== 'mailto' && kind !== 'sms' && kind !== 'whatsapp' && kind !== 'maps') return;
             event.preventDefault();
             openExternal(anchor.href || href);
         }, true);
         var originalOpen = window.open;
         window.open = function (url) {
-            if (typeof url === 'string' && shell.externalLinkKind(url) === 'whatsapp') {
-                openExternal(url);
-                return null;
+            if (typeof url === 'string') {
+                var kind = shell.externalLinkKind(url);
+                if (kind === 'whatsapp' || kind === 'maps') {
+                    openExternal(url);
+                    return null;
+                }
             }
             return originalOpen.apply(window, arguments);
         };
@@ -566,6 +570,16 @@
         Push.addListener('registration', function (token) {
             window.__itguyPushToken = token && (token.value || token.token);
             syncPushToken();
+        });
+        Push.addListener('pushNotificationActionPerformed', function (action) {
+            var note = action && action.notification;
+            var data = (note && note.data) || {};
+            var target = shell.jobOpenTarget({
+                collection: data.collection,
+                id: data.id
+            });
+            if (!target || !window.app || typeof window.app.navigateToDocument !== 'function') return;
+            window.app.navigateToDocument('job', target.id);
         });
         try {
             Push.addListener('registrationError', function (err) {

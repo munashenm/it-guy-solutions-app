@@ -106,6 +106,10 @@ test('external links, image inputs, and FCM data payload stay explicit', () => {
     assert.equal(shell.externalLinkKind('tel:+27820000000'), 'tel');
     assert.equal(shell.externalLinkKind('mailto:desk@itguysa.co.za'), 'mailto');
     assert.equal(shell.externalLinkKind('https://wa.me/27820000000?text=Hi'), 'whatsapp');
+    assert.equal(shell.externalLinkKind('https://maps.google.com/?q=12%20Main'), 'maps');
+    assert.equal(shell.jobOpenTarget({ collection: 'fieldJobs', id: 'FLD-9' }).hash, '#field');
+    assert.equal(shell.jobOpenTarget({ collection: 'jobs', id: 'JOB-3' }).hash, '#repair');
+    assert.equal(shell.jobOpenTarget({ collection: 'invoices', id: 'INV-1' }), null);
     assert.equal(shell.externalLinkKind('https://app.itguysa.co.za/files/job.pdf?download=1'), 'pdf');
     assert.equal(shell.externalLinkKind('https://app.itguysa.co.za/index.html'), '');
     assert.equal(shell.isImageFileInput({ type: 'file', accept: 'image/*' }), true);

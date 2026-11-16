@@ -131,8 +131,19 @@
         if (/^mailto:/i.test(u)) return 'mailto';
         if (/^sms:/i.test(u)) return 'sms';
         if (/^whatsapp:/i.test(u) || /wa\.me|api\.whatsapp\.com|whatsapp\.com\/send/i.test(u)) return 'whatsapp';
+        if (/maps\.google\.|google\.com\/maps|maps\.app\.goo\.gl/i.test(u)) return 'maps';
         if (/\.pdf(?:$|\?|#)/i.test(u)) return 'pdf';
         return '';
+    }
+
+    function jobOpenTarget(event) {
+        const src = event || {};
+        const id = String(src.id || '').trim();
+        if (!id) return null;
+        const collection = String(src.collection || '');
+        if (collection === 'fieldJobs' || id.indexOf('FLD') === 0) return { hash: '#field', id: id };
+        if (collection === 'jobs' || id.indexOf('JOB') === 0) return { hash: '#repair', id: id };
+        return null;
     }
 
     function isImageFileInput(el) {
@@ -261,6 +272,7 @@
         shouldQueueWrite: shouldQueueWrite,
         shouldCacheRead: shouldCacheRead,
         externalLinkKind: externalLinkKind,
+        jobOpenTarget: jobOpenTarget,
         isImageFileInput: isImageFileInput,
         slimValue: slimValue,
         parseCollectionUrl: parseCollectionUrl,
