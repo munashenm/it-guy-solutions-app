@@ -17,7 +17,17 @@ AcceptPathInfo Off
 RewriteEngine On
 
 RewriteCond %{THE_REQUEST} \s/+api(/|\s|\?) [NC]
-RewriteRule ^ - [END]
+RewriteRule ^ - [END,E=Cache-Control:no-store,E=cache-control:no-cache]
+
+<IfModule mod_headers.c>
+    SetEnvIf Request_URI "^/api/" itguy_api
+    Header set Cache-Control "no-store, no-cache, must-revalidate, private" env=itguy_api
+    Header set Pragma "no-cache" env=itguy_api
+    Header set Expires "0" env=itguy_api
+</IfModule>
+<IfModule LiteSpeed>
+    CacheDisable public /api
+</IfModule>
 
 # Certificate renewal. Every other dotfile is refused below.
 RewriteRule ^\.well-known/acme-challenge/ - [END]

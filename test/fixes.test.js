@@ -263,9 +263,9 @@ test('call-out notify never sends unless SMTP is ready and a customer email is p
     assert.equal(send.recipient, 'a@b.co');
 });
 
-test('app version is 4.9 from version.js', () => {
+test('app version is 4.9.1 from version.js', () => {
     const version = require('../version');
-    assert.equal(version.APP_VERSION, '4.9');
+    assert.equal(version.APP_VERSION, '4.9.1');
     const server = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
     const footer = fs.readFileSync(path.join(__dirname, '../js/app.js'), 'utf8');
     const sw = fs.readFileSync(path.join(__dirname, '../sw.js'), 'utf8');
@@ -288,7 +288,9 @@ test('htaccess keeps Passenger and serves only the public front end', () => {
     assert.match(ht, /PassengerAppType node/);
     assert.match(ht, /PassengerStartupFile app\.js/);
     assert.match(ht, /RewriteCond %\{THE_REQUEST\} \\s\/\+api\(\/\|\\s\|\\\?\) \[NC\]/);
-    assert.match(ht, /RewriteRule \^ - \[END\]/);
+    assert.match(ht, /RewriteRule \^ - \[END/);
+    assert.match(ht, /no-store/);
+    assert.match(ht, /CacheDisable public \/api/);
     const apiRule = ht.indexOf('THE_REQUEST');
     const forbidDir = ht.indexOf('REQUEST_FILENAME} -d');
     assert.equal(forbidDir, -1);

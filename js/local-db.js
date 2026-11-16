@@ -50,10 +50,15 @@ async function safeFetch(url, options = {}, retries = 3) {
         const token = sessionStorage.getItem('it-guy-token');
         if (token) headers.Authorization = `Bearer ${token}`;
     }
-    const request = Object.assign({}, options, { headers });
+    const request = Object.assign({}, options, { headers, cache: 'no-store' });
+    const method = String(request.method || 'GET').toUpperCase();
+    let target = url;
+    if (method === 'GET' && /\/api(?:\/|$|\?)/.test(String(target))) {
+        target += (String(target).indexOf('?') === -1 ? '?' : '&') + '_=' + Date.now();
+    }
 
     try {
-        const res = await fetch(url, request);
+        const res = await fetch(target, request);
         const contentType = res.headers.get('content-type') || '';
         const isJson = contentType.includes('application/json');
 

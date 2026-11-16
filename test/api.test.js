@@ -484,7 +484,7 @@ test('report email is captured by a local SMTP sink and failure stays an error',
 
 test('staff directory lists sql-only, collection-only, and legacy roles', async () => {
     const status = await (await fetch(base + '/status')).json();
-    assert.equal(status.version, '4.9');
+    assert.equal(status.version, '4.9.1');
 
     const admin = await login('admin', 'admin123');
     const created = await fetch(base + '/users', {
@@ -628,4 +628,37 @@ test('server files are not served as static assets', async () => {
     assert.equal((await fetch(origin + '/index.html')).status, 200);
     assert.equal((await fetch(origin + '/lib/itguy-fixes.js')).status, 200);
     assert.equal((await fetch(origin + '/js/app.js')).status, 200);
+});
+
+test('api responses are not cacheable and a saved customer stays in the list', async () => {
+    const status = await fetch(base + '/status');
+    assert.match(status.headers.get('cache-control') || '', /no-store/);
+    const statusBody = await status.json();
+    assert.equal(statusBody.version, '4.9.1');
+
+    const admin = await login('admin', 'admin123');
+    const empty = await fetch(base + '/collections/customers/autoid-empty', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: '{}'
+    });
+    assert.equal(empty.status, 400);
+
+    const id = 'autoid-d5wri9xv';
+    const created = await fetch(base + '/collections/customers/' + id, {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({ name: 'QA Persist Customer', phone: '0820000099', email: 'persist@example.com' })
+    });
+    const createdBody = await created.json();
+    assert.equal(created.status, 200, JSON.stringify(createdBody));
+    assert.match(created.headers.get('cache-control') || '', /no-store/);
+    assert.equal(createdBody.id, id);
+
+    const list = await (await fetch(base + '/collections/customers', { headers: auth(admin.token) })).json();
+    const saved = list.find(row => row.id === id);
+    assert.ok(saved, 'saved customer missing from GET /collections/customers');
+    assert.equal(saved.name, 'QA Persist Customer');
+    const emptyRow = list.find(row => row.id === 'autoid-empty');
+    assert.equal(emptyRow, undefined);
 });

@@ -103,7 +103,7 @@ async function main() {
         ['password', 'role', 'username', 'firstName', 'lastName', 'employeeId', 'phone', 'sessionToken', 'active'].forEach(col => {
             if (!after.includes(col)) fail('Migration did not add column ' + col + ' columns=' + after.join(','));
         });
-        if (status.version !== '4.9') fail('Status version is ' + status.version + ', expected 4.9');
+        if (status.version !== '4.9.1') fail('Status version is ' + status.version + ', expected 4.9.1');
         const [legacy] = await conn.query(`SELECT email FROM \`${dbName}\`.users WHERE uid = 'legacy-admin'`);
         if (!legacy.length || legacy[0].email !== 'legacy@example.com') fail('Legacy user row was lost');
 
