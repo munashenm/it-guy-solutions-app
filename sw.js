@@ -1,4 +1,5 @@
-const CACHE_NAME = 'itguy-app-5.0';
+importScripts('version.js');
+const CACHE_NAME = 'itguy-app-' + (self.APP_VERSION || '4.9.1');
 
 const APP_SHELL = [
     '/',
@@ -67,11 +68,12 @@ self.addEventListener('fetch', (event) => {
 
     // Authenticated API responses stay out of the Cache API so a shared browser
     // cannot serve one user's data to another. The page keeps a per-user copy.
+    // cache: 'no-store' also stops LiteSpeed and the browser HTTP cache.
     if (url.includes('/api/')) {
         event.respondWith(
-            fetch(request).catch(() => new Response(
+            fetch(request, { cache: 'no-store' }).catch(() => new Response(
                 JSON.stringify({ error: 'Service temporarily unavailable. Please check your connection or try again later.' }),
-                { status: 503, headers: { 'Content-Type': 'application/json' } }
+                { status: 503, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } }
             ))
         );
         return;
@@ -96,6 +98,7 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
+    // Network-first for HTML/JS/CSS so deploys are not stuck on old cached files.
     event.respondWith(
         fetch(request).then((response) => {
             if (response && response.ok) {

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../database');
 const bcrypt = require('bcryptjs');
+const fixes = require('../lib/itguy-fixes');
 const jwt = require('jsonwebtoken');
 const logger = require('../utils/logger');
 const nodemailer = require('nodemailer');
@@ -40,6 +41,11 @@ router.post('/login', async (req, res, next) => {
             } catch (bcryptErr) {
                 console.error(`[${logId}] Auth: Password comparison failed:`, bcryptErr.message);
                 throw new Error("Security module error during password check.");
+            }
+
+            if (isValid && !fixes.accountIsActive(row.active)) {
+                console.warn(`[${logId}] Auth: Account is deactivated.`);
+                return res.status(403).json({ error: 'This account is deactivated. Ask an admin to turn it back on.' });
             }
 
             if (isValid) {

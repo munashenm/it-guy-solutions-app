@@ -5,32 +5,61 @@ PassengerAppType node
 PassengerStartupFile app.js
 
 
-Options -Indexes
+Options -Indexes -MultiViews
+DirectoryIndex index.html
+AcceptPathInfo Off
 
-# Block sensitive dotfiles and SQLite DB if ever exposed as static files
-<IfModule mod_authz_core.c>
-    <FilesMatch "^\.(env|bak|log)$">
-        Require all denied
-    </FilesMatch>
-    <Files "database.sqlite">
-        Require all denied
-    </Files>
-</IfModule>
-<IfModule !mod_authz_core.c>
-    <FilesMatch "^\.(env|bak|log)$">
-        Order allow,deny
-        Deny from all
-    </FilesMatch>
-</IfModule>
-
+# Apache serves real files before Passenger sees them. In .htaccess, [L] restarts
+# rewriting and mod_rewrite maps /api/collections/... onto a filename of "api"
+# plus PATH_INFO. A later "-d" test then matches the app root or a real folder
+# such as routes/ and refuses the request, so saves never reach Node.
+# [END] stops that restart. /api is matched on the original request line.
 RewriteEngine On
 
-# Let /api reach Node (Passenger); do not rewrite
-RewriteCond %{REQUEST_URI} ^/api/ [NC]
-RewriteRule ^ - [L]
+RewriteCond %{THE_REQUEST} \s/+api(/|\s|\?) [NC]
+RewriteRule ^ - [END,E=Cache-Control:no-store,E=cache-control:no-cache]
 
-# SPA: non-files → index.html (never for /api — handled above)
-RewriteCond %{REQUEST_URI} !^/api/ [NC]
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ index.html [L]
+<IfModule mod_headers.c>
+    SetEnvIf Request_URI "^/api/" itguy_api
+    Header set Cache-Control "no-store, no-cache, must-revalidate, private" env=itguy_api
+    Header set Pragma "no-cache" env=itguy_api
+    Header set Expires "0" env=itguy_api
+</IfModule>
+<IfModule LiteSpeed>
+    CacheDisable public /api
+</IfModule>
+
+# Certificate renewal. Every other dotfile is refused below.
+RewriteRule ^\.well-known/acme-challenge/ - [END]
+
+# Dotfiles (.env, .env.production, .git, ...) and dot-segments.
+RewriteCond %{THE_REQUEST} \s/ [NC]
+RewriteCond %{REQUEST_URI} (^|/)\.|\.\. [NC]
+RewriteRule ^ - [F,END]
+
+# Private trees. lib/itguy-fixes.js is loaded by index.html and is allowed later.
+RewriteCond %{REQUEST_URI} ^/(routes|middleware|services|utils|node_modules|logs|tmp|deploy_temp|test|docs|mobile|uploads)(/|$) [NC,OR]
+RewriteCond %{REQUEST_URI} ^/lib(/|$) [NC]
+RewriteCond %{REQUEST_URI} !^/lib/itguy-fixes\.js$ [NC]
+RewriteRule ^ - [F,END]
+
+# version.js is the footer and service-worker version.
+RewriteCond %{REQUEST_URI} ^/(index\.html|client\.html|track\.html|manifest\.json|sw\.js|version\.js)$ [NC,OR]
+RewriteCond %{REQUEST_URI} ^/lib/itguy-fixes\.js$ [NC]
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [END]
+
+RewriteCond %{REQUEST_URI} ^/(css|js|img|public)/ [NC]
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [END]
+
+RewriteRule ^$ index.html [END]
+
+# Any other real file (server JS, json, zips, sql, sqlite, txt, logs, md).
+# Directories are not tested: the document root and routes/ are directories,
+# and a directory match forbids /api when path-info splitting is in play.
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [F,END]
+
+# Hash routes stay on the client. /api was ended above.
+RewriteRule ^ index.html [END]

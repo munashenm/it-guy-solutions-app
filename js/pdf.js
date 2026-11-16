@@ -408,27 +408,32 @@ window.pdfGenerator = {
                     `;
                 }
 
-                let termsText = 'Uncollected items will incur storage fees after 48 hours.';
-                if (docType === 'Invoice' && docSettings.termsInvoice) termsText = docSettings.termsInvoice.replace(/\n/g, '<br>');
-                if (docType === 'Quotation' && docSettings.termsQuote) termsText = docSettings.termsQuote.replace(/\n/g, '<br>');
-                if (docType === 'Job Card' && docSettings.termsJob) termsText = docSettings.termsJob.replace(/\n/g, '<br>');
+                const chosenTerms = (window.ItguyFixes && window.ItguyFixes.documentTerms)
+                    ? window.ItguyFixes.documentTerms(docType, docSettings)
+                    : { text: '' };
+                const termsText = (window.ItguyFixes && window.ItguyFixes.escapeHtml)
+                    ? window.ItguyFixes.escapeHtml(chosenTerms.text).replace(/\n/g, '<br>')
+                    : String(chosenTerms.text || '').replace(/\n/g, '<br>');
+                const commercialDoc = docType === 'Invoice' || docType === 'Quotation';
+                const signatureHTML = commercialDoc ? '' : `
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 28px;">
+                            <div style="width: 45%; border-bottom: 1px solid #000; height: 70px; display: flex; align-items: flex-end; padding-bottom: 5px;">
+                                ${dataObj.signatureBase64 ? `<img src="${dataObj.signatureBase64}" style="max-height: 60px;">` : '<span style="color:#000000;">Customer Signature</span>'}
+                            </div>
+                            <div style="width: 45%; border-bottom: 1px solid #000; height: 70px; display: flex; align-items: flex-end; padding-bottom: 5px;">
+                                <span style="color:#000; font-weight:bold;">${dataObj.technician || 'Authorized Rep'}</span>
+                            </div>
+                        </div>`;
 
                 const footerHTML = `
                     ${bankHTML}
-                    <div style="margin-top: 50px; border-top: 3px solid ${themeColor}; padding-top: 25px; font-family: ${fontStack}; color: #000000; background-color: #ffffff;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 50px;">
-                            <div style="width: 45%; border-bottom: 1px solid #000; height: 80px; display: flex; align-items: flex-end; padding-bottom: 5px;">
-                                ${dataObj.signatureBase64 ? `<img src="${dataObj.signatureBase64}" style="max-height: 70px;">` : '<span style="color:#000000;">Customer Signature</span>'}
-                            </div>
-                            <div style="width: 45%; border-bottom: 1px solid #000; height: 80px; display: flex; align-items: flex-end; padding-bottom: 5px;">
-                                <span style="color:#000; font-weight:bold;">${dataObj.technician || 'Authorized Rep'}</span>
-                            </div>
+                    <div style="margin-top: ${commercialDoc ? '18px' : '28px'}; border-top: 2px solid ${themeColor}; padding-top: 12px; font-family: ${fontStack}; color: #000000; background-color: #ffffff;">
+                        ${signatureHTML}
+                        <div class="pdf-terms" style="font-size: 9.5px; color: #111111; line-height: 1.35; column-count: 2; column-gap: 18px; text-align: left;">
+                            <div style="font-weight: 700; margin-bottom: 4px; column-span: all;">Terms &amp; Conditions</div>
+                            <div>${termsText}</div>
                         </div>
-                        <div style="text-align: center; font-size: 10px; color: #000000; line-height: 1.6;">
-                            <div style="margin-bottom: 8px; font-weight: 600;">Terms & Conditions:</div>
-                            <div style="max-width: 80%; margin: 0 auto 10px;">${termsText}</div>
-                            <div>System generated on ${new Date().toLocaleString()}</div>
-                        </div>
+                        <div style="text-align: center; font-size: 9px; color: #333333; margin-top: 8px;">System generated on ${new Date().toLocaleString()}</div>
                     </div>
                 `;
                 contentHTML = headerHTML + clientHTML + bodyHTML + footerHTML;

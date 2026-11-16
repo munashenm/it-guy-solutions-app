@@ -139,7 +139,8 @@ test('android shell assets match the web scripts', () => {
 
 test('service worker caches the app shell and does not store API responses', () => {
     const sw = fs.readFileSync(path.join(__dirname, '../sw.js'), 'utf8');
-    assert.match(sw, /itguy-app-5\.0/);
+    assert.match(sw, /importScripts\('version\.js'\)/);
+    assert.match(sw, /itguy-app-/);
     assert.match(sw, /\/index\.html/);
     assert.match(sw, /Authenticated API responses stay out of the Cache API/);
     const apiBranch = sw.split("if (url.includes('/api/'))")[1].split('if (isCdn')[0];

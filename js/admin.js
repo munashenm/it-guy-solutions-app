@@ -90,53 +90,36 @@ window.adminPanel = {
     },
 
     async fetchUsers() {
-        if(!window.fbDb) return;
         try {
-            const usersSnap = await window.fbDb.collection("users").orderBy("createdAt", "desc").get();
-            this.allStaff = [];
-            this.allCustomers = [];
-
-            usersSnap.forEach(doc => {
-                const data = doc.data();
-                if (data.role === 'admin' || data.role === 'technician' || data.role === 'frontdesk') {
-                    this.allStaff.push(data);
-                } else {
-                    this.allCustomers.push(data);
-                }
-            });
-
-            this.renderStaffTable(this.allStaff);
-            this.renderCustomerTable(this.allCustomers);
+            let allUsers = [];
+            if (window.app && typeof window.app.loadUserDirectory === 'function') {
+                allUsers = await window.app.loadUserDirectory();
+            } else {
+                const res = await window.safeFetch(`${window.API_BASE || '/api'}/users`);
+                allUsers = Array.isArray(res) ? res : [];
+            }
+            const split = window.ItguyFixes.splitDirectory(allUsers || []);
+            this.allStaff = split.staff;
+            this.allCustomers = split.clients;
+            const search = document.getElementById('admin-user-search');
+            if (search && search.value) this.handleSearch({ target: search });
+            else {
+                this.renderStaffTable(this.allStaff);
+                this.renderCustomerTable(this.allCustomers);
+            }
         } catch(e) {
             console.error("Error fetching users:", e);
         }
     },
 
     handleSearch(e) {
-        const query = e.target.value.toLowerCase().trim();
-        if(!query) {
-            this.renderStaffTable(this.allStaff);
-            this.renderCustomerTable(this.allCustomers);
-            return;
+        try {
+            const query = e && e.target ? e.target.value : '';
+            this.renderStaffTable(window.ItguyFixes.filterPeople(this.allStaff || [], query));
+            this.renderCustomerTable(window.ItguyFixes.filterPeople(this.allCustomers || [], query));
+        } catch (err) {
+            console.error('Staff search failed', err);
         }
-
-        const filteredStaff = this.allStaff.filter(u => 
-            (u.email && u.email.toLowerCase().includes(query)) ||
-            (u.username && u.username.toLowerCase().includes(query)) ||
-            (u.firstName && u.firstName.toLowerCase().includes(query)) ||
-            (u.lastName && u.lastName.toLowerCase().includes(query)) ||
-            (u.employeeId && u.employeeId.toLowerCase().includes(query))
-        );
-
-        const filteredCustomers = this.allCustomers.filter(u => 
-            (u.email && u.email.toLowerCase().includes(query)) ||
-            (u.phone && u.phone.toLowerCase().includes(query)) ||
-            (u.firstName && u.firstName.toLowerCase().includes(query)) ||
-            (u.lastName && u.lastName.toLowerCase().includes(query))
-        );
-
-        this.renderStaffTable(filteredStaff);
-        this.renderCustomerTable(filteredCustomers);
     },
 
     renderStaffTable(staffList) {
@@ -148,24 +131,39 @@ window.adminPanel = {
             return;
         }
 
+        const esc = (value) => window.ItguyFixes.escapeHtml(value);
+        const selfUid = window.authSystem && window.authSystem.currentUser ? window.authSystem.currentUser.uid : '';
         tbody.innerHTML = staffList.map(s => {
             let displayName = s.firstName || s.lastName ? `${s.firstName || ''} ${s.lastName || ''}`.trim() : s.username || s.email;
             let subDisplay = s.employeeId ? `EMP ID: ${s.employeeId} | ${s.email}` : s.email;
+            const active = window.ItguyFixes.accountIsActive(s.active);
+            const uid = esc(s.uid || s.id);
+            const email = esc(s.email || '');
+            const statusBtn = (s.uid || s.id) === selfUid ? '' : `<button type="button" class="btn-icon" title="${active ? 'Deactivate' : 'Reactivate'}" onclick="adminPanel.setUserActive('${uid}', ${active ? 'false' : 'true'})"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #74b9ff;">${active ? 'person_off' : 'how_to_reg'}</span></button>`;
             return `
             <tr>
                 <td>
-                    <strong>${displayName}</strong><br>
-                    <span style="font-size: 0.8rem; color: #a0a0a0;">${subDisplay}</span>
+                    <strong>${esc(displayName)}</strong><br>
+                    <span style="font-size: 0.8rem; color: #a0a0a0;">${esc(subDisplay)}</span>
                 </td>
-                <td><span class="badge ${s.role === 'admin' ? 'completed' : 'active'}">${s.role}</span></td>
+                <td><span class="badge ${s.role === 'admin' ? 'completed' : 'active'}">${esc(s.role || 'unspecified')}</span>${active ? '' : ' <span class="badge" style="background:#636e72;">Inactive</span>'}</td>
                 <td style="text-align: right; display: flex; justify-content: flex-end; gap: 8px;">
-                    <button class="btn-icon" title="Edit User" onclick="adminPanel.showEditUserModal('${s.uid}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #a29bfe;">edit</span></button>
-                    <button class="btn-icon" title="Reset Password" onclick="adminPanel.showAdminPasswordResetModal('${s.uid}', '${s.email}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #fdcb6e;">lock_reset</span></button>
-                    <button class="btn-icon" title="Delete User" onclick="adminPanel.deleteUser('${s.uid}', '${s.email}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #ff7675;">delete</span></button>
+                    <button type="button" class="btn-icon" title="Edit User" onclick="adminPanel.showEditUserModal('${uid}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #a29bfe;">edit</span></button>
+                    <button type="button" class="btn-icon" title="Reset Password" onclick="adminPanel.showAdminPasswordResetModal('${uid}', '${email}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #fdcb6e;">lock_reset</span></button>
+                    ${statusBtn}
+                    <button type="button" class="btn-icon" title="Delete User" onclick="adminPanel.deleteUser('${uid}', '${email}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; color: #ff7675;">delete</span></button>
                 </td>
             </tr>
             `;
         }).join('');
+    },
+
+    async setUserActive(uid, active) {
+        if (window.companySettings && typeof window.companySettings.setUserActive === 'function') {
+            await window.companySettings.setUserActive(uid, active);
+            this.fetchUsers();
+            return;
+        }
     },
 
     renderCustomerTable(customerList) {

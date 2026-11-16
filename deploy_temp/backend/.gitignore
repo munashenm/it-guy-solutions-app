@@ -1,8 +1,0 @@
-node_modules/
-uploads/*
-!uploads/.gitkeep
-database.sqlite
-database.sqlite.bak
-.env
-.env.local
-.env.*.local

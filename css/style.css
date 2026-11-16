@@ -1741,6 +1741,11 @@ body.page-public {
 #pdf-render-page .pdf-on-accent {
     color: #ffffff !important;
 }
+#pdf-render-page .pdf-terms {
+    font-size: 9.5px !important;
+    line-height: 1.35 !important;
+    color: #111111 !important;
+}
 textarea.item-desc,
 textarea.quo-desc {
     min-height: 72px;

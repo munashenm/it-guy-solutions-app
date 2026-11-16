@@ -16,6 +16,7 @@ window.customers = {
                     <p style="color: #a0a0a0; margin-top: 4px;">Names, phone numbers, and job history in one place.</p>
                 </div>
                 <div style="display: flex; gap: 12px;">
+                    <button class="btn-secondary" onclick="customers.toggleArchived()">${this.showArchived ? 'Hide archived' : 'Show archived'}</button>
                     <button class="btn-primary" onclick="customers.showAddCustomerModal()"><span class="material-symbols-outlined">person_add</span> Add Customer</button>
                 </div>
             </div>
@@ -41,24 +42,134 @@ window.customers = {
         this.container.innerHTML = html;
     },
 
+    showArchived: false,
+
+    esc(value) {
+        if (window.ItguyFixes && window.ItguyFixes.escapeHtml) return window.ItguyFixes.escapeHtml(value);
+        return String(value == null ? '' : value);
+    },
+
+    visibleCustomers() {
+        const all = (window.app && window.app.state && window.app.state.customers) || [];
+        return all.filter(c => this.showArchived ? c && c.archived === true : !(c && c.archived === true));
+    },
+
+    toggleArchived() {
+        this.showArchived = !this.showArchived;
+        this.render();
+    },
+
+    recordCount(customer) {
+        if (!window.ItguyFixes || !window.app) return 0;
+        return window.ItguyFixes.customerLinkCount(customer, window.app.state || {});
+    },
+
     renderCustomerRows() {
-        if(!window.app || !window.app.state.customers || window.app.state.customers.length === 0) {
-            return `<tr><td colspan="5" style="text-align: center; color: #a0a0a0; padding: 32px;">No customers yet. Add one so jobs and invoices can pick them from the list.</td></tr>`;
+        const rows = this.visibleCustomers();
+        if(!rows.length) {
+            const empty = this.showArchived
+                ? 'No archived customers.'
+                : 'No customers yet. Add one so jobs and invoices can pick them from the list.';
+            return `<tr><td colspan="5" style="text-align: center; color: #a0a0a0; padding: 32px;">${empty}</td></tr>`;
         }
         
-        return window.app.state.customers.map(c => `
+        return rows.map(c => {
+            const id = this.esc(c.id);
+            const links = this.recordCount(c);
+            const archived = c.archived === true;
+            let action = '';
+            if (archived) {
+                action = `<button class="btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="customers.restoreCustomer('${id}')">Restore</button>`;
+            } else if (links > 0) {
+                action = `<button class="btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="customers.archiveCustomer('${id}')">Archive</button>`;
+            } else {
+                action = `<button class="btn-secondary" style="padding: 6px 12px; font-size: 0.8rem; color: #ff7675;" onclick="customers.deleteCustomer('${id}')">Delete</button>`;
+            }
+            return `
             <tr>
-                <td><strong>${c.name}</strong></td>
-                <td>${c.phone || '-'}</td>
-                <td><a href="mailto:${c.email}" style="color: #a29bfe; text-decoration: none;">${c.email || '-'}</a></td>
-                <td style="color: #a0a0a0; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${c.address || '-'}</td>
-                <td>
-                    <button class="btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="customers.viewHistory('${c.id}')">
+                <td><strong>${this.esc(c.name)}</strong>${archived ? ' <span class="badge" style="background:#636e72;">Archived</span>' : ''}</td>
+                <td>${this.esc(c.phone || '-')}</td>
+                <td><a href="mailto:${this.esc(c.email)}" style="color: #a29bfe; text-decoration: none;">${this.esc(c.email || '-')}</a></td>
+                <td style="color: #a0a0a0; max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${this.esc(c.address || '-')}</td>
+                <td style="display: flex; gap: 8px; justify-content: flex-end;">
+                    <button class="btn-secondary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="customers.viewHistory('${id}')">
                         <span class="material-symbols-outlined" style="font-size: 1rem; margin-right: 4px;">history</span> History
                     </button>
+                    ${action}
                 </td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
+    },
+
+    findCustomer(id) {
+        const all = (window.app && window.app.state && window.app.state.customers) || [];
+        return all.find(c => c && c.id === id);
+    },
+
+    async deleteCustomer(id) {
+        const customer = this.findCustomer(id);
+        const name = customer && customer.name ? customer.name : 'this customer';
+        if (!confirm(`Delete ${name}?\n\nThis removes them from the customer list. It is only allowed when they have no jobs or invoices. Their records are not deleted.`)) return;
+        try {
+            await window.safeFetch(`${window.API_BASE || '/api'}/customers/${encodeURIComponent(id)}`, { method: 'DELETE' });
+            if (window.app && window.app.state && Array.isArray(window.app.state.customers)) {
+                window.app.state.customers = window.app.state.customers.filter(c => c.id !== id);
+            }
+            this.render();
+            if (window.app && window.app.showToast) window.app.showToast(`${name} was deleted.`, 'success');
+        } catch (err) {
+            const message = err && err.message ? err.message : 'Could not delete that customer.';
+            if (/archive/i.test(message) && confirm(`${message}\n\nArchive them now?`)) {
+                await this.archiveCustomer(id, true);
+                return;
+            }
+            alert(message);
+        }
+    },
+
+    async archiveCustomer(id, alreadyConfirmed) {
+        const customer = this.findCustomer(id);
+        const name = customer && customer.name ? customer.name : 'this customer';
+        const links = customer ? this.recordCount(customer) : 0;
+        if (!alreadyConfirmed) {
+            const recordNote = links > 0
+                ? `They have ${links} job, invoice, quote, or ticket record${links === 1 ? '' : 's'}. Those records stay.`
+                : 'They will be hidden from the active list. You can restore them later.';
+            if (!confirm(`Archive ${name}?\n\n${recordNote}`)) return;
+        }
+        try {
+            await window.safeFetch(`${window.API_BASE || '/api'}/customers/${encodeURIComponent(id)}/archive`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{}'
+            });
+            if (customer) {
+                customer.archived = true;
+            }
+            this.render();
+            if (window.app && window.app.showToast) window.app.showToast(`${name} was archived. Their jobs and invoices were kept.`, 'success');
+        } catch (err) {
+            alert(err.message || 'Could not archive that customer.');
+        }
+    },
+
+    async restoreCustomer(id) {
+        const customer = this.findCustomer(id);
+        const name = customer && customer.name ? customer.name : 'this customer';
+        if (!confirm(`Restore ${name} to the active customer list?`)) return;
+        try {
+            await window.safeFetch(`${window.API_BASE || '/api'}/customers/${encodeURIComponent(id)}/restore`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: '{}'
+            });
+            if (customer) customer.archived = false;
+            this.render();
+            if (window.app && window.app.showToast) window.app.showToast(`${name} is active again.`, 'success');
+        } catch (err) {
+            alert(err.message || 'Could not restore that customer.');
+        }
     },
 
     lastModalSource: null,

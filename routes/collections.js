@@ -42,13 +42,14 @@ router.get('/settings/companyProfile', async (req, res, next) => {
 router.use(requireAuth);
 
 const safeJsonParse = (str, fallback = {}, context = '') => {
-    try {
-        if (!str || str.trim() === '') return fallback;
-        return JSON.parse(str);
-    } catch (e) {
-        logger.error(`JSON Parse Failed: ${context}`, { error: e.message, rawLength: str?.length });
+    if (str == null || str === '') return fallback;
+    const parsed = fixes.parseStoredJson(str);
+    if (parsed == null) {
+        logger.error(`JSON Parse Failed: ${context}`, { rawType: typeof str });
         return { ...fallback, _parseError: true };
     }
+    if (typeof parsed !== 'object' || Array.isArray(parsed)) return fallback;
+    return parsed;
 };
 
 const getCollection = async (name, query = {}, user = null) => {
@@ -62,7 +63,7 @@ const getCollection = async (name, query = {}, user = null) => {
             ...safeJsonParse(r.data, {}, `Collection: ${name}, ID: ${r.id}`) 
         })).filter(item => !item._parseError);
 
-        if (user && user.role === 'client') {
+        if (user && fixes.canonicalRole(user.role) === 'client') {
             const clientEmail = (user.email || '').toLowerCase();
             results = results.filter(item => {
                 const itemEmail = (item.email || item.customerEmail || item.clientEmail || '').toLowerCase();
@@ -116,7 +117,10 @@ router.get('/:name', async (req, res, next) => {
 });
 
 
-const isStaff = (user) => user && ['admin', 'employee', 'technician'].includes(user.role);
+const isStaff = (user) => {
+    const role = fixes.canonicalRole(user && user.role);
+    return role === 'admin' || role === 'employee' || role === 'technician' || role === 'frontdesk';
+};
 
 router.get('/:name/:id', async (req, res, next) => {
     try {
@@ -126,7 +130,7 @@ router.get('/:name/:id', async (req, res, next) => {
         const data = safeJsonParse(row.data, {}, `Collection: ${req.params.name}, ID: ${req.params.id}`);
         
         // Security check for clients
-        if (req.user && req.user.role === 'client') {
+        if (req.user && fixes.canonicalRole(req.user.role) === 'client') {
             const itemEmail = (data.email || data.customerEmail || data.clientEmail || '').toLowerCase();
             if (itemEmail !== req.user.email.toLowerCase()) {
                 return res.status(403).json({ error: "Forbidden: You do not have permission to view this document." });
@@ -149,20 +153,29 @@ router.post('/:name/:id', async (req, res, next) => {
         }
 
         // For other collections (jobs, quotes), clients can only create/update their OWN
-        if (req.user && req.user.role === 'client') {
+        if (req.user && fixes.canonicalRole(req.user.role) === 'client') {
             const itemEmail = (req.body.email || req.body.customerEmail || req.body.clientEmail || '').toLowerCase();
             if (itemEmail !== req.user.email.toLowerCase()) {
                 return res.status(403).json({ error: "Forbidden: You can only save documents associated with your email." });
             }
         }
 
+        const payload = req.body;
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).length === 0) {
+            return res.status(400).json({ error: 'The save did not include any fields. Nothing was stored.' });
+        }
+
         const existing = await db.get("SELECT data FROM collections WHERE name = ? AND id = ?", [name, id]);
         const currentData = existing ? safeJsonParse(existing.data, {}, `Assign check: ${name}/${id}`) : {};
-        if (denyAssignment(res, req.user, name, currentData, req.body, 'set')) return;
+        if (denyAssignment(res, req.user, name, currentData, payload, 'set')) return;
 
-        await saveDoc(name, id, req.body);
-        await notifySaved(req, name, id, existing ? currentData : {}, Object.assign({ id: id }, req.body), !existing);
-        res.json({ success: true });
+        await saveDoc(name, id, payload);
+        const saved = await db.get("SELECT id, name FROM collections WHERE id = ?", [id]);
+        if (!saved || saved.name !== name) {
+            return res.status(500).json({ error: 'The record was not stored.' });
+        }
+        await notifySaved(req, name, id, existing ? currentData : {}, Object.assign({ id: id }, payload), !existing);
+        res.json({ success: true, id });
     } catch (e) {
         next(e);
     }
@@ -180,7 +193,7 @@ router.patch('/:name/:id', async (req, res, next) => {
         const currentData = row ? safeJsonParse(row.data, {}, `Patch Read: ${name}/${id}`) : {};
         
         // Security check for existing document ownership
-        if (req.user && req.user.role === 'client' && row) {
+        if (req.user && fixes.canonicalRole(req.user.role) === 'client' && row) {
             const itemEmail = (currentData.email || currentData.customerEmail || currentData.clientEmail || '').toLowerCase();
             if (itemEmail !== req.user.email.toLowerCase()) {
                 return res.status(403).json({ error: "Forbidden: You do not own this document." });
@@ -189,9 +202,9 @@ router.patch('/:name/:id', async (req, res, next) => {
 
         if (denyAssignment(res, req.user, name, currentData, req.body, 'patch')) return;
 
-        const newData = { ...currentData, ...req.body, id };
+        const newData = { ...currentData, ...req.body };
         await saveDoc(name, id, newData);
-        await notifySaved(req, name, id, row ? currentData : {}, newData, !row);
+        await notifySaved(req, name, id, row ? currentData : {}, Object.assign({ id: id }, newData), !row);
         res.json({ success: true });
     } catch (e) {
         next(e);

@@ -50,10 +50,15 @@ async function safeFetch(url, options = {}, retries = 3) {
         const token = sessionStorage.getItem('it-guy-token');
         if (token) headers.Authorization = `Bearer ${token}`;
     }
-    const request = Object.assign({}, options, { headers });
+    const request = Object.assign({}, options, { headers, cache: 'no-store' });
+    const method = String(request.method || 'GET').toUpperCase();
+    let target = url;
+    if (method === 'GET' && /\/api(?:\/|$|\?)/.test(String(target))) {
+        target += (String(target).indexOf('?') === -1 ? '?' : '&') + '_=' + Date.now();
+    }
 
     try {
-        const res = await fetch(url, request);
+        const res = await fetch(target, request);
         const contentType = res.headers.get('content-type') || '';
         const isJson = contentType.includes('application/json');
 
@@ -426,6 +431,7 @@ class LocalDoc {
         const docData = { id: this.id, ...data };
         this.parent._pending[this.id] = docData; // Track as pending
         const idx = this.parent.data.findIndex(d => d.id === this.id);
+        const previous = idx > -1 ? this.parent.data[idx] : null;
         if (idx > -1) this.parent.data[idx] = docData;
         else this.parent.data.unshift(docData);
         this.parent.emit();
@@ -436,9 +442,17 @@ class LocalDoc {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
+            delete this.parent._pending[this.id];
             this.parent.fetch(); 
         } catch (e) {
-            this.parent.fetch(); 
+            delete this.parent._pending[this.id];
+            if (previous) {
+                const at = this.parent.data.findIndex(d => d.id === this.id);
+                if (at > -1) this.parent.data[at] = previous;
+            } else {
+                this.parent.data = (this.parent.data || []).filter(d => d.id !== this.id);
+            }
+            this.parent.emit();
             throw e;
         }
         return { id: this.id };
