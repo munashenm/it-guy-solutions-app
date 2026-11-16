@@ -144,12 +144,21 @@ router.post('/:name/:id', async (req, res, next) => {
             }
         }
 
+        const payload = req.body;
+        if (!payload || typeof payload !== 'object' || Array.isArray(payload) || Object.keys(payload).length === 0) {
+            return res.status(400).json({ error: 'The save did not include any fields. Nothing was stored.' });
+        }
+
         const existing = await db.get("SELECT data FROM collections WHERE name = ? AND id = ?", [name, id]);
         const currentData = existing ? safeJsonParse(existing.data, {}, `Assign check: ${name}/${id}`) : {};
-        if (denyAssignment(res, req.user, name, currentData, req.body, 'set')) return;
+        if (denyAssignment(res, req.user, name, currentData, payload, 'set')) return;
 
-        await saveDoc(name, id, req.body);
-        res.json({ success: true });
+        await saveDoc(name, id, payload);
+        const saved = await db.get("SELECT id, name FROM collections WHERE id = ?", [id]);
+        if (!saved || saved.name !== name) {
+            return res.status(500).json({ error: 'The record was not stored.' });
+        }
+        res.json({ success: true, id });
     } catch (e) {
         next(e);
     }

@@ -1,5 +1,5 @@
 importScripts('version.js');
-const CACHE_NAME = 'itguy-app-' + (self.APP_VERSION || '4.9');
+const CACHE_NAME = 'itguy-app-' + (self.APP_VERSION || '4.9.1');
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -20,9 +20,9 @@ self.addEventListener('fetch', (event) => {
 
   if (url.includes('/api/')) {
     event.respondWith(
-      fetch(event.request).catch(() => new Response(
+      fetch(event.request, { cache: 'no-store' }).catch(() => new Response(
         JSON.stringify({ error: 'Service temporarily unavailable. Please check your connection or try again later.' }),
-        { status: 503, headers: { 'Content-Type': 'application/json' } }
+        { status: 503, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } }
       ))
     );
     return;
