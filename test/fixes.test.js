@@ -199,6 +199,9 @@ test('staff directory keeps every non-client role and storage shape', () => {
     assert.equal(fixes.canonicalRole('Technician'), 'technician');
     assert.equal(fixes.canonicalRole('tech'), 'technician');
     assert.equal(fixes.canonicalRole('Front Desk'), 'frontdesk');
+    assert.equal(fixes.canonicalRole('admin'), 'admin');
+    assert.equal(fixes.canonicalRole('Admin'), 'admin');
+    assert.equal(fixes.canonicalRole(' Administrator '), 'admin');
     assert.equal(fixes.isStaffAccount({ role: 'technician', email: 'a@b.co' }), true);
     assert.equal(fixes.isStaffAccount({ role: 'TECHNICIAN' }), true);
     assert.equal(fixes.isStaffAccount({ role: 'employee' }), true);
@@ -263,9 +266,9 @@ test('call-out notify never sends unless SMTP is ready and a customer email is p
     assert.equal(send.recipient, 'a@b.co');
 });
 
-test('app version is 4.9.1 from version.js', () => {
+test('app version is 4.9.2 from version.js', () => {
     const version = require('../version');
-    assert.equal(version.APP_VERSION, '4.9.1');
+    assert.equal(version.APP_VERSION, '4.9.2');
     const server = fs.readFileSync(path.join(__dirname, '../app.js'), 'utf8');
     const footer = fs.readFileSync(path.join(__dirname, '../js/app.js'), 'utf8');
     const sw = fs.readFileSync(path.join(__dirname, '../sw.js'), 'utf8');
@@ -378,6 +381,7 @@ test('only an admin can delete a field job or an unpaid invoice', () => {
     const fieldUi = fs.readFileSync(path.join(__dirname, '../js/field.js'), 'utf8');
     const invoiceUi = fs.readFileSync(path.join(__dirname, '../js/invoice.js'), 'utf8');
     assert.match(fieldUi, /canonicalRole\(role\) === 'admin'/);
+    assert.match(fieldUi, /toLowerCase\(\) === 'admin'/);
     assert.match(fieldUi, /confirm\('Delete field job '/);
     assert.match(invoiceUi, /invoiceIsPaid\(inv\)/);
     assert.match(invoiceUi, /confirm\('Delete invoice '/);

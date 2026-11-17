@@ -13,7 +13,7 @@ window.invoice = {
         const isFrontDesk = user && user.role === 'frontdesk';
         const isAdmin = window.ItguyFixes
             ? window.ItguyFixes.canonicalRole(user && user.role) === 'admin'
-            : !!(user && user.role === 'admin');
+            : String(user && user.role || '').trim().toLowerCase() === 'admin';
         
         let tableRows = '';
         if (invoices.length === 0) {
@@ -81,7 +81,7 @@ window.invoice = {
         const role = window.authSystem && window.authSystem.currentUser && window.authSystem.currentUser.role;
         const isAdmin = window.ItguyFixes
             ? window.ItguyFixes.canonicalRole(role) === 'admin'
-            : role === 'admin';
+            : String(role || '').trim().toLowerCase() === 'admin';
         if (!isAdmin) {
             window.app.showToast('Only an admin can delete an invoice.', 'error');
             return;

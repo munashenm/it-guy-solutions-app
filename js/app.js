@@ -516,7 +516,7 @@ const app = {
             text.textContent = isHealthy ? 'System Online' : 'DB Sync Error';
             text.style.color = isHealthy ? '#00b894' : '#ff7675';
             const engineInfo = status.dbType ? `${status.dbType.toUpperCase()} Engine` : 'Local Engine';
-            const ver = (typeof window !== 'undefined' && window.APP_VERSION) || '4.9.1';
+            const ver = (typeof window !== 'undefined' && window.APP_VERSION) || '4.9.2';
             if (label) label.textContent = `${engineInfo} | v${ver}`;
             
             if (!isHealthy && status.dbError) {
