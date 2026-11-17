@@ -142,12 +142,13 @@ class LocalStorage {
         this.emit();
 
         try {
-            await safeFetch(`${API_BASE}/collections/${this.name}/${id}`, {
+            const result = await safeFetch(`${API_BASE}/collections/${this.name}/${id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
-            this.fetch();
+            if (!(result && result.offlineQueued)) this.fetch();
+            else return { id, offlineQueued: true };
         } catch (e) {
             delete this.parent._pending[id];
             this.data = this.data.filter(d => d.id !== id);
@@ -437,11 +438,12 @@ class LocalDoc {
         this.parent.emit();
 
         try {
-            await safeFetch(`${API_BASE}/collections/${this.parent.name}/${this.id}`, {
+            const result = await safeFetch(`${API_BASE}/collections/${this.parent.name}/${this.id}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data)
             });
+            if (result && result.offlineQueued) return { id: this.id, offlineQueued: true };
             delete this.parent._pending[this.id];
             this.parent.fetch(); 
         } catch (e) {

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#0f111a">
+    <title>IT Guy Staff</title>
+    <style>
+        :root { color-scheme: dark; }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: #0f111a;
+            color: #f5f6fa;
+            font-family: Outfit, system-ui, sans-serif;
+        }
+        main {
+            width: min(420px, 100%);
+            text-align: center;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(108, 92, 231, 0.45);
+            border-radius: 20px;
+            padding: 32px 24px;
+        }
+        img { width: 72px; height: 72px; border-radius: 16px; }
+        h1 { font-size: 1.6rem; margin: 16px 0 8px; }
+        h1 span { color: #6c5ce7; }
+        p { color: #c8c9d4; line-height: 1.45; margin: 0 0 12px; }
+        button {
+            margin-top: 12px;
+            width: 100%;
+            border: 0;
+            border-radius: 12px;
+            padding: 14px 16px;
+            font-size: 1rem;
+            font-weight: 600;
+            color: white;
+            background: #6c5ce7;
+        }
+        button.secondary { background: transparent; border: 1px solid rgba(255,255,255,.2); margin-top: 8px; }
+    </style>
+</head>
+<body>
+    <main>
+        <img src="icon.png" alt="IT Guy Solutions">
+        <h1>IT Guy <span>Staff</span></h1>
+        <p><strong>You're offline.</strong> This phone can't reach the staff app right now.</p>
+        <p>If you have opened IT Guy Staff online before, saved screens can still load. Nothing you already queued on the device is thrown away.</p>
+        <button type="button" id="retry">Try again</button>
+        <button type="button" class="secondary" id="saved">Open saved screens</button>
+    </main>
+    <script>
+        var LIVE = 'https://app.itguysa.co.za/index.html';
+        document.getElementById('retry').addEventListener('click', function () {
+            window.location.replace(LIVE);
+        });
+        document.getElementById('saved').addEventListener('click', function () {
+            window.location.replace(LIVE);
+        });
+    </script>
+</body>
+</html>

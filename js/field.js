@@ -73,8 +73,14 @@ window.field = {
             ? `<select class="form-control" style="appearance:auto; max-width: 220px;" onchange="field.assignTechnician('${job.id}', this)">${window.app.staffSelectOptions(job.technician || '')}</select>`
             : `<strong style="color:#fff;">${window.app.escapeHtml(techLabel)}</strong>`;
 
+        const safeJobId = String(job.id || '').replace(/[^A-Za-z0-9_-]/g, '');
+        const cardId = 'field-card-' + safeJobId;
+        const addressArg = String(job.address || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        const photoStrip = window.repair && typeof window.repair.renderDevicePhotos === 'function'
+            ? window.repair.renderDevicePhotos(job.photos)
+            : '';
         return `
-            <div class="glass-card" style="padding: 20px; display: flex; flex-direction: column;">
+            <div class="glass-card" id="${cardId}" style="padding: 20px; display: flex; flex-direction: column;">
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
                     <div>
                         <div style="color: #a0a0a0; font-size: 0.8rem; margin-bottom: 4px;">${job.id}</div>
@@ -108,9 +114,13 @@ window.field = {
 
                 <div style="border-top: 1px solid #e0e0e0; margin: 16px 0;"></div>
 
-                <div style="display: flex; gap: 12px; margin-bottom: 24px;">
-                    <button class="btn-secondary" style="flex: 1; justify-content: center;" onclick="field.navTo('${job.address}')">
+                ${photoStrip}
+                <div style="display: flex; gap: 12px; margin: 16px 0;">
+                    <button class="btn-secondary" style="flex: 1; justify-content: center;" onclick="field.navTo('${addressArg}')">
                         <span class="material-symbols-outlined">directions_car</span> Navigate
+                    </button>
+                    <button class="btn-secondary" style="flex: 1; justify-content: center;" onclick="repair.quickPhoto('${safeJobId}')">
+                        <span class="material-symbols-outlined">photo_camera</span> Photo
                     </button>
                     ${job.phone ? `
                     <button class="btn-secondary" style="flex: 1; justify-content: center;" onclick="window.location.href='tel:${job.phone}'">
@@ -213,6 +223,19 @@ window.field = {
                 </div>
             </div>
         `);
+    },
+
+    openJob(id) {
+        const cardId = 'field-card-' + String(id || '').replace(/[^A-Za-z0-9_-]/g, '');
+        const el = document.getElementById(cardId);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.style.outline = '2px solid #6c5ce7';
+            return;
+        }
+        if (window.app && window.app.showToast) {
+            window.app.showToast('Call-out ' + id + ' is not on this screen. Sync when you are back online.', 'warning');
+        }
     },
 
     navTo(address) {

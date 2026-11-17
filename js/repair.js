@@ -157,6 +157,7 @@ window.repair = {
             <div id="repair-timeline" style="flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px;">
                 <div style="text-align: center; color: #a0a0a0; font-size: 0.8rem; margin-bottom: 8px;">Job Created on ${job.date}</div>
                 ${this.renderNotes(job.notes)}
+                ${this.renderDevicePhotos(job.photos)}
                 
                 ${this.renderPartsUsed(job.items)}
             </div>
@@ -182,6 +183,17 @@ window.repair = {
                 `}
             </div>
         `;
+    },
+
+    renderDevicePhotos(photos) {
+        if (!photos || !photos.length) return '';
+        const tiles = photos.map(p => {
+            const src = p && typeof p.dataUrl === 'string' && p.dataUrl.indexOf('data:image/') === 0 ? p.dataUrl : '';
+            if (!src) return '';
+            return `<img src="${src}" alt="Job photo" style="width:120px;height:120px;object-fit:cover;border-radius:8px;border:1px solid var(--border);">`;
+        }).join('');
+        if (!tiles) return '';
+        return `<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;">${tiles}</div>`;
     },
 
     renderNotes(notes) {
@@ -595,14 +607,43 @@ window.repair = {
     },
 
     quickPhoto(jobId) {
-        window.app.showToast("Camera access requested for " + jobId, "info");
+        /* itguy-device-photo — persisted on the job, camera or gallery */
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/*';
         input.capture = 'environment';
-        input.onchange = (e) => {
-            const file = e.target.files[0];
-            if(file) window.app.showToast("Job photo captured locally. (Upload logic integration next)", "success");
+        input.onchange = async (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            try {
+                const compress = window.field && typeof window.field.compressImage === 'function'
+                    ? window.field.compressImage.bind(window.field)
+                    : async (picked) => await new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = () => resolve(reader.result);
+                        reader.onerror = () => reject(new Error('Could not read the photo.'));
+                        reader.readAsDataURL(picked);
+                    });
+                const dataUrl = await compress(file);
+                if (!dataUrl || String(dataUrl).indexOf('data:image/') !== 0) throw new Error('Could not read the photo.');
+                const job = (window.app.state.jobs || []).find(j => j.id === jobId)
+                    || (window.app.state.fieldJobs || []).find(j => j.id === jobId);
+                if (!job) throw new Error('Job not found on this device.');
+                const photos = Array.isArray(job.photos) ? job.photos.slice() : [];
+                const user = window.authSystem && window.authSystem.currentUser;
+                photos.push({
+                    at: new Date().toISOString(),
+                    by: user && user.email ? user.email.split('@')[0] : 'Staff',
+                    dataUrl: dataUrl
+                });
+                const coll = String(jobId).indexOf('FLD') === 0 ? 'fieldJobs' : 'jobs';
+                await window.fbDb.collection(coll).doc(jobId).update({ photos: photos });
+                window.app.showToast('Photo attached to ' + jobId + '.', 'success');
+            } catch (err) {
+                const message = (err && err.message) ? err.message : 'Could not save the photo.';
+                window.app.showToast(message, 'error');
+                alert(message);
+            }
         };
         input.click();
     }

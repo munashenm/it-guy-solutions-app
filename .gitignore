@@ -22,3 +22,17 @@ db-test-prod.js
 test-db.js
 .htaccess.old
 backup.htaccess
+
+mobile/node_modules/
+mobile/android/.gradle/
+mobile/android/build/
+mobile/android/app/build/
+mobile/android/local.properties
+mobile/android/app/google-services.json
+mobile/android/.idea/
+mobile/android/captures/
+*.apk
+*.aab
+*.keystore
+*.jks
+mobile/android/keystore.properties

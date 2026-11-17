@@ -44,6 +44,7 @@ try {
     app.use('/api', authRoutes);
     app.use('/api/auth', authRoutes);
     app.use('/api/users', require('./routes/users'));
+    app.use('/api/devices', require('./routes/devices'));
     app.use('/api/customers', require('./routes/customers'));
     app.use('/api/collections', require('./routes/collections'));
     app.use('/api', require('./routes/system'));
@@ -65,7 +66,7 @@ app.get('/api/status', (req, res) => {
 
 const publicFiles = new Set([
     '/', '/index.html', '/client.html', '/track.html', '/manifest.json',
-    '/sw.js', '/version.js', '/lib/itguy-fixes.js'
+    '/sw.js', '/version.js', '/lib/itguy-fixes.js', '/lib/staff-shell.js'
 ]);
 const publicPrefixes = ['/css/', '/js/', '/img/', '/public/'];
 const privatePrefixes = [

@@ -4,6 +4,22 @@ const db = require('../database');
 const { requireAuth } = require('../middleware/auth');
 const logger = require('../utils/logger');
 const fixes = require('../lib/itguy-fixes');
+const push = require('../services/pushService');
+
+async function notifySaved(req, name, id, before, after, isCreate) {
+    try {
+        await push.notifyCollectionChange({
+            collection: name,
+            id: id,
+            before: before || {},
+            after: after || {},
+            actorUid: req.user && req.user.uid,
+            isCreate: !!isCreate
+        });
+    } catch (err) {
+        logger.error('Push notification failed', { error: err.message });
+    }
+}
 
 function denyAssignment(res, actor, name, current, nextBody, method) {
     const denial = fixes.assignmentDenial(actor, name, current || {}, nextBody || {}, method);
@@ -158,6 +174,7 @@ router.post('/:name/:id', async (req, res, next) => {
         if (!saved || saved.name !== name) {
             return res.status(500).json({ error: 'The record was not stored.' });
         }
+        await notifySaved(req, name, id, existing ? currentData : {}, Object.assign({ id: id }, payload), !existing);
         res.json({ success: true, id });
     } catch (e) {
         next(e);
@@ -187,6 +204,7 @@ router.patch('/:name/:id', async (req, res, next) => {
 
         const newData = { ...currentData, ...req.body };
         await saveDoc(name, id, newData);
+        await notifySaved(req, name, id, row ? currentData : {}, Object.assign({ id: id }, newData), !row);
         res.json({ success: true });
     } catch (e) {
         next(e);

@@ -1,0 +1,31 @@
+{
+  "appId": "za.co.itguysa.staff",
+  "appName": "IT Guy Staff",
+  "webDir": "www",
+  "server": {
+    "url": "https://app.itguysa.co.za",
+    "errorPath": "offline.html",
+    "cleartext": false,
+    "androidScheme": "https",
+    "allowNavigation": [
+      "app.itguysa.co.za",
+      "*.itguysa.co.za"
+    ]
+  },
+  "appendUserAgent": "ItGuyStaffApp",
+  "android": {
+    "backgroundColor": "#0f111a",
+    "allowMixedContent": false,
+    "appendUserAgent": "ItGuyStaffApp"
+  },
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "SplashScreen": {
+      "launchAutoHide": true,
+      "backgroundColor": "#0f111a",
+      "showSpinner": false
+    }
+  }
+}
