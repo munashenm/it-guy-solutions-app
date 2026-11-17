@@ -288,9 +288,11 @@ test('htaccess keeps Passenger and serves only the public front end', () => {
     assert.match(ht, /PassengerAppType node/);
     assert.match(ht, /PassengerStartupFile app\.js/);
     assert.match(ht, /RewriteCond %\{THE_REQUEST\} \\s\/\+api\(\/\|\\s\|\\\?\) \[NC\]/);
-    assert.match(ht, /RewriteRule \^ - \[END/);
-    assert.match(ht, /no-store/);
-    assert.match(ht, /CacheDisable public \/api/);
+    assert.match(ht, /RewriteRule \^ - \[END\]/);
+    assert.doesNotMatch(ht, /E=Cache-Control/);
+    assert.doesNotMatch(ht, /SetEnvIf/);
+    assert.doesNotMatch(ht, /mod_headers/);
+    assert.doesNotMatch(ht, /CacheDisable/);
     const apiRule = ht.indexOf('THE_REQUEST');
     const forbidDir = ht.indexOf('REQUEST_FILENAME} -d');
     assert.equal(forbidDir, -1);
@@ -361,4 +363,23 @@ test('invoice line amounts include VAT and are numbered', () => {
     const plain = fixes.commercialTotals([fixes.commercialLine({ unit: 10, qty: 1 }, 0, 15, false)], 15, false);
     assert.equal(plain.vat, 0);
     assert.equal(plain.total, 10);
+});
+
+test('only an admin can delete a field job or an unpaid invoice', () => {
+    const admin = { role: 'Administrator' };
+    const desk = { role: 'frontdesk' };
+    assert.equal(fixes.adminRecordDelete(admin, 'fieldJobs', { id: 'FLD-1' }), null);
+    assert.equal(fixes.adminRecordDelete(desk, 'fieldJobs', { id: 'FLD-1' }).status, 403);
+    assert.equal(fixes.adminRecordDelete(admin, 'invoices', { status: 'Unpaid' }), null);
+    assert.equal(fixes.adminRecordDelete(admin, 'invoices', { status: ' Paid ' }).status, 409);
+    assert.equal(fixes.invoiceIsPaid({ status: 'Paid' }), true);
+    assert.equal(fixes.invoiceIsPaid({ status: 'Unpaid' }), false);
+    assert.equal(fixes.adminRecordDelete(admin, 'expenses', {}), null);
+    const fieldUi = fs.readFileSync(path.join(__dirname, '../js/field.js'), 'utf8');
+    const invoiceUi = fs.readFileSync(path.join(__dirname, '../js/invoice.js'), 'utf8');
+    assert.match(fieldUi, /canonicalRole\(role\) === 'admin'/);
+    assert.match(fieldUi, /confirm\('Delete field job '/);
+    assert.match(invoiceUi, /invoiceIsPaid\(inv\)/);
+    assert.match(invoiceUi, /confirm\('Delete invoice '/);
+    assert.match(invoiceUi, /isAdmin && !paid/);
 });

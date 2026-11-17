@@ -65,8 +65,12 @@ window.field = {
         if(statusText.toLowerCase() === 'completed') statusBadge = 'success';
 
         const currentUser = window.authSystem && window.authSystem.currentUser;
+        const role = currentUser && currentUser.role;
+        const isAdmin = window.ItguyFixes
+            ? window.ItguyFixes.canonicalRole(role) === 'admin'
+            : role === 'admin';
         const canAssign = window.ItguyFixes
-            ? window.ItguyFixes.canAssignTechnician(currentUser && currentUser.role)
+            ? window.ItguyFixes.canAssignTechnician(role)
             : false;
         const techLabel = job.technician || 'Unassigned';
         const techControl = canAssign
@@ -145,9 +149,37 @@ window.field = {
                             <button class="btn-primary" style="flex: 1; justify-content: center; background: var(--success);" onclick="field.viewReport('${job.id}')"><span class="material-symbols-outlined" style="font-size: 1.1rem; margin-right: 4px;">assignment</span> Report</button>
                         `}
                     </div>
+                    ${isAdmin ? `
+                    <button class="btn-secondary" style="justify-content: center; color: #ff7675; border-color: #ff7675;" onclick="field.deleteJob('${job.id}')">
+                        <span class="material-symbols-outlined" style="font-size: 1.1rem; margin-right: 4px;">delete</span> Delete
+                    </button>` : ''}
                 </div>
             </div>
         `;
+    },
+
+    async deleteJob(jobId) {
+        const role = window.authSystem && window.authSystem.currentUser && window.authSystem.currentUser.role;
+        const isAdmin = window.ItguyFixes
+            ? window.ItguyFixes.canonicalRole(role) === 'admin'
+            : role === 'admin';
+        if (!isAdmin) {
+            window.app.showToast('Only an admin can delete a field job.', 'error');
+            return;
+        }
+        if (!confirm('Delete field job ' + jobId + '? This cannot be undone.')) return;
+        try {
+            await window.fbDb.collection('fieldJobs').doc(jobId).delete();
+            window.app.showToast('Field job ' + jobId + ' deleted.', 'success');
+            if (typeof window.app.logActivity === 'function') {
+                window.app.logActivity('Field Job Deleted', jobId);
+            }
+            this.render();
+        } catch (e) {
+            console.error(e);
+            window.app.showToast(e.message || 'Could not delete the field job.', 'error');
+            this.render();
+        }
     },
 
     async assignTechnician(jobId, selectEl) {

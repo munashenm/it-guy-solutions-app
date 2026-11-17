@@ -459,9 +459,19 @@ class LocalDoc {
     }
 
     async delete() {
-        this.parent.data = this.parent.data.filter(d => d.id !== this.id);
+        const previous = (this.parent.data || []).find(d => d.id === this.id);
+        this.parent.data = (this.parent.data || []).filter(d => d.id !== this.id);
         this.parent.emit();
-        return await safeFetch(`${API_BASE}/collections/${this.parent.name}/${this.id}`, { method: 'DELETE' });
+        try {
+            return await safeFetch(`${API_BASE}/collections/${this.parent.name}/${this.id}`, { method: 'DELETE' });
+        } catch (e) {
+            if (previous) {
+                const rest = (this.parent.data || []).filter(d => d.id !== this.id);
+                this.parent.data = [previous].concat(rest);
+                this.parent.emit();
+            }
+            throw e;
+        }
     }
 }
 
