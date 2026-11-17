@@ -196,7 +196,12 @@ router.patch('/:name/:id', async (req, res, next) => {
 router.delete('/:name/:id', async (req, res, next) => {
     try {
         const { name, id } = req.params;
-        if (!isStaff(req.user)) {
+        if (name === 'fieldJobs' || name === 'invoices') {
+            const row = await db.get("SELECT data FROM collections WHERE name = ? AND id = ?", [name, id]);
+            const current = row ? safeJsonParse(row.data, {}, `Delete: ${name}/${id}`) : null;
+            const denial = fixes.adminRecordDelete(req.user, name, current);
+            if (denial) return res.status(denial.status).json({ error: denial.error });
+        } else if (!isStaff(req.user)) {
             return res.status(403).json({ error: "Forbidden: Only staff can delete records." });
         }
         await db.run(`DELETE FROM collections WHERE name = ? AND id = ?`, [name, id]);

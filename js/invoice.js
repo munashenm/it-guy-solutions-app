@@ -11,6 +11,9 @@ window.invoice = {
         const invoices = (window.app && window.app.state && window.app.state.invoices) || [];
         const user = window.authSystem?.currentUser;
         const isFrontDesk = user && user.role === 'frontdesk';
+        const isAdmin = window.ItguyFixes
+            ? window.ItguyFixes.canonicalRole(user && user.role) === 'admin'
+            : !!(user && user.role === 'admin');
         
         let tableRows = '';
         if (invoices.length === 0) {
@@ -19,7 +22,9 @@ window.invoice = {
                 No invoices yet. Create one to bill a customer.
             </td></tr>`;
         } else {
-            tableRows = invoices.map(inv => `
+            tableRows = invoices.map(inv => {
+                const paid = window.ItguyFixes ? window.ItguyFixes.invoiceIsPaid(inv) : String(inv.status || '').toLowerCase() === 'paid';
+                return `
                 <tr>
                     <td><strong>${inv.id || 'N/A'}</strong></td>
                     <td>${inv.date || '-'}</td>
@@ -30,9 +35,11 @@ window.invoice = {
                         <button class="btn-icon" title="Send to customer" onclick="app.showSendModal('${inv.id}', 'Invoice')"><span class="material-symbols-outlined">send</span></button>
                         ${inv.status !== 'Paid' ? `<button class="btn-icon" title="Mark as paid" onclick="app.markInvoiceAsPaid('${inv.id}')"><span class="material-symbols-outlined">payments</span></button>` : ''}
                         <button class="btn-icon" title="Download PDF" onclick="app.executeDocumentAction('Print', 'Invoice', '${inv.id}')"><span class="material-symbols-outlined">download</span></button>
+                        ${isAdmin && !paid ? `<button class="btn-icon" title="Delete invoice" onclick="invoice.deleteInvoice('${inv.id}')"><span class="material-symbols-outlined" style="color:#ff7675;">delete</span></button>` : ''}
                     </td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
         }
 
         const html = `
@@ -68,6 +75,35 @@ window.invoice = {
         (window.app && window.app.writeViewHtml)
             ? window.app.writeViewHtml(this.container, html)
             : (this.container.innerHTML = html);
+    },
+
+    async deleteInvoice(id) {
+        const role = window.authSystem && window.authSystem.currentUser && window.authSystem.currentUser.role;
+        const isAdmin = window.ItguyFixes
+            ? window.ItguyFixes.canonicalRole(role) === 'admin'
+            : role === 'admin';
+        if (!isAdmin) {
+            window.app.showToast('Only an admin can delete an invoice.', 'error');
+            return;
+        }
+        const inv = ((window.app.state && window.app.state.invoices) || []).find(row => row.id === id);
+        if (window.ItguyFixes ? window.ItguyFixes.invoiceIsPaid(inv) : String(inv && inv.status || '').toLowerCase() === 'paid') {
+            window.app.showToast('Paid invoices cannot be deleted.', 'error');
+            return;
+        }
+        if (!confirm('Delete invoice ' + id + '? This cannot be undone.')) return;
+        try {
+            await window.fbDb.collection('invoices').doc(id).delete();
+            window.app.showToast('Invoice ' + id + ' deleted.', 'success');
+            if (typeof window.app.logActivity === 'function') {
+                window.app.logActivity('Invoice Deleted', id);
+            }
+            this.render();
+        } catch (e) {
+            console.error(e);
+            window.app.showToast(e.message || 'Could not delete the invoice.', 'error');
+            this.render();
+        }
     },
 
     addExternalItem(customer, desc, qty, unit) {

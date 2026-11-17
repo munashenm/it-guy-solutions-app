@@ -662,3 +662,86 @@ test('api responses are not cacheable and a saved customer stays in the list', a
     const emptyRow = list.find(row => row.id === 'autoid-empty');
     assert.equal(emptyRow, undefined);
 });
+
+test('admins can delete field jobs and unpaid invoices, not paid invoices', async () => {
+    const admin = await login('admin', 'admin123');
+    const stamp = Date.now();
+    const deskRes = await fetch(base + '/users', {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({
+            email: 'delete-desk-' + stamp + '@example.com',
+            password: 'Welcome123!',
+            role: 'frontdesk',
+            firstName: 'Delete',
+            lastName: 'Desk',
+            username: 'deldesk' + stamp,
+            employeeId: 'EMP-D' + stamp
+        })
+    });
+    assert.equal(deskRes.status, 200, await deskRes.clone().text());
+    const desk = await login('deldesk' + stamp, 'Welcome123!');
+
+    const jobId = 'FLD-DEL-' + stamp;
+    const createdJob = await fetch(base + '/collections/fieldJobs/' + jobId, {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({ id: jobId, customer: 'Delete Me', status: 'Scheduled', address: '1 Test Road' })
+    });
+    assert.equal(createdJob.status, 200, await createdJob.clone().text());
+
+    const deskDelete = await fetch(base + '/collections/fieldJobs/' + jobId, {
+        method: 'DELETE',
+        headers: auth(desk.token)
+    });
+    assert.equal(deskDelete.status, 403);
+    const stillThere = await fetch(base + '/collections/fieldJobs/' + jobId, { headers: auth(admin.token) });
+    assert.equal(stillThere.status, 200);
+
+    const adminDelete = await fetch(base + '/collections/fieldJobs/' + jobId, {
+        method: 'DELETE',
+        headers: auth(admin.token)
+    });
+    assert.equal(adminDelete.status, 200);
+    const gone = await fetch(base + '/collections/fieldJobs/' + jobId, { headers: auth(admin.token) });
+    assert.equal(gone.status, 404);
+
+    const openId = 'INV-OPEN-' + stamp;
+    const paidId = 'INV-PAID-' + stamp;
+    const openInv = await fetch(base + '/collections/invoices/' + openId, {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({ id: openId, customer: 'Delete Me', status: 'Unpaid', amount: 100 })
+    });
+    const paidInv = await fetch(base + '/collections/invoices/' + paidId, {
+        method: 'POST',
+        headers: auth(admin.token),
+        body: JSON.stringify({ id: paidId, customer: 'Keep Me', status: 'Paid', amount: 250 })
+    });
+    assert.equal(openInv.status, 200);
+    assert.equal(paidInv.status, 200);
+
+    const deskInvoice = await fetch(base + '/collections/invoices/' + openId, {
+        method: 'DELETE',
+        headers: auth(desk.token)
+    });
+    assert.equal(deskInvoice.status, 403);
+
+    const paidDelete = await fetch(base + '/collections/invoices/' + paidId, {
+        method: 'DELETE',
+        headers: auth(admin.token)
+    });
+    const paidBody = await paidDelete.json();
+    assert.equal(paidDelete.status, 409);
+    assert.match(paidBody.error, /Paid invoices/);
+    const paidStill = await fetch(base + '/collections/invoices/' + paidId, { headers: auth(admin.token) });
+    assert.equal(paidStill.status, 200);
+
+    const openDelete = await fetch(base + '/collections/invoices/' + openId, {
+        method: 'DELETE',
+        headers: auth(admin.token)
+    });
+    assert.equal(openDelete.status, 200);
+    const openGone = await fetch(base + '/collections/invoices/' + openId, { headers: auth(admin.token) });
+    assert.equal(openGone.status, 404);
+});
