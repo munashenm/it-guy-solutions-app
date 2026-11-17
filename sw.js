@@ -1,5 +1,5 @@
 importScripts('version.js');
-const CACHE_NAME = 'itguy-app-' + (self.APP_VERSION || '4.9.1');
+const CACHE_NAME = 'itguy-app-' + (self.APP_VERSION || '4.9.2');
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();

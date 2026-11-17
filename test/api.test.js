@@ -484,7 +484,7 @@ test('report email is captured by a local SMTP sink and failure stays an error',
 
 test('staff directory lists sql-only, collection-only, and legacy roles', async () => {
     const status = await (await fetch(base + '/status')).json();
-    assert.equal(status.version, '4.9.1');
+    assert.equal(status.version, '4.9.2');
 
     const admin = await login('admin', 'admin123');
     const created = await fetch(base + '/users', {
@@ -634,7 +634,7 @@ test('api responses are not cacheable and a saved customer stays in the list', a
     const status = await fetch(base + '/status');
     assert.match(status.headers.get('cache-control') || '', /no-store/);
     const statusBody = await status.json();
-    assert.equal(statusBody.version, '4.9.1');
+    assert.equal(statusBody.version, '4.9.2');
 
     const admin = await login('admin', 'admin123');
     const empty = await fetch(base + '/collections/customers/autoid-empty', {

@@ -68,7 +68,7 @@ window.field = {
         const role = currentUser && currentUser.role;
         const isAdmin = window.ItguyFixes
             ? window.ItguyFixes.canonicalRole(role) === 'admin'
-            : role === 'admin';
+            : String(role || '').trim().toLowerCase() === 'admin';
         const canAssign = window.ItguyFixes
             ? window.ItguyFixes.canAssignTechnician(role)
             : false;
@@ -162,7 +162,7 @@ window.field = {
         const role = window.authSystem && window.authSystem.currentUser && window.authSystem.currentUser.role;
         const isAdmin = window.ItguyFixes
             ? window.ItguyFixes.canonicalRole(role) === 'admin'
-            : role === 'admin';
+            : String(role || '').trim().toLowerCase() === 'admin';
         if (!isAdmin) {
             window.app.showToast('Only an admin can delete a field job.', 'error');
             return;

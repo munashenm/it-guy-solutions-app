@@ -8,5 +8,5 @@
     if (typeof module !== 'undefined' && module.exports) module.exports = api;
     if (root) root.APP_VERSION = api.APP_VERSION;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
-    return { APP_VERSION: '4.9.1' };
+    return { APP_VERSION: '4.9.2' };
 });
